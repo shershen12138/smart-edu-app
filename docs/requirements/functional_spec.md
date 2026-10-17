@@ -23,7 +23,6 @@
   * FR-4.2：生成班级作业统计报表，展示平均分、高频错题及班级共性薄弱项。
 
 ## 3. 领域模型 (Domain Model UML)
-[在此处插入 Mermaid 类图，建议在 Typora 或 GitHub 中预览]
 
 ```mermaid
 classDiagram
