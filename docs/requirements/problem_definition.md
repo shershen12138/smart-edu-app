@@ -76,6 +76,3 @@
 
 > 备注：本文为问题定义初稿，作为后续功能规格（functional_spec）与非功能规格（nonfunctional_spec）的需求源头；5W1H 各维度可在评审后细化与量化。
 =======
-# 5W1H
-# 产品描述
->>>>>>> cadc9db9b740823aa136e5c765e0fb22bda66e48
