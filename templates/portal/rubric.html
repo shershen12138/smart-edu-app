@@ -9,7 +9,7 @@
     <div class="actions">
       {% if rubric %}
         <a class="button secondary small"
-           href="{% url 'work_rubric_download' work.pk %}">下载 Markdown</a>
+           data-no-loading href="{% url 'work_rubric_download' work.pk %}">下载 Markdown</a>
       {% endif %}
     </div>
   </div>
@@ -24,11 +24,11 @@
       </p>
     {% endif %}
     <div class="actions space-top">
-      <form method="post">
+      <form method="post" data-loading="正在调用大模型分析评分标准，可能需要十几秒…">
         {% csrf_token %}
         <button class="button" {% if not llm_ready %}disabled{% endif %}>调用大模型生成</button>
       </form>
-      <form method="post">
+      <form method="post" data-loading="正在按规则生成评分标准…">
         {% csrf_token %}
         <input type="hidden" name="mode" value="offline">
         <button class="button secondary">规则兜底生成（离线演示）</button>

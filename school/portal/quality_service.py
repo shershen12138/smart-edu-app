@@ -84,16 +84,32 @@ def supported(entry) -> bool:
     )
 
 
+def _specs_signature(items) -> str:
+    """题库考点的指纹：补齐某门课的规格后，旧报告要自动重算。"""
+    known = agent.known_specs()
+    return '|'.join(
+        f'{name}:{",".join(known[name].points)}' for name, _ in items if name in known
+    )
+
+
 def generate(entry, force: bool = False) -> QualityReport:
     if not supported(entry):
         raise ValidationError('非机器批阅作业不生成代码质量报告。')
 
     source = storage.read_private(entry.source_path)
     digest = entry.source_hash or storage.code_digest(source)
+    items = [
+        (item.function_name, item.title) for item in entry.coursework.items.all()
+    ]
     dimensions, rubric_note = dimensions_for(entry.coursework)
-    # 量表改了（维度或权重）就要重算，不能只比源码摘要。
-    signature = '|'.join(
-        f'{dimension.key}:{dimension.label}:{dimension.weight}' for dimension in dimensions
+    # 量表维度或题库考点变了都要重算，不能只比源码摘要。
+    signature = (
+        '|'.join(
+            f'{dimension.key}:{dimension.label}:{dimension.weight}'
+            for dimension in dimensions
+        )
+        + '#'
+        + _specs_signature(items)
     )
 
     existing = QualityReport.objects.filter(submission=entry).first()
@@ -104,10 +120,6 @@ def generate(entry, force: bool = False) -> QualityReport:
         and (existing.payload or {}).get('rubric_signature') == signature
     ):
         return existing
-
-    items = [
-        (item.function_name, item.title) for item in entry.coursework.items.all()
-    ]
     display_name = entry.student.get_full_name() or entry.student.username
     workdir = Path(settings.PRIVATE_STORAGE) / 'quality-tmp'
     analysis, dimensions, rubric_note = agent.analyze(

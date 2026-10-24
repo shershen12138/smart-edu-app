@@ -8,7 +8,7 @@
     {% if export %}
       <div class="actions"><a class="button" href="{% url 'work_export' work.pk %}">导出 CSV 报表</a>
       <a class="button secondary"
-   href="{% url 'work_submissions_download' work.pk %}">打包下载作业（每人最后一次）</a></div>
+   data-no-loading href="{% url 'work_submissions_download' work.pk %}">打包下载作业（每人最后一次）</a></div>
     {% endif %}
   </div>
   {% include "portal/package_update_status.html" %}

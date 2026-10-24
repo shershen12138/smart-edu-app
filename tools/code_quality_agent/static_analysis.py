@@ -187,7 +187,11 @@ def d_compare(fn, helpers) -> bool:
 
 
 def d_if_else(fn, helpers) -> bool:
-    return any(isinstance(item, ast.If) and item.orelse for item in _walk(fn))
+    # 条件表达式（a if cond else b）同样属于分支结构，不能漏判。
+    return any(
+        (isinstance(item, ast.If) and item.orelse) or isinstance(item, ast.IfExp)
+        for item in _walk(fn)
+    )
 
 
 def d_elif_chain(fn, helpers) -> bool:
@@ -278,6 +282,10 @@ def d_sort_key(fn, helpers) -> bool:
     return False
 
 
+def d_sort_builtin(fn, helpers) -> bool:
+    return bool(_call_names(fn) & {"sort", "sorted"})
+
+
 def d_lambda(fn, helpers) -> bool:
     return any(isinstance(item, ast.Lambda) for item in _walk(fn))
 
@@ -362,6 +370,7 @@ KNOWLEDGE_DETECTORS = {
     "counter": d_counter,
     "nested_list": d_nested_list,
     "sort_key": d_sort_key,
+    "sort_builtin": d_sort_builtin,
     "lambda": d_lambda,
     "range_loop": d_range_loop,
     "int_str_convert": d_int_str_convert,

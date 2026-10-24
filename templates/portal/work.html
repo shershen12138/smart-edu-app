@@ -37,15 +37,15 @@
     <h2>题目文件</h2>
     <div class="actions">
       {% if work.document_path %}
-        <a class="button"
+        <a class="button" data-no-loading
            href="{% url 'work_file' work.pk 'document' %}">下载 {{ work.document_name }}</a>
       {% endif %}
       {% if work.package.template_path %}
-        <a class="button secondary"
+        <a class="button secondary" data-no-loading
            href="{% url 'work_file' work.pk 'template' %}">下载 Python 答题模板</a>
       {% endif %}
       {% if work.grading_mode == 'manual' and work.materials_path %}
-        <a class="button secondary"
+        <a class="button secondary" data-no-loading
            href="{% url 'work_file' work.pk 'materials' %}">下载题目数据文件</a>
       {% endif %}
     </div>
@@ -94,7 +94,7 @@
         <p class="subtle">请上传一个 UTF-8 编码的 Python 文件。文件名不限，但不得修改题目规定的函数名和参数。重新提交会覆盖看板中的当前成绩，历史提交仍可查看。</p>
       {% endif %}
       {% if open %}
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" data-loading="正在上传并提交作业…">
           {% csrf_token %}{{ form.as_p }}<button class="button">提交作业 →</button>
         </form>
       {% else %}
@@ -126,7 +126,8 @@
                 <div class="actions">
                   <a href="{% url 'entry' e.pk %}">{% if work.grading_mode == 'manual' %}查看提交 / 批阅结果{% else %}查看题目 / 用例结果{% endif %}</a>
                   {% if e.can_report %}
-                    <a class="button secondary small" href="{% url 'quality_report' e.pk %}">查看评测报告</a>
+                    <a class="button secondary small" data-loading="正在生成评测报告…"
+                       href="{% url 'quality_report' e.pk %}">查看评测报告</a>
                   {% endif %}
                 </div>
               </td>

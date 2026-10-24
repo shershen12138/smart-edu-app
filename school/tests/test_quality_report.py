@@ -16,7 +16,7 @@ from school.models import (
     User,
     UserRole,
 )
-from school.storage import save_private
+from school.storage import read_private, save_private
 
 SOURCE = (
     "def func301(A, B):\n"
@@ -233,3 +233,59 @@ class QualityReportTests(TestCase):
         response = self.client.get(reverse('entry', args=[self.entry.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse('quality_report', args=[self.entry.pk]))
+
+    def test_report_table_headers_and_lint_issues(self):
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        self.assertContains(response, '题目编号')
+        self.assertContains(response, '作业考察的知识点')
+
+        report = QualityReport.objects.get(submission=self.entry)
+        issues = report.payload['tasks'][0]['issues']
+        # SOURCE 里的 A/B/C 是单字母变量名，pylint 的命名提示必须出现在缺陷表里
+        self.assertTrue(issues)
+        self.assertIn('命名', ''.join(item['message'] for item in issues))
+        # 修改建议只给方向，不能附代码
+        self.assertNotIn('def ', ''.join(item['advice'] for item in issues))
+
+    def test_markdown_report_uses_required_headers(self):
+        self.client.force_login(self.student)
+        self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        report = QualityReport.objects.get(submission=self.entry)
+        text = read_private(report.markdown_key)
+        self.assertIn('| 题目编号 | 作业考察的知识点 | 缺陷及所在代码行 | 修改建议 |', text)
+        self.assertIn('| 维度 | 权重 | 得分 |', text)
+
+    def test_branch_course_reports_knowledge_points(self):
+        work = Coursework.objects.create(
+            classroom=self.classroom,
+            owner=self.teacher,
+            title='04-分支结构习题说明',
+            description='实现 func404',
+            grading_mode='automatic',
+            opens_at=timezone.now(),
+            deadline=timezone.now() + timezone.timedelta(days=1),
+            status='open',
+        )
+        CourseworkItem.objects.create(
+            coursework=work,
+            function_name='func404',
+            title='比较两个正整数并返回较大值',
+            points=10,
+            order=1,
+        )
+        source = 'def func404(a, b):\n    return a if a > b else b\n'
+        entry = CourseworkSubmission.objects.create(
+            coursework=work,
+            student=self.student,
+            sequence=1,
+            source_path=save_private(source, '.py'),
+            source_hash=hashlib.sha256(source.encode()).hexdigest(),
+            snapshot={'items': [], 'max_score': 10, 'grading_mode': 'automatic'},
+            status='done',
+        )
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('quality_report', args=[entry.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'if / else 分支')
+        self.assertNotContains(response, '未配置知识点模板')

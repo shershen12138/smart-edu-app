@@ -1,11 +1,15 @@
-"""编排：发现学生文件 -> 静态分析 -> 规则校验 -> 打分。"""
+"""编排入口：发现学生文件 → 执行评测图 → 组装学生报告数据。
+
+各阶段实现在 `stages.py`，执行顺序与条件分支由 `agent_graph` 的 LangGraph
+状态图决定；本模块只负责文件发现、临时落盘与最终数据结构组装。
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import curriculum, lint, models, rubric, rules, static_analysis
+from . import agent_graph, curriculum, lint, models, rubric
 from .config import CourseContext, build_context
 
 
@@ -43,26 +47,6 @@ class Evaluation:
     lint_note: str | None = None
 
 
-def _task_issue(
-    task_id: str,
-    line: int,
-    message: str,
-    advice: str,
-    dimension: str,
-    severity: str = "warning",
-    source: str = "rule",
-) -> models.Issue:
-    return models.Issue(
-        task_id=task_id,
-        line=max(1, line),
-        message=message,
-        dimension=dimension,
-        severity=severity,
-        source=source,
-        advice=advice,
-    )
-
-
 def _analyze_source(
     source: str,
     lint_path: Path,
@@ -71,151 +55,26 @@ def _analyze_source(
     name: str,
     file_name: str,
 ) -> StudentAnalysis:
-    blocks = static_analysis.split_functions(source)
-    by_name = {block.name: block for block in blocks}
-    helper_names = set(by_name) - {spec.task_id for spec in specs}
-
-    module_ast, module_error = static_analysis.parse_whole(source)
-    lint_messages: list[lint.LintMessage] = []
-    if module_ast is not None:
-        lint_messages, _ = lint.run(lint_path)
-
-    results: list[models.TaskResult] = []
-    style_notes: list[str] = []
-    style_from_issues = 0
-    structure_stats = {"long": 0, "deep": 0, "dense": 0}
-
-    for spec in specs:
-        result = models.TaskResult(spec=spec, parsed=False)
-        block = by_name.get(spec.task_id)
-        if block is None:
-            result.issues.append(
-                _task_issue(
-                    spec.task_id,
-                    1,
-                    f"未找到函数 {spec.task_id} 的定义",
-                    "按题目要求补上函数定义并返回结果",
-                    models.KNOWLEDGE,
-                    severity="error",
-                    source="ast",
-                )
-            )
-        elif block.syntax_error:
-            result.issues.append(
-                _task_issue(
-                    spec.task_id,
-                    block.error_line or block.start_line,
-                    f"语法错误：{block.syntax_error}",
-                    "先修正该函数的语法，使其可以独立解析，再检查逻辑",
-                    models.SYNTAX,
-                    severity="error",
-                    source="syntax",
-                )
-            )
-        else:
-            result.parsed = True
-            node = block.node
-            assert node is not None
-            detected = set(static_analysis.detect_points(node, helper_names))
-            result.covered = [tag for tag in spec.points if tag in detected]
-            result.missing = [tag for tag in spec.points if tag not in detected]
-
-            metric = static_analysis.function_metrics(node)
-            if metric["lines"] > 40:
-                structure_stats["long"] += 1
-            if metric["depth"] > 3:
-                structure_stats["deep"] += 1
-            if metric["statements"] > 25:
-                structure_stats["dense"] += 1
-
-            findings = list(rules.evaluate_task(spec.task_id, node, helper_names))
-            findings.extend(rules.common_rules(node))
-            for relative_line, message, advice, dimension in findings:
-                result.issues.append(
-                    _task_issue(
-                        spec.task_id,
-                        block.start_line + relative_line - 1,
-                        message,
-                        advice,
-                        dimension,
-                    )
-                )
-
-        for message in lint_messages:
-            if not (block and block.start_line <= message.line <= block.end_line):
-                continue
-            if message.symbol == "syntax-error":
-                continue
-            issue = _task_issue(
-                spec.task_id,
-                message.line,
-                message.message,
-                message.advice,
-                message.dimension,
-                severity=message.severity,
-                source="pylint",
-            )
-            result.issues.append(issue)
-
-        result.issues.sort(key=lambda item: (item.line, item.message))
-        style_from_issues += sum(
-            1
-            for issue in result.issues
-            if issue.dimension == models.STYLE and issue.source != "pylint"
-        )
-        results.append(result)
-
-    style_lint = [
-        message
-        for message in lint_messages
-        if message.dimension == models.STYLE and message.symbol != "syntax-error"
-    ]
-    naming = [message for message in style_lint if message.symbol == "invalid-name"]
-    if naming:
-        lines = list(dict.fromkeys(message.line for message in naming))[:6]
-        preview = "、".join(str(line) for line in lines)
-        style_notes.append(
-            f"命名不规范共 {len(naming)} 处（第 {preview} 行等），"
-            "单字母变量名会降低可读性"
-        )
-    for message in style_lint:
-        if message.symbol == "invalid-name":
-            continue
-        note = f"第 {message.line} 行：{message.message}"
-        if note not in style_notes:
-            style_notes.append(note)
-
-    syntax_warning = sum(
-        1
-        for message in lint_messages
-        if message.dimension == models.SYNTAX and message.severity == "warning"
+    """执行 LangGraph 评测图，再把最终状态组装成学生报告数据。"""
+    state = agent_graph.invoke(
+        {
+            "source": source,
+            "lint_path": lint_path,
+            "specs": specs,
+            "dimensions": dimensions,
+            "name": name,
+            "file_name": file_name,
+        }
     )
-    # 命名问题按"一类问题"计分，避免大量单字母变量把规范分一次扣光。
-    counts = {
-        "style": (6 if naming else 0) + (len(style_lint) - len(naming)) + style_from_issues,
-        "syntax_warning": syntax_warning,
-    }
-    runnable = module_ast is not None
-    metrics = {
-        "long_functions": structure_stats["long"],
-        "deep_functions": structure_stats["deep"],
-        "dense_functions": structure_stats["dense"],
-        "functions": len(results),
-    }
-    scores = rubric.score_student(
-        results, counts, dimensions, runnable=runnable, metrics=metrics
-    )
-    total = rubric.weighted_total(scores, dimensions)
-
     return StudentAnalysis(
         name=name,
         file_name=file_name,
-        results=results,
-        scores=scores,
-        total=total,
-        style_notes=style_notes[:8],
-        module_note=module_error,
-        metrics=metrics,
+        results=state["results"],
+        scores=state["scores"],
+        total=state["total"],
+        style_notes=state["style_notes"][:8],
+        module_note=state.get("module_error"),
+        metrics=state["metrics"],
     )
 
 

@@ -48,7 +48,7 @@
       </p>
       </details>
     {% endif %}
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" data-loading="正在保存作业与批阅包…">
       {% csrf_token %}{{ form.as_p }}<div class="actions">
       <button class="button">保存</button>
       <a class="button secondary" href="{{ back_url }}">取消并返回</a>

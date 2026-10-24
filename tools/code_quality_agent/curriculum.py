@@ -1,4 +1,4 @@
-"""03-列表 题库规格：每道题考什么、按什么语义规则检查。
+"""题库规格：每道题考什么、按什么语义规则检查。
 
 题目要求来自 `exercise requirements/03-列表/.../03-列表习题说明.docx`
 与 `func_info_list.txt`；知识点标签与 static_analysis.KNOWLEDGE_DETECTORS 对应。
@@ -42,6 +42,7 @@ POINT_LABELS: dict[str, str] = {
     "linear_scan": "线性扫描定位",
     "insert": "insert() 插入",
     "modulo": "取余 %",
+    "sort_builtin": "sorted() / list.sort() 排序",
 }
 
 LIST_TASKS: tuple[TaskSpec, ...] = (
@@ -122,8 +123,67 @@ LIST_TASKS: tuple[TaskSpec, ...] = (
     ),
 )
 
+BRANCH_TASKS: tuple[TaskSpec, ...] = (
+    TaskSpec(
+        "func401",
+        "判断整数是奇数还是偶数",
+        ("if_else", "modulo", "compare"),
+    ),
+    TaskSpec(
+        "func402",
+        "判断能否被 3 整除，输入不在 0~100 时返回错误提示",
+        ("if_else", "compare", "modulo"),
+    ),
+    TaskSpec(
+        "func403",
+        "求位数、逐位数字与逆序结果",
+        ("int_str_convert", "len", "comprehension", "slice_reverse"),
+    ),
+    TaskSpec(
+        "func404",
+        "比较两个正整数并返回较大值",
+        ("if_else", "compare"),
+    ),
+    TaskSpec(
+        "func405",
+        "三个整数按从小到大输出",
+        ("sort_builtin",),
+    ),
+    TaskSpec(
+        "func406",
+        "按用户信息列表校验用户名和密码",
+        ("if_else", "compare"),
+    ),
+    TaskSpec(
+        "func407",
+        "按买 3 送 1、买 5 送 2 计算最多瓶数",
+        ("while_loop", "floor_div", "elif_chain", "counter"),
+    ),
+    TaskSpec(
+        "func408",
+        "按存款区间计算一年后的本息和",
+        ("if_else", "elif_chain", "compare"),
+    ),
+    TaskSpec(
+        "func409",
+        "判断能否构成三角形并计算面积与周长",
+        ("if_else", "compare"),
+    ),
+    TaskSpec(
+        "func410",
+        "判断等边、直角或一般三角形",
+        ("if_else", "elif_chain", "compare"),
+    ),
+    TaskSpec(
+        "func411",
+        "判断坐标点是否在圆内",
+        ("if_else", "compare"),
+    ),
+)
+
 COURSE_SPECS: dict[str, tuple[TaskSpec, ...]] = {
     "03-列表": LIST_TASKS,
+    "04-分支结构": BRANCH_TASKS,
 }
 
 

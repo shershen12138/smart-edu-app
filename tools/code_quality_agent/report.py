@@ -67,7 +67,7 @@ def _student_section(student, chart_relative: str) -> list[str]:
         "",
         f"![{student.name} 代码完成度]({chart_relative})",
         "",
-        "| 作业编号 | 该题目需要用到的python基础知识点 | 缺陷及所在代码行 | 修改建议 |",
+        "| 题目编号 | 作业考察的知识点 | 缺陷及所在代码行 | 修改建议 |",
         "| --- | --- | --- | --- |",
     ]
     for result in student.results:

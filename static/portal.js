@@ -30,3 +30,52 @@ if (gradingModes.length) {
   gradingModes.forEach((field) => field.addEventListener('change', updateUploadFields));
   updateUploadFields();
 }
+
+// 加载遮罩：链接跳转与表单提交时显示，避免长请求期间页面毫无反馈。
+// 延迟 120ms 再出现，本地快速跳转不会闪一下；30s 兜底隐藏，防止下载类操作卡住。
+const loadingOverlay = document.querySelector('[data-loading]');
+const loadingLabel = loadingOverlay?.querySelector('.loading-label');
+let loadingShowTimer = 0;
+let loadingHideTimer = 0;
+
+const showLoading = (label) => {
+  if (!loadingOverlay) return;
+  window.clearTimeout(loadingShowTimer);
+  window.clearTimeout(loadingHideTimer);
+  loadingShowTimer = window.setTimeout(() => {
+    if (loadingLabel) loadingLabel.textContent = label || '正在加载…';
+    loadingOverlay.hidden = false;
+  }, 120);
+  loadingHideTimer = window.setTimeout(() => { loadingOverlay.hidden = true; }, 30000);
+};
+
+const hideLoading = () => {
+  window.clearTimeout(loadingShowTimer);
+  window.clearTimeout(loadingHideTimer);
+  if (loadingOverlay) loadingOverlay.hidden = true;
+};
+
+const skipLoading = (element) => element.closest('[data-no-loading]') !== null;
+
+document.addEventListener('submit', (event) => {
+  if (event.defaultPrevented || skipLoading(event.target)) return;
+  showLoading(event.target.dataset.loading || '正在提交…');
+});
+
+document.addEventListener('click', (event) => {
+  if (event.defaultPrevented || event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const link = event.target.closest('a[href]');
+  if (!link || skipLoading(link)) return;
+  if (link.target && link.target !== '_self') return;
+  if (link.hasAttribute('download')) return;
+  const url = new URL(link.href, window.location.href);
+  if (url.origin !== window.location.origin) return;
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+  showLoading(link.dataset.loading || '正在加载…');
+});
+
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) hideLoading();
+});

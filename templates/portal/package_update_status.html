@@ -6,7 +6,8 @@
       <div class="tip">
         <p>单文件更新“{{ update.changed_path }}”验证失败：{{ update.error }} 旧版本和旧成绩未改变。</p>
         {% if can_retry_package %}
-          <form method="post" action="{% url 'work_package_retry' work.pk %}">
+          <form method="post" action="{% url 'work_package_retry' work.pk %}"
+                data-loading="正在重新验证批阅包…">
             {% csrf_token %}<button class="button secondary">重新验证</button>
           </form>
         {% endif %}

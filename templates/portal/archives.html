@@ -24,7 +24,7 @@
             <td>{{ classroom.name }}</td>
             <td>{{ classroom.term }}</td>
             <td>
-              <form method="post" class="actions">
+              <form method="post" class="actions" data-loading="正在处理归档操作…">
                 {% csrf_token %}
                 <input type="hidden" name="classroom" value="{{ classroom.pk }}">
                 <label><input type="checkbox"
