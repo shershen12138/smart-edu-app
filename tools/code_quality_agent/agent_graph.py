@@ -3,8 +3,8 @@
 把静态评测拆成带状态图的多步流程，而不是一条顺序函数调用：
 
 ```text
-START → prepare ─┬─(整文件可解析)→ lint ─┐
-                 └─(不可解析)───────────┴→ tasks → notes → score → END
+START → resolve_specs → prepare ─┬─(整文件可解析)→ lint ─┐
+                                 └─(不可解析)───────────┴→ tasks → notes → score → END
 ```
 
 - 节点由 `stages` 提供，每个节点只读自己需要的状态字段；
@@ -28,7 +28,10 @@ from .stages import ReviewState
 
 LINT = "lint"
 SKIP_LINT = "tasks"
-NODE_NAMES = ("prepare", LINT, "tasks", "notes", "score")
+# 节点名不能与状态字段重名，否则新版 langgraph 报
+# "'specs' is already being used as a state key"，因此解析考点的节点叫 resolve_specs。
+RESOLVE_SPECS = "resolve_specs"
+NODE_NAMES = (RESOLVE_SPECS, "prepare", LINT, "tasks", "notes", "score")
 
 
 def _route_after_prepare(state: ReviewState) -> str:
@@ -38,13 +41,15 @@ def _route_after_prepare(state: ReviewState) -> str:
 
 def build_graph():
     graph = StateGraph(ReviewState)
+    graph.add_node(RESOLVE_SPECS, stages.resolve_specs)
     graph.add_node("prepare", stages.prepare)
     graph.add_node(LINT, stages.run_lint)
     graph.add_node("tasks", stages.build_tasks)
     graph.add_node("notes", stages.collect_notes)
     graph.add_node("score", stages.score)
 
-    graph.add_edge(START, "prepare")
+    graph.add_edge(START, RESOLVE_SPECS)
+    graph.add_edge(RESOLVE_SPECS, "prepare")
     graph.add_conditional_edges(
         "prepare", _route_after_prepare, {LINT: LINT, SKIP_LINT: SKIP_LINT}
     )

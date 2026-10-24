@@ -43,7 +43,23 @@ POINT_LABELS: dict[str, str] = {
     "insert": "insert() 插入",
     "modulo": "取余 %",
     "sort_builtin": "sorted() / list.sort() 排序",
+    "str_method": "字符串方法（upper / split / isdigit 等）",
+    "str_join": "字符串拼接（+ / join）",
+    "dict_access": "字典按键取值",
+    "dict_update": "字典按键赋值",
+    "set_op": "集合 set 运算",
+    "recursion": "递归调用",
+    "try_except": "try / except 异常处理",
+    "file_open": "open() 文件读写",
+    "class_def": "class 类与对象",
+    "enumerate_zip": "enumerate() / zip() 遍历",
+    "loop_control": "break / continue 循环控制",
+    "basic_def": "函数定义与返回值",
 }
+
+# 反向索引：评分标准里使用的中文知识点名若与题库标签同名，可据此还原出检测标签，
+# 从而判断学生在代码里是否真的用到了该知识点；自定义名称无法还原，只展示不判定。
+LABEL_TO_POINT: dict[str, str] = {label: tag for tag, label in POINT_LABELS.items()}
 
 LIST_TASKS: tuple[TaskSpec, ...] = (
     TaskSpec(

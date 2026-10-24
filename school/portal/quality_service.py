@@ -76,6 +76,37 @@ def dimensions_for(coursework) -> tuple[list[agent_models.Dimension], str]:
     return agent_rubric.load_rubric(rubric_path())
 
 
+def knowledge_points_for(coursework, items) -> dict[str, tuple[str, ...]]:
+    """评分标准（CourseworkRubric）里的“作业考察的知识点”，按函数名分组。
+
+    报告逐题明细的知识点列直接使用这份清单，而不是评测器按题库规格推断的标签；
+    作业还没有评分标准时返回空，由评测器回退到题库规格。
+    `tasks` 为空的知识点视为覆盖该作业的全部题目。
+    """
+    stored = getattr(coursework, 'rubric', None)
+    if not stored:
+        return {}
+    functions = [name for name, _ in items]
+    known = set(functions)
+    grouped: dict[str, list[str]] = {}
+    for point in stored.knowledge_points or []:
+        if not isinstance(point, dict):
+            continue
+        name = str(point.get('name', '')).strip()
+        if not name:
+            continue
+        raw_tasks = point.get('tasks') or []
+        if isinstance(raw_tasks, str):
+            raw_tasks = [raw_tasks]
+        tasks = [str(task).strip() for task in raw_tasks if str(task).strip()]
+        targets = [task for task in tasks if task in known] if tasks else functions
+        for function in targets:
+            names = grouped.setdefault(function, [])
+            if name not in names:
+                names.append(name)
+    return {function: tuple(names) for function, names in grouped.items()}
+
+
 def supported(entry) -> bool:
     """该提交是否可以生成代码质量报告。"""
     return (
@@ -92,6 +123,13 @@ def _specs_signature(items) -> str:
     )
 
 
+def _knowledge_signature(points: dict[str, tuple[str, ...]]) -> str:
+    """评分标准知识点的指纹：重新生成评分标准后，旧报告要自动重算。"""
+    return '|'.join(
+        f'{function}:{",".join(names)}' for function, names in sorted(points.items())
+    )
+
+
 def generate(entry, force: bool = False) -> QualityReport:
     if not supported(entry):
         raise ValidationError('非机器批阅作业不生成代码质量报告。')
@@ -102,7 +140,8 @@ def generate(entry, force: bool = False) -> QualityReport:
         (item.function_name, item.title) for item in entry.coursework.items.all()
     ]
     dimensions, rubric_note = dimensions_for(entry.coursework)
-    # 量表维度或题库考点变了都要重算，不能只比源码摘要。
+    knowledge_points = knowledge_points_for(entry.coursework, items)
+    # 量表维度、题库考点或评分标准知识点变了都要重算，不能只比源码摘要。
     signature = (
         '|'.join(
             f'{dimension.key}:{dimension.label}:{dimension.weight}'
@@ -110,6 +149,8 @@ def generate(entry, force: bool = False) -> QualityReport:
         )
         + '#'
         + _specs_signature(items)
+        + '#'
+        + _knowledge_signature(knowledge_points)
     )
 
     existing = QualityReport.objects.filter(submission=entry).first()
@@ -132,8 +173,10 @@ def generate(entry, force: bool = False) -> QualityReport:
         rubric_note=rubric_note,
     )
     radar = agent.radar_png(analysis, dimensions)
-    markdown = agent.markdown(analysis, dimensions, rubric_note)
-    payload = agent.payload(analysis, dimensions, rubric_note, bool(radar))
+    markdown = agent.markdown(analysis, dimensions, rubric_note, knowledge_points)
+    payload = agent.payload(
+        analysis, dimensions, rubric_note, bool(radar), knowledge_points
+    )
     payload['rubric_signature'] = signature
 
     markdown_key = storage.save_private(markdown, '.md')

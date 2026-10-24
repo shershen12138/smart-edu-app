@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from . import curriculum, models, pipeline, rubric
+from . import specs as spec_parser
 
 
 def known_specs() -> dict[str, models.TaskSpec]:
@@ -24,29 +25,24 @@ def known_specs() -> dict[str, models.TaskSpec]:
     return known
 
 
-def build_specs(items: Iterable[tuple[str, str]]) -> tuple[models.TaskSpec, ...]:
-    """items: [(function_name, title)]，按数据库中的题目顺序生成规格。"""
-    known = known_specs()
-    specs: list[models.TaskSpec] = []
-    for function_name, title in items:
-        base = known.get(function_name)
-        if base is None:
-            specs.append(
-                models.TaskSpec(
-                    task_id=function_name,
-                    title=title or function_name,
-                    points=(),
-                )
-            )
-        else:
-            specs.append(
-                models.TaskSpec(
-                    task_id=base.task_id,
-                    title=title or base.title,
-                    points=base.points,
-                )
-            )
-    return tuple(specs)
+def build_specs(
+    items: Iterable[tuple[str, str]],
+    *,
+    problem_text: str = "",
+    reference_source: str = "",
+    points_by_function: dict[str, list[str]] | None = None,
+) -> tuple[models.TaskSpec, ...]:
+    """items: [(function_name, title)]，按数据库中的题目顺序生成规格。
+
+    考点依次取自：已校准的题库规格 → 数据库确认的考点 → 参考答案 AST →
+    题面关键词 → `basic_def` 兜底，保证每道题都有可展示的考点。
+    """
+    return spec_parser.resolve_specs(
+        items,
+        problem_text=problem_text,
+        reference_source=reference_source,
+        points_by_function=points_by_function,
+    )
 
 
 def analyze(
@@ -57,15 +53,36 @@ def analyze(
     name: str = "student",
     dimensions: Sequence[models.Dimension] | None = None,
     rubric_note: str | None = None,
+    problem_text: str = "",
+    reference_source: str = "",
+    points_by_function: dict[str, list[str]] | None = None,
+    specs: Sequence[models.TaskSpec] | None = None,
 ) -> tuple[pipeline.StudentAnalysis, list[models.Dimension], str]:
-    """dimensions 为空时读取 Markdown 量表，否则使用数据库中的作业评分标准。"""
-    specs = build_specs(items)
+    """dimensions 为空时读取 Markdown 量表，否则使用数据库中的作业评分标准。
+
+    specs 非空时直接使用调用方给出的已解析规格，跳过图中的考点解析；
+    problem_text / reference_source / points_by_function 用于自动确定考点，
+    缺省时按题目函数名回退到题库规格与通用检查。
+    """
+    rows = list(items)
+    resolved = tuple(specs) if specs else ()
     if dimensions:
         active = list(dimensions)
         note = rubric_note or "使用作业评分标准"
     else:
         active, note = rubric.load_rubric(rubric_path)
-    analysis = pipeline.analyze_text(source, specs, active, workdir, name)
+    # specs 为空时由评测图的 specs 节点解析：题库规格 → 数据库确认 → 参考答案 → 题面 → 兜底。
+    analysis = pipeline.analyze_text(
+        source,
+        resolved,
+        active,
+        workdir,
+        name,
+        items=rows,
+        problem_text=problem_text,
+        reference_source=reference_source,
+        points_by_function=points_by_function,
+    )
     return analysis, active, note
 
 
@@ -120,11 +137,48 @@ def report_issues(result: models.TaskResult) -> tuple[list[dict], int]:
     return items[:_REPORT_LIMIT], max(0, len(items) - _REPORT_LIMIT)
 
 
+def _display_points(
+    result: models.TaskResult,
+    knowledge_points: dict[str, Sequence[str]] | None,
+) -> list[dict]:
+    """逐题明细里“作业考察的知识点”一列的内容。
+
+    优先用作业评分标准（`CourseworkRubric.knowledge_points`）中属于该函数的知识点，
+    它才是这份作业真正考察的内容；评分标准缺失时才回退到题库规格的标签。
+    名称能与题库标签对应时仍给出 ✓/✗，模型自定义的名称只展示、不做机器判定。
+    """
+    names = list((knowledge_points or {}).get(result.spec.task_id) or ())
+    if not names:
+        return [
+            {
+                "tag": tag,
+                "label": curriculum.POINT_LABELS.get(tag, tag),
+                "ok": tag in result.covered,
+                "judged": True,
+            }
+            for tag in result.spec.points
+        ]
+    points = []
+    for name in names:
+        tag = curriculum.LABEL_TO_POINT.get(name)
+        judged = bool(tag and tag in result.spec.points)
+        points.append(
+            {
+                "tag": tag or "",
+                "label": name,
+                "ok": bool(judged and tag in result.covered),
+                "judged": judged,
+            }
+        )
+    return points
+
+
 def payload(
     analysis: pipeline.StudentAnalysis,
     dimensions: Sequence[models.Dimension],
     rubric_note: str,
     has_radar: bool,
+    knowledge_points: dict[str, Sequence[str]] | None = None,
 ) -> dict:
     tasks = []
     for result in analysis.results:
@@ -134,14 +188,7 @@ def payload(
                 "task_id": result.spec.task_id,
                 "title": result.spec.title,
                 "parsed": result.parsed,
-                "points": [
-                    {
-                        "tag": tag,
-                        "label": curriculum.POINT_LABELS.get(tag, tag),
-                        "ok": tag in result.covered,
-                    }
-                    for tag in result.spec.points
-                ],
+                "points": _display_points(result, knowledge_points),
                 "issues": [
                     {
                         "line": issue["line"],
@@ -184,6 +231,7 @@ def markdown(
     analysis: pipeline.StudentAnalysis,
     dimensions: Sequence[models.Dimension],
     rubric_note: str,
+    knowledge_points: dict[str, Sequence[str]] | None = None,
 ) -> str:
     lines = [
         f"# {analysis.name} 代码质量评测报告",
@@ -207,10 +255,13 @@ def markdown(
         ]
     )
     for result in analysis.results:
-        if result.spec.points:
+        display = _display_points(result, knowledge_points)
+        if display:
             points = "；".join(
-                f"{curriculum.POINT_LABELS.get(tag, tag)} {'✓' if tag in result.covered else '✗'}"
-                for tag in result.spec.points
+                f"{item['label']} {'✓' if item['ok'] else '✗'}"
+                if item["judged"]
+                else item["label"]
+                for item in display
             )
         else:
             points = "未配置知识点模板（仅通用检查）"
