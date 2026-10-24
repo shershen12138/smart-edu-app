@@ -13,6 +13,7 @@ from school.services import audit
 from school.storage import read_private_bytes
 
 from . import learning_forms as forms
+from . import quality_service
 from .access import allowed, role
 from .common_views import page, private_download, work_for
 from .package_update_services import package_update_display
@@ -51,13 +52,17 @@ def work_detail(request, pk):
                 form.add_error(None, exc)
             else:
                 return redirect('entry', pk=entry.pk)
+    entries = list(work.entries.filter(student=request.user)) if student else []
+    for entry in entries:
+        entry.coursework = work
+        entry.can_report = quality_service.supported(entry)
     return page(
         request,
         'work',
         work.title,
         work=work,
         form=form,
-        entries=work.entries.filter(student=request.user) if student else [],
+        entries=entries,
         can_edit=can_edit,
         package_update_alert=package_update_alert,
         package_update_history=package_update_history,
@@ -151,6 +156,7 @@ def entry_detail(request, pk, download=False):
         manual_files=manual_files,
         grade_form=grade_form,
         can_grade=can_grade,
+        can_report=quality_service.supported(entry),
         back_url=reverse('work', args=[entry.coursework_id])
         if role(request.user) == 'student'
         else reverse('work_results', args=[entry.coursework_id]),

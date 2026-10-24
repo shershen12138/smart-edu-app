@@ -6,7 +6,12 @@
       <h1>{{ entry.snapshot.title }}</h1>
       <p>{{ entry.student.full_name }} · 第 {{ entry.sequence }} 次提交 · {{ entry.submitted_at|date:'Y-m-d H:i:s' }}</p>
     </div>
-    <a class="button secondary" href="{% url 'entry_source' entry.pk %}">下载本次{% if entry.coursework.grading_mode == "manual" %}答案 ZIP{% else %} Python 文件{% endif %}</a>
+    <div class="actions">
+      {% if can_report %}
+        <a class="button" href="{% url 'quality_report' entry.pk %}">查看评测报告</a>
+      {% endif %}
+      <a class="button secondary" href="{% url 'entry_source' entry.pk %}">下载本次{% if entry.coursework.grading_mode == "manual" %}答案 ZIP{% else %} Python 文件{% endif %}</a>
+    </div>
   </div>
   <section class="result-card {% if entry.status == 'done' %}accepted{% endif %}">
     <div>

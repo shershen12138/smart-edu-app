@@ -1,0 +1,57 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <span class="tag">{{ work.classroom.name }}</span>
+      <h1 class="space-top">{{ work.title }} · 评分标准</h1>
+      <p class="subtle">读取数据库中的题目信息，生成“考察知识点 + 5 分制量表”，供后续代码质量评测与雷达图使用。</p>
+    </div>
+    <div class="actions">
+      {% if rubric %}
+        <a class="button secondary small"
+           href="{% url 'work_rubric_download' work.pk %}">下载 Markdown</a>
+      {% endif %}
+    </div>
+  </div>
+  <section class="card space-bottom">
+    <h2>题目分析智能体</h2>
+    <p class="subtle">{{ llm_status }}</p>
+    {% if rubric %}
+      <p>
+        <span class="tag">{% if rubric.source == "llm" %}大模型分析{% else %}规则兜底{% endif %}</span>
+        {% if rubric.model %}<span class="subtle">模型：{{ rubric.model }}</span>{% endif %}
+        <span class="subtle">更新时间：{{ rubric.updated_at|date:'Y-m-d H:i' }}</span>
+      </p>
+    {% endif %}
+    <div class="actions space-top">
+      <form method="post">
+        {% csrf_token %}
+        <button class="button" {% if not llm_ready %}disabled{% endif %}>调用大模型生成</button>
+      </form>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="mode" value="offline">
+        <button class="button secondary">规则兜底生成（离线演示）</button>
+      </form>
+    </div>
+    {% if not llm_ready %}
+      <p class="tip space-top">
+        未配置大模型端点，主按钮不可用。规则兜底只依据题库函数名与知识点模板生成，
+        结果会标注“规则兜底”，不能当作大模型结论，也不应直接作为正式评分依据。
+      </p>
+    {% endif %}
+  </section>
+  {% if rubric %}
+    <section class="card">
+      <h2>评分标准（已保存到数据库）</h2>
+      <p class="subtle">
+        知识点 {{ rubric.knowledge_points|length }} 条 ·
+        维度 {{ rubric.dimensions|length }} 个 ·
+        来源：{{ rubric.get_source_display }}
+      </p>
+      <pre style="white-space:pre-wrap">{{ rubric.markdown }}</pre>
+    </section>
+  {% else %}
+    <p class="tip">该作业尚未生成评分标准。</p>
+  {% endif %}
+{% endblock %}

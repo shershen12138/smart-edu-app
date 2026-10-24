@@ -107,6 +107,13 @@ JUDGE_CONTAINER_START_GRACE_SECONDS = float(
 )
 COURSEWORK_CASE_TIME_MS = int(os.getenv('COURSEWORK_CASE_TIME_MS', '2000'))
 COURSEWORK_SUBMISSION_TIME_MS = int(os.getenv('COURSEWORK_SUBMISSION_TIME_MS', '30000'))
+
+# 题目分析智能体：OpenAI 兼容的对话补全端点。
+# 未配置时必须走规则兜底并在结果中标注来源，不能把兜底结果当成模型结论。
+LLM_BASE_URL = os.getenv('LLM_BASE_URL', '').rstrip('/')
+LLM_API_KEY = os.getenv('LLM_API_KEY', '')
+LLM_MODEL = os.getenv('LLM_MODEL', '')
+LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', '60'))
 STORE_RECOVERY_PASSWORDS = os.getenv('STORE_RECOVERY_PASSWORDS', '1' if DEBUG else '0') == '1'
 REDIS_URL = os.getenv('REDIS_URL', '')
 CELERY_BROKER_URL = REDIS_URL or 'redis://127.0.0.1:6379/0'

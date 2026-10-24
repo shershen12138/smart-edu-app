@@ -287,3 +287,28 @@ class QualityReport(models.Model):
     class Meta:
         verbose_name = '代码质量报告'
         verbose_name_plural = '代码质量报告'
+
+
+class CourseworkRubric(models.Model):
+    """题目分析智能体产出的评分标准（Markdown + 结构化维度）。"""
+
+    SOURCES = [
+        ('llm', '大模型分析'),
+        ('rule', '规则兜底'),
+    ]
+
+    coursework = models.OneToOneField(
+        Coursework, on_delete=models.CASCADE, related_name='rubric'
+    )
+    markdown = models.TextField('评分标准 Markdown')
+    knowledge_points = models.JSONField('考察知识点', default=list)
+    dimensions = models.JSONField('评分维度', default=list)
+    source = models.CharField('来源', max_length=8, choices=SOURCES, default='llm')
+    model = models.CharField('模型', max_length=80, blank=True)
+    prompt_version = models.CharField('提示词版本', max_length=20, default='v1')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = '题目评分标准'
+        verbose_name_plural = '题目评分标准'

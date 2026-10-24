@@ -18,6 +18,7 @@ class StudentAnalysis:
     total: float
     style_notes: list[str] = field(default_factory=list)
     module_note: str | None = None
+    metrics: dict = field(default_factory=dict)
 
     @property
     def grade(self) -> str:
@@ -82,6 +83,7 @@ def _analyze_source(
     results: list[models.TaskResult] = []
     style_notes: list[str] = []
     style_from_issues = 0
+    structure_stats = {"long": 0, "deep": 0, "dense": 0}
 
     for spec in specs:
         result = models.TaskResult(spec=spec, parsed=False)
@@ -117,6 +119,14 @@ def _analyze_source(
             detected = set(static_analysis.detect_points(node, helper_names))
             result.covered = [tag for tag in spec.points if tag in detected]
             result.missing = [tag for tag in spec.points if tag not in detected]
+
+            metric = static_analysis.function_metrics(node)
+            if metric["lines"] > 40:
+                structure_stats["long"] += 1
+            if metric["depth"] > 3:
+                structure_stats["deep"] += 1
+            if metric["statements"] > 25:
+                structure_stats["dense"] += 1
 
             findings = list(rules.evaluate_task(spec.task_id, node, helper_names))
             findings.extend(rules.common_rules(node))
@@ -186,7 +196,15 @@ def _analyze_source(
         "syntax_warning": syntax_warning,
     }
     runnable = module_ast is not None
-    scores = rubric.score_student(results, counts, dimensions, runnable=runnable)
+    metrics = {
+        "long_functions": structure_stats["long"],
+        "deep_functions": structure_stats["deep"],
+        "dense_functions": structure_stats["dense"],
+        "functions": len(results),
+    }
+    scores = rubric.score_student(
+        results, counts, dimensions, runnable=runnable, metrics=metrics
+    )
     total = rubric.weighted_total(scores, dimensions)
 
     return StudentAnalysis(
@@ -197,6 +215,7 @@ def _analyze_source(
         total=total,
         style_notes=style_notes[:8],
         module_note=module_error,
+        metrics=metrics,
     )
 
 
