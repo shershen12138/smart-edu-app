@@ -1,0 +1,101 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="eyebrow">{{ assignment.classroom.name }}</div>
+    <h1>{{ version.title }}</h1>
+    <p class="preline">{{ version.description }}</p>
+    <div class="actions">
+      <span class="tag {% if version.status == 'draft' %}amber{% endif %}">
+        {{ version.get_status_display }}
+      </span>
+      {% if can_edit %}
+        <a class="button secondary"
+           href="{% url 'assignment_edit' assignment.classroom_id assignment.pk %}">编辑作业</a>
+      {% endif %}
+      {% if can_publish and version.status == "draft" %}
+        <form method="post" action="{% url 'assignment_action' version.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="publish">
+          <input type="hidden" name="edit_token" value="{{ edit_token }}">
+          <button class="button" {% if pending_evaluation %}disabled{% endif %}>发布作业</button>
+        </form>
+      {% endif %}
+      {% if can_grades and assignment.current_version_id %}
+        <a class="button secondary" href="{% url 'grades' assignment.pk %}">成绩与统计</a>
+        <a href="{% url 'extensions' assignment.pk %}">补交审批</a>
+      {% endif %}
+    </div>
+  </div>
+  {% if version.status == "draft" %}
+    <div class="tip space-top">
+      {% if assignment.current_version_id %}修改已保存，学生仍看到上次发布的内容。{% else %}这份作业尚未向学生开放。{% endif %}
+      {% if pending_evaluation %}{{ pending_evaluation }}{% else %}由负责教师发布后生效。{% endif %}
+    </div>
+  {% endif %}
+  <div class="rule-strip">
+    <div>
+      <small>开放时间</small>
+      <strong>{{ version.rule.opens_at|date:'m月d日 H:i' }}</strong>
+    </div>
+    <div>
+      <small>正常截止</small>
+      <strong>{{ version.rule.deadline|date:'m月d日 H:i' }}</strong>
+    </div>
+    <div>
+      <small>每题提交次数</small>
+      <strong>{{ version.rule.max_attempts }} 次</strong>
+    </div>
+    <div>
+      <small>成绩选取</small>
+      <strong>{{ version.rule.get_selection_display }}</strong>
+    </div>
+  </div>
+  {% if version.rule.late_deadline %}
+    <p class="help">
+      迟交截止：{{ version.rule.late_deadline|date:'Y-m-d H:i' }}，扣分比例 {{ version.rule.late_penalty }}。
+    </p>
+  {% endif %}
+  <section class="card">
+    <h2>题目列表</h2>
+    {% for q in questions %}
+      <a class="list-row" href="{% url 'question' q.pk %}">
+        <div>
+          <span class="problem-number">{{ forloop.counter|stringformat:'02d' }}</span>
+          <strong>{{ q.problem_version.title }}</strong>
+          <small>{{ q.problem_version.knowledge }} · {{ q.problem_version.difficulty }}</small>
+        </div>
+        <span>{{ q.max_score }} 分 &nbsp; →</span>
+      </a>
+    {% endfor %}
+  </section>
+  {% if can_edit and version.status == "draft" %}
+    <section class="card space-top">
+      <h2>题目分值</h2>
+      <form method="post" action="{% url 'assignment_action' version.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="points">
+        <input type="hidden" name="edit_token" value="{{ edit_token }}">
+        {% for q in questions %}
+          <p>
+            <label>
+              {{ q.problem_version.title }}
+              <input type="number"
+                     name="points_{{ q.pk }}"
+                     value="{{ q.max_score }}"
+                     min="1"
+                     max="1000"
+                     step="0.01">
+            </label>
+          </p>
+        {% endfor %}
+        <button class="button secondary">保存分值</button>
+      </form>
+    </section>
+  {% endif %}
+  {% if can_submit %}
+    <p class="help">
+      因特殊情况错过截止时间？
+      <a href="{% url 'extensions' assignment.pk %}">申请补交</a>
+    </p>
+  {% endif %}
+{% endblock %}

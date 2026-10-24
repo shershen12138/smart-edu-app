@@ -1,0 +1,40 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <h1>归档管理</h1>
+  <p>勾选并保存后，本班名单、作业、提交和成绩从管理员、教师、学生的日常页面隐藏，旧链接也不能访问。取消勾选并保存后恢复；归档不会删除数据。</p>
+  <form method="get" class="search">
+    <input name="q"
+           value="{{ request.GET.q }}"
+           placeholder="班级编号、名称或学期"><button class="button secondary">搜索</button>
+  </form>
+  <div class="card table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>班级编号</th>
+          <th>班级名称</th>
+          <th>学期</th>
+          <th>归档状态</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for classroom in page %}
+          <tr>
+            <td>{{ classroom.code }}</td>
+            <td>{{ classroom.name }}</td>
+            <td>{{ classroom.term }}</td>
+            <td>
+              <form method="post" class="actions">
+                {% csrf_token %}
+                <input type="hidden" name="classroom" value="{{ classroom.pk }}">
+                <label><input type="checkbox"
+       name="archived"
+       {% if classroom.archived %}checked{% endif %}>归档</label>
+                <button class="button secondary small">保存</button>
+              </form>
+            </td>
+          </tr>{% empty %}<tr><td colspan="4">暂无教学班。</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    {% include "portal/pagination.html" %}
+{% endblock %}

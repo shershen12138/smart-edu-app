@@ -1,0 +1,137 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <span class="tag">{{ work.classroom.name }}</span>
+      <h1 class="space-top">{{ work.title }}</h1>
+    </div>
+    <div class="actions">
+      {% if can_edit %}
+        <a class="button secondary" href="{% url 'work_edit' work.pk %}">修改文件 / 时限</a>
+      {% endif %}
+      {% if can_results %}
+        <a class="button" href="{% url 'work_results' work.pk %}">查看班级结果</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="rule-strip">
+    <div>
+      <small>提交截止</small>
+      <strong>{{ work.deadline|date:'Y-m-d H:i' }}</strong>
+    </div>
+    <div>
+      <small>提交文件</small>
+      <strong>{% if work.grading_mode == 'manual' %}一个 ZIP · 包含 1001.py 至 1005.py{% else %}单个 .py · 最大 128 KB{% endif %}</strong>
+    </div>
+    <div>
+      <small>提交次数</small>
+      <strong>最多 {{ work.max_attempts }} 次，以最后一次为准</strong>
+    </div>
+    <div>
+      <small>评分规则</small>
+      <strong>{% if work.grading_mode == 'manual' %}教师逐题人工批阅{% else %}按每题通过用例比例计分{% endif %}</strong>
+    </div>
+  </div>
+  <section class="card space-bottom">
+    <h2>题目文件</h2>
+    <div class="actions">
+      {% if work.document_path %}
+        <a class="button"
+           href="{% url 'work_file' work.pk 'document' %}">下载 {{ work.document_name }}</a>
+      {% endif %}
+      {% if work.package.template_path %}
+        <a class="button secondary"
+           href="{% url 'work_file' work.pk 'template' %}">下载 Python 答题模板</a>
+      {% endif %}
+      {% if work.grading_mode == 'manual' and work.materials_path %}
+        <a class="button secondary"
+           href="{% url 'work_file' work.pk 'materials' %}">下载题目数据文件</a>
+      {% endif %}
+    </div>
+    <details class="space-top" {% if not work.document_path %}open{% endif %}>
+      <summary>查看题目文字</summary>
+      <div class="preline space-top">{{ work.description }}</div>
+    </details>
+  </section>
+  {% include "portal/package_update_status.html" with can_retry_package=True show_package_update_history=True %}
+  {% if work.grading_mode == 'manual' %}
+    <p class="tip">本作业由教师人工批阅。学生提交后会显示“待教师批阅”。</p>
+  {% elif not work.package.reference_path %}
+    <p class="tip">本作业可收取 Python 文件，自动批阅程序尚待关联；提交后不会生成虚假分数。</p>
+  {% elif work.package.status == "pending" or work.package.status == "validating" %}
+    <p class="tip">完整批阅包已保存，正在 Docker 中验证标准答案；验证通过后等待中的提交会自动进入批阅。</p>
+  {% elif work.package.status == "error" %}
+    <p class="tip">批阅包验证失败：{{ work.package.validation_error }}。学生文件仍会保存，但暂不生成成绩。</p>
+  {% endif %}
+  {% if work.items.all %}
+    <details class="card space-bottom">
+      <summary>本作业的题目与分值（{{ work.items.count }} 题，共 {{ work.max_score }} 分）</summary>
+      <table>
+        <thead>
+          <tr>
+            <th>题目 / 函数</th>
+            <th>满分</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in work.items.all %}
+            <tr>
+              <td>{{ item.title }}</td>
+              <td>{{ item.points }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+  {% endif %}
+  {% if form %}
+    <section class="card form-card">
+      <h2>提交 Python 作业</h2>
+      {% if work.grading_mode == 'manual' %}
+        <p class="subtle"><strong>请上传包含 `1001.py` 至 `1005.py` 的ZIP文件。教师提供的数据文件和程序生成的结果文件无需提交。</strong></p>
+      {% else %}
+        <p class="subtle">请上传一个 UTF-8 编码的 Python 文件。文件名不限，但不得修改题目规定的函数名和参数。重新提交会覆盖看板中的当前成绩，历史提交仍可查看。</p>
+      {% endif %}
+      {% if open %}
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}{{ form.as_p }}<button class="button">提交作业 →</button>
+        </form>
+      {% else %}
+        <p class="tip">当前已关闭提交。请查看截止时间。</p>
+      {% endif %}
+    </section>
+    <h2 class="space-top">我的提交记录</h2>
+    <div class="card table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>次数</th>
+            <th>时间</th>
+            <th>状态</th>
+            <th>得分 / 总分</th>
+            <th>批阅方式</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in entries %}
+            <tr>
+              <td>第 {{ e.sequence }} 次</td>
+              <td>{{ e.submitted_at|date:'m-d H:i:s' }}</td>
+              <td>{{ e.get_status_display }}</td>
+              <td>{% if e.total != None %}{{ e.total|floatformat:1 }}{% else %}—{% endif %} / {{ e.snapshot.max_score|default:work.max_score }}</td>
+              <td>{% if e.snapshot.grading_mode == 'manual' %}非机器批阅{% else %}机器批阅{% endif %}</td>
+              <td>
+                <a href="{% url 'entry' e.pk %}">{% if work.grading_mode == 'manual' %}查看提交 / 批阅结果{% else %}查看题目 / 用例结果{% endif %}</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6" class="empty">尚未提交。</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endblock %}

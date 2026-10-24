@@ -1,0 +1,58 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="{% if secondary_action %}form-heading-row{% endif %}">
+      <h1>{{ title }}</h1>
+      {% if secondary_action %}
+        <a class="button secondary" href="{{ secondary_action.url }}">{{ secondary_action.label }}</a>
+      {% endif %}
+    </div>
+    {% if description %}
+      <p>{{ description }}</p>
+    {% endif %}
+  </div>
+  {% if grants %}
+    <div class="card table-card space-bottom">
+      <table>
+        <thead>
+          <tr>
+            <th>教学班</th>
+            <th>作业管理</th>
+            <th>查看结果</th>
+            <th>导出报表</th>
+            <th>授权状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in grants %}
+            <tr>
+              <td>{{ g.classroom.name }}</td>
+              <td>{{ g.can_edit|yesno:'允许,不允许' }}</td>
+              <td>{{ g.can_view_grades|yesno:'允许,不允许' }}</td>
+              <td>{{ g.can_export|yesno:'允许,不允许' }}</td>
+              <td>{{ g.active|yesno:'启用,已撤销' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  <section class="card form-card">
+    {% if recovery_available %}
+      <details class="tip space-bottom">
+        <summary>查看当前密码（仅管理员）</summary>
+        <p>
+          {% if recovery_password %}
+            <code>{{ recovery_password }}</code>
+    {% else %}旧账号尚无明文记录，请在下方设置新密码。{% endif %}
+      </p>
+      </details>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}{{ form.as_p }}<div class="actions">
+      <button class="button">保存</button>
+      <a class="button secondary" href="{{ back_url }}">取消并返回</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

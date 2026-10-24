@@ -1,0 +1,53 @@
+{% if package_update_alert %}
+  {% with update=package_update_alert progress=package_update_alert.regrade_progress %}
+    {% if update.status == 'pending' or update.status == 'validating' %}
+      <p class="tip" data-refresh="10000">单文件更新“{{ update.changed_path }}”正在等待 Docker 验证；旧版本和旧成绩仍在使用。</p>
+    {% elif update.status == 'error' %}
+      <div class="tip">
+        <p>单文件更新“{{ update.changed_path }}”验证失败：{{ update.error }} 旧版本和旧成绩未改变。</p>
+        {% if can_retry_package %}
+          <form method="post" action="{% url 'work_package_retry' work.pk %}">
+            {% csrf_token %}<button class="button secondary">重新验证</button>
+          </form>
+        {% endif %}
+      </div>
+    {% elif progress.remaining %}
+      <p class="tip" data-refresh="10000">新版本“{{ update.changed_path }}”已生效，重评进度：成功 {{ progress.success }} / {{ progress.total }}，剩余 {{ progress.remaining }}，失败 {{ progress.failed }}。</p>
+    {% elif progress.failed %}
+      <p class="tip">本次重新批阅已经结束：成功 {{ progress.success }} / {{ progress.total }}，失败 {{ progress.failed }}。请在班级结果中查看并重试失败提交。</p>
+    {% endif %}
+  {% endwith %}
+{% endif %}
+
+{% if show_package_update_history and package_update_history %}
+  <details class="card space-bottom">
+    <summary>版本更新记录（最近 {{ package_update_history|length }} 次）</summary>
+    <div class="table-card space-top">
+      <table>
+        <thead><tr><th>时间</th><th>更新文件</th><th>状态</th><th>重评结果</th></tr></thead>
+        <tbody>
+          {% for update in package_update_history %}
+            {% with progress=update.regrade_progress %}
+              <tr>
+                <td>{{ update.created_at|date:'Y-m-d H:i:s' }}</td>
+                <td>{{ update.changed_path }}</td>
+                <td>{{ update.get_status_display }}</td>
+                <td>
+                  {% if update.status == 'error' %}{{ update.error }}
+                  {% elif update.status != 'activated' %}—
+                  {% elif work.grading_mode == 'manual' %}材料已更新，无需调用 Docker 或重新批阅
+                  {% elif not update.grading_changed %}仅说明文档变化，无需重评
+                  {% elif not progress.total %}没有历史提交需要重评
+                  {% elif progress.remaining %}成功 {{ progress.success }}/{{ progress.total }}，剩余 {{ progress.remaining }}，失败 {{ progress.failed }}
+                  {% elif progress.failed %}重评结束：成功 {{ progress.success }}/{{ progress.total }}，失败 {{ progress.failed }}
+                  {% else %}重评完成：{{ progress.success }}/{{ progress.total }}
+                  {% endif %}
+                </td>
+              </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+{% endif %}

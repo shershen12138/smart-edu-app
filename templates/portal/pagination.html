@@ -1,0 +1,33 @@
+<div class="pagination" aria-label="分页导航">
+  <span>共 {{ page.paginator.count }} {{ count_unit|default:'条' }} · 每页 {{ per_page }} {{ count_unit|default:'条' }} · 第 {{ page.number }} / {{ page.paginator.num_pages }} 页</span>
+  {% if page.has_previous %}
+    <a href="?{{ page_query }}&per_page={{ per_page }}&page=1">首页</a>
+    <a href="?{{ page_query }}&per_page={{ per_page }}&page={{ page.previous_page_number }}">上一页</a>
+  {% endif %}
+  {% for number in page_range %}
+    {% if number == page.number %}<strong aria-current="page">{{ number }}</strong>
+  {% elif number == "…" %}<span>…</span>
+  {% else %}<a href="?{{ page_query }}&per_page={{ per_page }}&page={{ number }}">{{ number }}</a>{% endif %}
+{% endfor %}
+{% if page.has_next %}
+  <a href="?{{ page_query }}&per_page={{ per_page }}&page={{ page.next_page_number }}">下一页</a>
+  <a href="?{{ page_query }}&per_page={{ per_page }}&page={{ page.paginator.num_pages }}">末页</a>
+{% endif %}
+<form method="get" class="actions">
+  {% for key,value in page_filters %}
+    <input type="hidden" name="{{ key }}" value="{{ value }}">
+  {% endfor %}
+  <label>每页 <select name="per_page">{% for size in page_sizes %}<option value="{{ size }}" {% if size == per_page %}selected{% endif %}>{{ size }}</option>{% endfor %}</select></label>
+  <label>
+    跳至
+    <input type="number"
+           name="page"
+           min="1"
+           max="{{ page.paginator.num_pages }}"
+           value="{{ page.number }}"
+           style="width: 5rem">
+    页
+  </label>
+  <button class="button secondary small">确定</button>
+</form>
+</div>

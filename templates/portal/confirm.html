@@ -1,0 +1,15 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <section class="card form-card">
+    <h1>{{ title }}</h1>
+    <h2>{{ object }}</h2>
+    <p>{{ description }}</p>
+    <form method="post">
+      {% csrf_token %}
+      <div class="actions">
+        <button class="button">确认删除</button>
+        <a class="button secondary" href="{{ back_url }}">取消并返回</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

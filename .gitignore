@@ -1,0 +1,17 @@
+.venv/
+.runtime/
+backups/
+.env
+*.sqlite3
+__pycache__/
+*.py[cod]
+.pytest_cache/
+staticfiles/
+.document_work/
+交付文档/
+.idea/
+.vscode/
+*.log
+*.zip
+*.tar.gz
+.DS_Store

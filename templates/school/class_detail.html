@@ -1,0 +1,174 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="eyebrow">{{ classroom.term }} / {{ classroom.code }}</div>
+    <h1>{{ classroom.name }}</h1>
+    <p>
+      {{ classroom.course_name }}
+      {% if classroom.archived %}
+        · 已归档
+      {% endif %}
+    </p>
+    <div class="actions">
+      {% if can_edit %}
+        <a class="button" href="{% url 'assignment_create' classroom.pk %}">创建作业</a>
+        <a class="button secondary" href="{% url 'problems' classroom.pk %}">管理题库</a>
+      {% endif %}
+      {% if can_publish %}
+        <a class="button secondary"
+           href="{% url 'class_announcement' classroom.pk %}">发布公告</a>
+      {% endif %}
+      {% if administrator %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="archive">
+          <button class="button secondary">
+            {% if classroom.archived %}
+              恢复教学
+            {% else %}
+              归档教学班
+            {% endif %}
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+  <section class="card">
+    <h2>已发布作业</h2>
+    {% for a in assignments %}
+      <a class="list-row" href="{% url 'assignment' a.pk %}">
+        {{ a.current_version.title }}
+        <span>查看 →</span>
+      </a>
+    {% empty %}
+      <p class="empty">尚无已发布作业</p>
+    {% endfor %}
+  </section>
+  {% if drafts %}
+    <section class="card space-top">
+      <h2>待发布作业</h2>
+      {% for draft in drafts %}
+        <a class="list-row" href="{% url 'assignment' draft.assignment_id %}">
+          <span>{{ draft.title }}</span><span class="tag amber">草稿</span>
+        </a>
+      {% endfor %}
+    </section>
+  {% endif %}
+  {% if members or staff or administrator %}
+    <div class="section-heading">
+      <h2>教学成员</h2>
+      <span class="subtle">学生名单由管理员维护</span>
+    </div>
+    <div class="card table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>学工号</th>
+            <th>姓名</th>
+            <th>状态</th>
+            {% if administrator %}
+              <th>操作</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in members %}
+            <tr>
+              <td>{{ m.student.student_no }}</td>
+              <td>{{ m.student.full_name }}</td>
+              <td>
+                {% if m.active %}
+                  在班
+                {% else %}
+                  已移出
+                {% endif %}
+              </td>
+              {% if administrator %}
+                <td>
+                  <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="member">
+                    <input type="hidden" name="student" value="{{ m.student_id }}">
+                    <input type="hidden"
+                           name="active"
+                           value="{% if m.active %}0{% else %}1{% endif %}">
+                    <button class="text-button">
+                      {% if m.active %}
+                        移出
+                      {% else %}
+                        恢复
+                      {% endif %}
+                    </button>
+                  </form>
+                </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">暂无学生</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <section class="card space-top">
+      <h2>教师与助教</h2>
+      {% for s in staff %}
+        <div class="list-row">
+          <div>
+            <strong>{{ s.user.full_name }}</strong>
+            · {{ s.get_role_display }}
+            <small>
+              {% if s.active %}
+                有效
+              {% else %}
+                已撤销
+              {% endif %}
+              · 编辑 {{ s.can_edit|yesno:'是,否' }} / 成绩 {{ s.can_view_grades|yesno:'是,否' }} / 导出 {{ s.can_export|yesno:'是,否' }}
+            </small>
+          </div>
+          {% if administrator and s.active %}
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="revoke">
+              <input type="hidden" name="staff" value="{{ s.pk }}">
+              <button class="text-button">撤销授权</button>
+            </form>
+          {% endif %}
+        </div>
+      {% empty %}
+        <p class="empty">尚未指定负责教师</p>
+      {% endfor %}
+    </section>
+  {% endif %}
+  {% if administrator %}
+    <div class="two-columns space-top">
+      <section class="card">
+        <h2>添加学生</h2>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="member">
+          <label for="student">学生账号</label>
+          <select name="student" id="student">
+            {% for s in student_choices %}
+              <option value="{{ s.pk }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+          <button class="button space-top">添加到本班</button>
+        </form>
+        <p>
+          <a href="{% url 'users_import' %}">批量导入名单 →</a>
+        </p>
+      </section>
+      <section class="card">
+        <h2>配置任课与助教权限</h2>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="staff">
+          {{ staff_form.as_p }}
+          <button class="button">保存授权</button>
+        </form>
+      </section>
+    </div>
+  {% endif %}
+{% endblock %}

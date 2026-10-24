@@ -1,0 +1,85 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <h1>{{ problem.title }}</h1>
+    <div class="actions">
+      <span class="tag">{{ problem.difficulty }}</span>
+      <span class="subtle">
+        {{ question.max_score }} 分 · {{ problem.time_ms }} ms · {{ problem.memory_mb }} MB · Python 3.12
+      </span>
+    </div>
+  </div>
+  <div class="two-columns question-layout">
+    <article class="card statement">
+      <h2>题目描述</h2>
+      <p class="preline">{{ problem.statement }}</p>
+      <h3>输入格式</h3>
+      <p class="preline">{{ problem.input_format }}</p>
+      <h3>输出格式</h3>
+      <p class="preline">{{ problem.output_format }}</p>
+      <h3>数据范围</h3>
+      <p class="preline">{{ problem.data_range }}</p>
+      {% for s in samples %}
+        <h3>样例 {{ forloop.counter }}</h3>
+        <small>输入</small>
+        <pre>{{ s.input }}</pre>
+        <small>输出</small>
+        <pre>{{ s.output }}</pre>
+        <p>{{ s.description }}</p>
+      {% empty %}
+        <h3>样例</h3>
+        <p class="subtle">预留，待批阅程序接入。</p>
+      {% endfor %}
+      <div class="tip">全部正式测试用例通过，获得该题基础满分；任一用例未通过，基础分为 0。公开样例仅用于理解题意。</div>
+    </article>
+    <section>
+      {% if student_workspace %}
+        <div class="card">
+          <div class="section-heading">
+            <h2>编写并提交</h2>
+            <span class="tag">Python 3.12</span>
+          </div>
+          {% if can_submit %}
+            <p class="help">普通提交剩余 {{ remaining }} 次。补交许可使用独立次数；最终以服务器受理结果为准。</p>
+            <form method="post"
+                  enctype="multipart/form-data"
+                  id="submission-form"
+                  data-draft="question-{{ question.pk }}-{{ user.pk }}">
+              {% csrf_token %}
+              {{ form.as_p }}
+              <div class="actions">
+                <button class="button">提交并评测 →</button>
+                <span class="subtle" id="draft-status">编辑内容仅保存在当前浏览器</span>
+              </div>
+            </form>
+          {% else %}
+            <p class="empty">当前身份或班级状态不允许提交。</p>
+          {% endif %}
+        </div>
+        <section class="card space-top">
+          <h3>本题提交记录</h3>
+          {% for s in history %}
+            <a class="list-row" href="{% url 'submission' s.pk %}">
+              <span>#{{ s.pk }} · 第 {{ s.sequence }} 次</span>
+              <small>{{ s.received_at|date:'m/d H:i' }}</small>
+            </a>
+          {% empty %}
+            <p class="subtle">还没有提交记录</p>
+          {% endfor %}
+        </section>
+      {% else %}
+        <section class="card">
+          <h2>题目预览</h2>
+          <p>在这里检查学生将看到的题目内容。</p>
+          {% if can_edit %}
+            <p><a class="button secondary"
+   href="{% url 'problem_edit' assignment.classroom_id problem.pk %}">编辑题目</a></p>
+          {% endif %}
+          {% if can_grades and assignment.current_version_id %}
+            <p><a class="button secondary" href="{% url 'grades' assignment.pk %}">查看学生成绩与提交</a></p>
+          {% endif %}
+        </section>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

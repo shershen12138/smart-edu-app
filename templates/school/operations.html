@@ -1,0 +1,74 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="eyebrow">OPERATIONS</div>
+    <h1>运行监控与审计</h1>
+    <p>查看队列状态、处理系统异常，保留每一次管理操作。</p>
+  </div>
+  <div class="stat-grid">
+    {% for c in counts %}
+      <div class="stat">
+        <span>{{ c.status }}</span>
+        <strong>{{ c.count }}</strong>
+      </div>
+    {% endfor %}
+  </div>
+  <section class="card">
+    <h2>异常任务</h2>
+    <p class="subtle">运行环境 {{ judge_image }}。异常任务不会直接记为零分。</p>
+    {% for r in errors %}
+      <div class="list-row">
+        <div>
+          #{{ r.pk }} · {{ r.submission.student.full_name }}
+          <small>{{ r.error_code }}</small>
+        </div>
+        <div class="actions">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="run" value="{{ r.pk }}">
+            <input type="hidden" name="action" value="retry">
+            <button class="button small">重新派发</button>
+          </form>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="run" value="{{ r.pk }}">
+            <input type="hidden" name="action" value="refund">
+            <button class="button secondary small">作废并返还次数</button>
+          </form>
+        </div>
+      </div>
+    {% empty %}
+      <p class="empty">当前没有异常任务</p>
+    {% endfor %}
+  </section>
+  <div class="section-heading">
+    <h2>最近操作记录</h2>
+    <span class="subtle">仅供查询，不能在页面改写</span>
+  </div>
+  <div class="card table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>时间</th>
+          <th>操作者</th>
+          <th>动作</th>
+          <th>对象</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+          <tr>
+            <td>{{ log.created_at|date:'m-d H:i:s' }}</td>
+            <td>{{ log.actor.full_name|default:'未登录' }}</td>
+            <td>{{ log.action }}</td>
+            <td>{{ log.target }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4">暂无操作记录</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

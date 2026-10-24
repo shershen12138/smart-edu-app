@@ -1,0 +1,42 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <h1>处理补交申请</h1>
+    <p>{{ extension.student.full_name }} · {{ extension.get_status_display }}</p>
+  </div>
+  <div class="two-columns">
+    <section class="card">
+      <h2>申请原因</h2>
+      <p class="preline">{{ extension.reason }}</p>
+      <h3>协作意见</h3>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="note">
+        <textarea name="note" rows="5" maxlength="1000">{{ extension.assistant_note }}</textarea>
+        <button class="button secondary space-top">保存意见</button>
+      </form>
+    </section>
+    {% if can_publish %}
+      <section class="card">
+        {% if extension.status == "pending" %}
+          <h2>教师决定</h2>
+          <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button class="button">确认处理</button>
+          </form>
+        {% elif extension.status == "approved" %}
+          <h2>有效许可</h2>
+          <p>截止 {{ extension.ends_at|date:'Y-m-d H:i' }}，每题新增 {{ extension.extra_attempts }} 次。</p>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="revoke">
+            <button class="button secondary">撤销此许可</button>
+          </form>
+        {% else %}
+          <p>申请已处理：{{ extension.decision }}</p>
+        {% endif %}
+      </section>
+    {% endif %}
+  </div>
+{% endblock %}

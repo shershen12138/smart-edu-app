@@ -1,0 +1,62 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <h1>{{ title }}</h1>
+    <p>先下载模板填写登录名、姓名、学号、班级编号，再上传检查。每批最多 500 行。</p>
+  </div>
+  {% if error %}
+    <p class="message error">{{ error }}</p>
+  {% endif %}
+  <section class="card form-card">
+    <a href="{% url 'students_template' %}">下载 CSV 模板</a>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <p>
+        <label for="file">学生名单（CSV / XLSX）</label>
+        <input id="file" name="file" type="file" accept=".csv,.xlsx" required>
+      </p>
+      <button class="button">预览名单</button>
+    </form>
+  </section>
+  {% if rows %}
+    <div class="card table-card space-top">
+      <table>
+        <thead>
+          <tr>
+            <th>行</th>
+            <th>登录名</th>
+            <th>姓名</th>
+            <th>学号</th>
+            <th>班级编号</th>
+            <th>检查结果</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>{{ r.line }}</td>
+              <td>{{ r.username }}</td>
+              <td>{{ r.full_name }}</td>
+              <td>{{ r.student_no }}</td>
+              <td>{{ r.class_code }}</td>
+              <td>{{ r.error|default:'可以导入' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  {% if ready %}
+    <form method="post" class="card form-card space-top">
+      {% csrf_token %}
+      <input type="hidden" name="confirm" value="yes">
+      <label for="password">本批新账号的临时密码（留空使用 123456）</label>
+      <input id="password"
+             name="password"
+             type="password"
+             autocomplete="new-password">
+      <p class="help">已有账号只加入对应班级，不覆盖密码。新账号首次登录需修改。</p>
+      <button class="button">确认导入</button>
+    </form>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends shell_template|default:"school/base.html" %}
+{% block content %}
+  <div class="login-layout">
+    <section class="login-story">
+      <div class="eyebrow">COURSE / CODE / GROW</div>
+      <h1>
+        让每一次提交，
+        <br>
+        都有清晰的反馈。
+      </h1>
+      <p>
+        连接课堂、代码与学习。
+        <br>
+        从第一行 Python，到独立解决一个问题。
+      </p>
+      <div class="code-art">
+        <span># 今天，也进步一点点</span>
+        <br>
+        <b>
+          def
+        </b>
+        learn(practice):
+        <br>
+        &nbsp;&nbsp;&nbsp;&nbsp;
+        <b>
+          return
+        </b>
+        practice + 1
+      </div>
+    </section>
+    <section class="card login-card">
+      <span class="brand-mark">&gt;_</span>
+      <h2>欢迎回到课码</h2>
+      <p class="subtle">使用管理员为你创建的账号登录</p>
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="button full">登录工作空间 →</button>
+      </form>
+      <p class="help">
+        忘记密码？请联系管理员核验身份后重置。
+        <br>
+        首次登录需要修改初始密码。
+      </p>
+    </section>
+  </div>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "portal/base.html" %}
+{% load portal_tags %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <h1>{{ entry.snapshot.title }}</h1>
+      <p>{{ entry.student.full_name }} · 第 {{ entry.sequence }} 次提交 · {{ entry.submitted_at|date:'Y-m-d H:i:s' }}</p>
+    </div>
+    <a class="button secondary" href="{% url 'entry_source' entry.pk %}">下载本次{% if entry.coursework.grading_mode == "manual" %}答案 ZIP{% else %} Python 文件{% endif %}</a>
+  </div>
+  <section class="result-card {% if entry.status == 'done' %}accepted{% endif %}">
+    <div>
+      <h2>{{ entry.get_status_display }}</h2>
+      <p>
+        {% if entry.status == "done" and entry.coursework.grading_mode == "manual" %}教师已经完成本次人工批阅。{% elif entry.status == "done" %}每题按通过用例数占该题全部用例的比例计分。{% elif entry.status == "review" %}答案ZIP已保存，等待教师人工批阅。{% elif entry.status == "waiting" %}文件已保存，批阅包正在验证或等待关联。{% elif entry.status == "error" %}本次没有生成成绩。批阅服务恢复后可以重试。{% else %}文件已保存，结果会自动更新。{% endif %}
+      </p>
+    </div>
+    <div class="score">
+      {% if entry.total != None %}{{ entry.total|floatformat:1 }}{% else %}—{% endif %}<small>本次作业满分 {{ entry.snapshot.max_score }}</small>
+    </div>
+  </section>
+  {% if can_retry %}
+    <form method="post"
+          action="{% url 'entry_retry' entry.pk %}"
+          class="space-top">
+      {% csrf_token %}
+      <button class="button secondary">重新批阅本次提交</button>
+    </form>
+  {% endif %}
+  {% if entry.status == "pending" or entry.status == "queued" or entry.status == "running" %}
+    <p class="help" data-refresh="10000">批阅中，每 10 秒刷新一次。</p>
+  {% endif %}
+  {% if grade_history %}
+    <details class="card space-top space-bottom">
+      <summary>重评前的历史成绩（{{ grade_history.count }} 条）</summary>
+      <table class="space-top">
+        <thead><tr><th>归档时间</th><th>变更文件</th><th>原状态</th><th>原成绩</th></tr></thead>
+        <tbody>
+          {% for history in grade_history %}
+            <tr>
+              <td>{{ history.archived_at|date:'Y-m-d H:i:s' }}</td>
+              <td>{{ history.package_update.changed_path }}</td>
+              <td>{{ history.status }}</td>
+              <td>{% if history.total != None %}{{ history.total|floatformat:1 }}{% else %}—{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+  {% endif %}
+  {% if entry.coursework.grading_mode == "manual" %}
+    <h2 class="space-top">本次提交的源程序</h2>
+    {% for file in manual_files %}
+      <details class="card space-bottom">
+        <summary><strong>{{ file.name }}</strong></summary>
+        <pre class="space-top"><code>{{ file.source }}</code></pre>
+      </details>
+    {% endfor %}
+    <h2 class="space-top">逐题批阅结果</h2>
+  {% else %}
+    <h2 class="space-top">题目与用例结果</h2>
+    <p class="subtle">点击题目展开用例。{% if show_answers %}教师可查看期望结果和学生实际返回结果；升级前的提交可能没有记录实际结果。{% else %}页面显示测试输入，参考答案不对学生公开。{% endif %}</p>
+  {% endif %}
+  {% for q in questions %}
+    <details class="card space-bottom"
+             {% if q.verdict != "AC" and q.verdict != "PENDING" and q.verdict != "WAITING" %}open{% endif %}>
+      <summary class="split">
+        <strong>{{ forloop.counter }}. {{ q.title }}{% if q.title != q.function_name %} <small>{{ q.function_name }}</small>
+  {% endif %}
+  </strong>
+  <span>{{ q.verdict|verdict_label }} · {% if q.score != None %}{{ q.score|floatformat:1 }}{% else %}—{% endif %} / {{ q.points }} 分{% if q.total_cases %} · 通过 {{ q.passed_cases }} / {{ q.total_cases }}{% endif %}{% if entry.coursework.grading_mode != "manual" %} · 展开用例{% endif %}</span>
+  </summary>
+  {% if q.feedback %}<p class="tip space-top">教师评语：{{ q.feedback }}</p>{% endif %}
+  {% if entry.coursework.grading_mode != "manual" %}
+    <div class="table-card space-top">
+      <table>
+        <thead>
+          <tr>
+            <th>测试输入</th>
+            {% if show_answers %}<th>期望结果</th><th>实际结果</th>{% endif %}
+            <th>批阅结果</th>
+            <th>耗时（含容器启动）</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in q.cases.all %}
+            <tr>
+              <td><code>{{ c.input_value }}</code></td>
+              {% if show_answers %}<td><pre>{{ c.expected_output }}</pre></td><td><pre>{{ c.actual_display }}</pre></td>{% endif %}
+              <td>{{ c.verdict|verdict_label }}</td>
+              <td>{{ c.elapsed_ms }} ms</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="{% if show_answers %}5{% else %}3{% endif %}" class="empty">尚无用例结果。</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  </details>
+{% empty %}
+  <div class="card empty">批阅程序接入后将显示题目和用例结果，当前提交文件已保存。</div>
+{% endfor %}
+{% if can_grade %}
+  <section class="card form-card space-top">
+    <h2>教师人工批阅</h2>
+    <form method="post">
+      {% csrf_token %}{{ grade_form.as_p }}
+      <button class="button">保存成绩和评语</button>
+    </form>
+  </section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,77 @@
+name: ${STACK_NAME:-coursejudge-school}
+x-app: &app
+  DJANGO_SETTINGS_MODULE: config.campus_settings
+  DEBUG: "false"
+  SECRET_KEY: ${SECRET_KEY:?Initialize first}
+  ALLOWED_HOSTS: ${LAN_IP},127.0.0.1,localhost
+  CSRF_TRUSTED_ORIGINS: http://${LAN_IP}:${WEB_PORT}
+  DATABASE_URL: mysql://coursejudge:${MYSQL_PASSWORD}@db:3306/coursejudge
+  REDIS_URL: redis://redis:6379/0
+  PRIVATE_STORAGE: /storage
+  JUDGE_HOST_STORAGE: ${JUDGE_HOST_STORAGE:?Initialize first}
+  JUDGE_IMAGE: python:3.12-slim
+  STORE_RECOVERY_PASSWORDS: "1"
+  TRUST_PROXY: "false"
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: coursejudge
+      MYSQL_USER: coursejudge
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes: ["mysql_data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -ucoursejudge -e 'SELECT 1' coursejudge"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+    restart: unless-stopped
+    logging: *logging
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["redis_data:/data"]
+    restart: unless-stopped
+    logging: *logging
+  web:
+    image: ${COURSEJUDGE_WEB_IMAGE:-coursejudge-web:campus-20260930}
+    environment: *app
+    ports: ["${LAN_IP}:${WEB_PORT}:8000"]
+    volumes: ["private_data:/storage", "./coursework:/seed:ro"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+    restart: "no"
+    logging: *logging
+  worker:
+    image: ${COURSEJUDGE_WORKER_IMAGE:-coursejudge-worker:campus-20260930}
+    environment: *app
+    volumes: ["private_data:/storage", "/var/run/docker.sock:/var/run/docker.sock"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+    restart: unless-stopped
+    logging: *logging
+  beat:
+    image: ${COURSEJUDGE_WEB_IMAGE:-coursejudge-web:campus-20260930}
+    environment: *app
+    command: ["celery", "-A", "config", "beat", "-l", "INFO", "--schedule=/app/.runtime/celerybeat-schedule"]
+    volumes: ["private_data:/storage"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+    restart: unless-stopped
+    logging: *logging
+volumes:
+  private_data:
+    external: true
+    name: ${STACK_NAME:-coursejudge-school}_private
+  mysql_data:
+  redis_data:

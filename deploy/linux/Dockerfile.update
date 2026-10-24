@@ -1,0 +1,13 @@
+# Reuse the tested, already-installed Linux runtime; no dependency downloads.
+ARG BASE_IMAGE=coursejudge-web:campus-20260930
+FROM ${BASE_IMAGE}
+USER root
+WORKDIR /app
+COPY --chown=10001:10001 config /app/config
+COPY --chown=10001:10001 school /app/school
+COPY --chown=10001:10001 templates /app/templates
+COPY --chown=10001:10001 static /app/static
+COPY --chown=10001:10001 manage.py /app/manage.py
+RUN DEBUG=true SECRET_KEY=build-only-static DJANGO_SETTINGS_MODULE=config.settings python manage.py collectstatic --noinput
+ARG RUN_USER=10001:10001
+USER ${RUN_USER}

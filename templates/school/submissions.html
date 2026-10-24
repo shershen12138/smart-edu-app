@@ -1,0 +1,39 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="eyebrow">SUBMISSIONS</div>
+    <h1>我的提交</h1>
+    <p>每一次尝试都有记录，移出班级后仍可查询本人历史。</p>
+  </div>
+  <div class="card table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>编号</th>
+          <th>题目</th>
+          <th>提交类型</th>
+          <th>受理时间</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in submissions %}
+          <tr>
+            <td>#{{ s.pk }}</td>
+            <td>{{ s.question.problem_version.title }}</td>
+            <td>{{ s.get_kind_display }}</td>
+            <td>{{ s.received_at|date:'Y-m-d H:i:s' }}</td>
+            <td>
+              <a href="{% url 'submission' s.pk %}">查看结果 →</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5">暂无提交</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "school/pagination.html" with page=submissions %}
+{% endblock %}

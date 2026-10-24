@@ -1,0 +1,114 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <h1>{{ title }}</h1>
+      {% if description %}
+        <p>{{ description }}</p>
+      {% endif %}
+    </div>
+    <div class="actions">
+      {% if create %}
+        <a class="button" href="{{ create.url }}">＋ {{ create.label }}</a>
+      {% endif %}
+      {% for item in extras %}
+        <a class="button secondary" href="{{ item.url }}">{{ item.label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% if search or filter_class %}
+    <form method="get" class="search">
+      {% if search %}
+        <input name="q"
+               aria-label="搜索登录名、姓名、学工号"
+               value="{{ request.GET.q }}"
+               placeholder="搜索登录名、姓名、学工号">
+      {% endif %}
+      {% if classrooms %}
+        <select name="classroom" aria-label="筛选教学班">
+          <option value="">{{ class_filter_all_label|default:'全部教学班' }}</option>
+          {% for c in classrooms %}
+            <option value="{{ c.pk }}"
+                    {% if c.pk|stringformat:'s' == selected_class %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      {% endif %}
+      <button class="button secondary">筛选</button>
+    </form>
+  {% endif %}
+  {% if batch %}
+    <form method="post" action="{% url 'students_batch' %}">
+      {% csrf_token %}
+  {% endif %}
+  <div class="card table-card">
+    <table>
+      <thead>
+        <tr>
+          {% if batch %}
+            <th>
+              <input type="checkbox" aria-label="全选本页学生" data-select-all>
+            </th>
+          {% endif %}
+          {% if count_unit == "人" %}<th>序号</th>{% endif %}
+          {% for h in headers %}
+            <th>{{ h }}</th>
+          {% endfor %}
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in page %}
+          <tr>
+            {% if batch %}
+              <td>
+                <input type="checkbox"
+                       name="selected"
+                       value="{{ row.pk }}"
+                       aria-label="选择学生 {{ row.pk }}">
+              </td>
+            {% endif %}
+            {% if count_unit == "人" %}<td>{{ forloop.counter0|add:page.start_index }}</td>{% endif %}
+            {% for cell in row.cells %}
+              <td>{{ cell|default_if_none:'—' }}</td>
+            {% endfor %}
+            <td>
+              <div class="actions">
+                {% for item in row.actions %}
+                  <a href="{{ item.url }}">{{ item.label }}</a>
+                {% endfor %}
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="8" class="empty">暂无记录。</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if batch %}
+    <div class="card space-top batch-tools">
+      <label>
+        批量操作<select name="action">
+        <option value="add_class">加入教学班</option>
+        <option value="remove_class">移出教学班</option>
+        <option value="deactivate">停用账号</option>
+        <option value="activate">启用账号</option>
+        <option value="delete">永久删除账号及其提交</option>
+        </select>
+      </label>
+      <label>
+        目标教学班<select name="classroom">
+        <option value="">账号启停无需选择班级</option>
+        {% for c in classrooms %}
+          <option value="{{ c.pk }}">{{ c }}</option>
+        {% endfor %}
+        </select>
+      </label>
+      <button class="button">应用到所选学生</button>
+    </div>
+    </form>
+  {% endif %}
+  {% include "portal/pagination.html" %}
+{% endblock %}

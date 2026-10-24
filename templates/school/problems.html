@@ -1,0 +1,55 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <div class="eyebrow">{{ classroom.name }}</div>
+      <h1>课程题库</h1>
+      <p>每道题只显示当前内容。修改后编辑对应作业并保存，即可采用最新题目。</p>
+    </div>
+    <a class="button" href="{% url 'problem_create' classroom.pk %}">＋ 新建题目</a>
+  </div>
+  <div class="card table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>题目</th>
+          <th>评测状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in versions %}
+          <tr>
+            <td>
+              <strong>{{ p.title }}</strong>
+              <small>{{ p.problem.code }} · {{ p.difficulty }}</small>
+            </td>
+            <td>
+              {% if not p.evaluation_configured %}
+                <span class="tag amber">评测待接入</span>
+              {% elif p.reference_verified %}
+                <span class="tag">参考程序校验通过</span>
+              {% elif p.verification_error %}
+                <span class="error-text">{{ p.verification_error }}</span>
+                <form method="post" action="{% url 'problem_retry' p.pk %}">
+                  {% csrf_token %}
+                  <button class="text-button">重新校验</button>
+                </form>
+              {% else %}
+                <span class="tag amber">等待参考程序校验</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'problem_edit' classroom.pk p.pk %}">编辑题目</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="3">题库还是空的，创建第一道题目吧。</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="help">样例与批阅程序暂留空，等待已有批阅代码接入。已配置的题目继续显示原校验状态。这里的校验是自动检查参考程序能否通过测试，不是人工评分。</p>
+{% endblock %}

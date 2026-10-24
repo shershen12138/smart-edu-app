@@ -1,0 +1,84 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <h1>
+      {{ account.full_name }}
+      <small>{{ account.username }}</small>
+    </h1>
+    <p>{{ account.is_active|yesno:'账号正常,账号已停用' }}</p>
+  </div>
+  <div class="two-columns">
+    <section class="card">
+      <h2>基本信息</h2>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="profile">
+        <p>
+          <label>
+            姓名
+            <input name="full_name"
+                   value="{{ account.full_name }}"
+                   required
+                   maxlength="80">
+          </label>
+        </p>
+        <p>
+          <label>
+            学工号
+            <input name="student_no"
+                   value="{{ account.student_no|default:'' }}"
+                   maxlength="40">
+          </label>
+        </p>
+        <button class="button">保存资料</button>
+      </form>
+      <hr>
+      <h2>系统身份</h2>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="roles">
+        {% for key,label in roles %}
+          <label class="check">
+            <input type="checkbox"
+                   name="roles"
+                   value="{{ key }}"
+                   {% if key in assigned_roles %}checked{% endif %}>
+            {{ label }}
+          </label>
+        {% endfor %}
+        <button class="button space-top">更新身份</button>
+      </form>
+    </section>
+    <section class="card">
+      <h2>密码重置</h2>
+      <p class="subtle">核验本人身份后设置初始密码，下次登录必须修改。</p>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="reset">
+        <label>
+          新初始密码
+          <input type="password"
+                 name="password"
+                 minlength="10"
+                 required
+                 autocomplete="new-password">
+        </label>
+        <button class="button secondary space-top">重置密码</button>
+      </form>
+      <hr>
+      <h2>账号状态</h2>
+      <p>停用会阻止登录，并保留历史教学记录。</p>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="toggle">
+        <button class="button secondary">
+          {% if account.is_active %}
+            停用账号
+          {% else %}
+            恢复账号
+          {% endif %}
+        </button>
+      </form>
+    </section>
+  </div>
+{% endblock %}

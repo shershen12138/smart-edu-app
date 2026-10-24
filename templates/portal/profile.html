@@ -1,0 +1,22 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <section class="card form-card">
+    <h1>个人中心</h1>
+    <dl>
+      <dt>姓名</dt>
+      <dd>
+        {{ user.full_name }}
+      </dd>
+      <dt>登录名</dt>
+      <dd>
+        {{ user.username }}
+      </dd>
+      <dt>学号 / 工号</dt>
+      <dd>
+        {{ user.student_no|default:'—' }}
+      </dd>
+    </dl>
+    <p class="subtle">账号信息和班级由管理员维护。忘记密码时联系管理员，无需邮箱。</p>
+    <a class="button" href="{% url 'password' %}">修改我的密码</a>
+  </section>
+{% endblock %}

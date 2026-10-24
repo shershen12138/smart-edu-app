@@ -1,0 +1,39 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <h1>补交申请</h1>
+    <p>{{ assignment.current_version.title }}</p>
+  </div>
+  {% if not teaching %}
+    <section class="card form-card">
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="button">提交申请</button>
+      </form>
+    </section>
+  {% endif %}
+  <section class="card space-top">
+    <h2>申请记录</h2>
+    {% for e in extensions %}
+      <div class="list-row">
+        <div>
+          <strong>{{ e.student.full_name }}</strong>
+          · {{ e.get_status_display }}
+          <p>{{ e.reason }}</p>
+          <small>
+            {{ e.decision }}
+            {% if e.ends_at %}
+              · 补交截止 {{ e.ends_at|date:'Y-m-d H:i' }} · 每题 {{ e.extra_attempts }} 次
+            {% endif %}
+          </small>
+        </div>
+        {% if teaching %}
+          <a href="{% url 'extension_decide' e.pk %}">查看与处理 →</a>
+        {% endif %}
+      </div>
+    {% empty %}
+      <p class="empty">暂无申请</p>
+    {% endfor %}
+  </section>
+{% endblock %}

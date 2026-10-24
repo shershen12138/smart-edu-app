@@ -1,0 +1,45 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="eyebrow">MY PROGRESS</div>
+    <h1>我的成绩</h1>
+    <p>这里显示教师正式发布的最新成绩。</p>
+  </div>
+  {% for g in grades %}
+    <section class="card space-bottom">
+      <div class="split">
+        <div>
+          <span class="tag">第 {{ g.revision.number }} 批</span>
+          <h2>{{ g.revision.version.title }}</h2>
+          <p class="subtle">发布于 {{ g.revision.published_at|date:'Y-m-d H:i' }}</p>
+        </div>
+        <div class="score">
+          {{ g.total }}
+          <small>作业总分</small>
+        </div>
+      </div>
+      {% for q in g.questions.all %}
+        <div class="list-row">
+          <span>
+            {{ q.question.problem_version.title }}
+            <small>基础 {{ q.base_score }} · 扣分 {{ q.deduction }}</small>
+          </span>
+          <span>
+            {{ q.final_score }} 分
+            {% if q.submission %}
+              <a href="{% url 'submission' q.submission_id %}">查看提交 →</a>
+            {% else %}
+              · 未提交
+            {% endif %}
+          </span>
+        </div>
+      {% endfor %}
+    </section>
+  {% empty %}
+    <section class="card empty">
+      还没有已发布的正式成绩。
+      <br>
+      你可以在“我的提交”中查看即时评测反馈。
+    </section>
+  {% endfor %}
+{% endblock %}
