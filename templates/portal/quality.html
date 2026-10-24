@@ -1,0 +1,135 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <span class="tag">{{ work.classroom.name }}</span>
+      <h1 class="space-top">{{ work.title }} · 代码评测报告</h1>
+      <p class="subtle">
+        第 {{ entry.sequence }} 次提交 · {{ entry.submitted_at|date:'Y-m-d H:i' }} · 静态分析（不执行学生代码）
+      </p>
+    </div>
+    <div class="actions">
+      <a class="button secondary small" href="{% url 'quality_markdown' entry.pk %}">下载 Markdown 报告</a>
+    </div>
+  </div>
+  <div class="rule-strip">
+    <div>
+      <small>总分</small>
+      <strong>{{ report.total|floatformat:1 }} / 100（{{ detail.grade }}）</strong>
+    </div>
+    <div>
+      <small>题量</small>
+      <strong>{{ detail.tasks|length }} 题</strong>
+    </div>
+    <div>
+      <small>评分量表</small>
+      <strong>{{ detail.rubric_note }}</strong>
+    </div>
+    <div>
+      <small>分析方式</small>
+      <strong>pylint + AST 知识点 + 题库规则</strong>
+    </div>
+  </div>
+  <section class="card space-bottom">
+    <h2>五维得分与雷达图</h2>
+    <div class="split">
+      <div>
+        <table>
+          <thead>
+            <tr>
+              <th>维度</th>
+              <th>权重</th>
+              <th>得分</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in detail.scores %}
+              <tr>
+                <td>{{ d.label }}</td>
+                <td>{{ d.weight }}%</td>
+                <td>{{ d.score|floatformat:0 }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div>
+        {% if radar_url %}
+          <img src="{{ radar_url }}"
+               alt="{{ entry.student.username }} 代码完成度雷达图"
+               style="max-width:100%;height:auto"
+               width="420">
+        {% else %}
+          <p class="tip">雷达图组件未安装（matplotlib 不可用），其余结论不受影响。</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+  <h2 class="space-top">逐题明细</h2>
+  <div class="card table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>作业编号</th>
+          <th>该题目需要用到的python基础知识点</th>
+          <th>缺陷及所在代码行</th>
+          <th>修改建议</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in detail.tasks %}
+          <tr>
+            <td>
+              <code>{{ task.task_id }}</code>
+              <br>
+              <span class="subtle">{{ task.title }}</span>
+            </td>
+            <td>
+              {% if not task.parsed %}
+                <span class="subtle">语法未通过，未能验证</span>
+              {% elif task.points %}
+                {% for p in task.points %}{{ p.label }} {% if p.ok %}✓{% else %}✗{% endif %}{% if not forloop.last %}；{% endif %}{% endfor %}
+              {% else %}
+                <span class="subtle">未配置知识点模板（仅通用检查）</span>
+              {% endif %}
+            </td>
+            <td>
+              {% for i in task.issues %}
+                第 {{ i.line }} 行：{{ i.message }}
+                {% if not forloop.last %}<br>{% endif %}
+              {% empty %}
+                未发现静态缺陷
+              {% endfor %}
+            </td>
+            <td>
+              {% for i in task.issues %}
+                {{ i.advice }}
+                {% if not forloop.last %}<br>{% endif %}
+              {% empty %}
+                —
+              {% endfor %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4" class="empty">该作业没有题目信息。</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if detail.style_notes %}
+    <section class="card space-top">
+      <h2>pylint 规范提示</h2>
+      <ul>
+        {% for note in detail.style_notes %}<li>{{ note }}</li>{% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+  {% if detail.module_note %}
+    <p class="tip">文件整体解析失败：{{ detail.module_note }}。知识点状态标记为未验证。</p>
+  {% endif %}
+  <p class="tip space-top">
+    本报告为静态分析结果，没有执行学生代码；“疑似”类结论需要教师用样例数据复核。报告不改变机器判题得分。
+  </p>
+{% endblock %}

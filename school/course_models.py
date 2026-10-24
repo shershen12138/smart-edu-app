@@ -269,3 +269,21 @@ class CourseworkGradeHistory(models.Model):
                 fields=['submission', 'package_update'], name='course_grade_history_update_unique'
             )
         ]
+
+
+class QualityReport(models.Model):
+    """学生代码质量评测结果（静态分析，独立于机器判题得分）。"""
+
+    submission = models.OneToOneField(
+        CourseworkSubmission, on_delete=models.CASCADE, related_name='quality_report'
+    )
+    source_sha256 = models.CharField('源码摘要', max_length=64)
+    total = models.DecimalField('总分', max_digits=5, decimal_places=1, default=0)
+    payload = models.JSONField('评测明细', default=dict)
+    markdown_key = models.CharField('Markdown 文件', max_length=255, blank=True)
+    radar_key = models.CharField('雷达图文件', max_length=255, blank=True)
+    generated_at = models.DateTimeField('生成时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '代码质量报告'
+        verbose_name_plural = '代码质量报告'
