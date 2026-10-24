@@ -5,8 +5,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{{ title|default:'工作台' }} · 课码</title>
-    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261006-1">
-    <script src="{% static 'portal.js' %}?v=20261006-1" defer></script>
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261024-1">
+    <script src="{% static 'portal.js' %}?v=20261024-1" defer></script>
   </head>
   <body>
     {% if user.is_authenticated %}
@@ -73,5 +73,11 @@
         课码 · Python 编程作业在线评测与批改系统
       </footer>
     </main>
+    <div class="loading-overlay" data-loading hidden role="status" aria-live="polite">
+      <div class="loading-panel">
+        <span class="spinner" aria-hidden="true"></span>
+        <span class="loading-label">正在加载…</span>
+      </div>
+    </div>
   </body>
 </html>

@@ -1268,3 +1268,61 @@ summary { cursor: pointer; line-height: 1.8; }
   .sidebar-bottom>form { margin: 0; }
   .actions .button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 }
+
+/* 加载态：页面跳转、表单提交、报告生成期间给出可见反馈 */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: grid;
+  place-content: center;
+  background: rgba(245, 247, 243, .72);
+}
+
+.loading-overlay[hidden] {
+  display: none;
+}
+
+.loading-panel {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  min-width: 180px;
+  padding: 22px 28px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(23, 46, 43, .14);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--green-light);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+.loading-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.button[aria-busy="true"],
+button[aria-busy="true"] {
+  opacity: .65;
+  pointer-events: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}

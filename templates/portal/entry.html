@@ -8,9 +8,10 @@
     </div>
     <div class="actions">
       {% if can_report %}
-        <a class="button" href="{% url 'quality_report' entry.pk %}">查看评测报告</a>
+        <a class="button" data-loading="正在生成评测报告…"
+           href="{% url 'quality_report' entry.pk %}">查看评测报告</a>
       {% endif %}
-      <a class="button secondary" href="{% url 'entry_source' entry.pk %}">下载本次{% if entry.coursework.grading_mode == "manual" %}答案 ZIP{% else %} Python 文件{% endif %}</a>
+      <a class="button secondary" data-no-loading href="{% url 'entry_source' entry.pk %}">下载本次{% if entry.coursework.grading_mode == "manual" %}答案 ZIP{% else %} Python 文件{% endif %}</a>
     </div>
   </div>
   <section class="result-card {% if entry.status == 'done' %}accepted{% endif %}">
@@ -27,7 +28,8 @@
   {% if can_retry %}
     <form method="post"
           action="{% url 'entry_retry' entry.pk %}"
-          class="space-top">
+          class="space-top"
+          data-loading="正在重新提交批阅…">
       {% csrf_token %}
       <button class="button secondary">重新批阅本次提交</button>
     </form>

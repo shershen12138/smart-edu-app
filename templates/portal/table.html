@@ -37,7 +37,7 @@
     </form>
   {% endif %}
   {% if batch %}
-    <form method="post" action="{% url 'students_batch' %}">
+    <form method="post" action="{% url 'students_batch' %}" data-loading="正在处理所选学生账号…">
       {% csrf_token %}
   {% endif %}
   <div class="card table-card">

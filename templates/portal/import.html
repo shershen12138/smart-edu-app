@@ -8,8 +8,8 @@
     <p class="message error">{{ error }}</p>
   {% endif %}
   <section class="card form-card">
-    <a href="{% url 'students_template' %}">下载 CSV 模板</a>
-    <form method="post" enctype="multipart/form-data">
+    <a data-no-loading href="{% url 'students_template' %}">下载 CSV 模板</a>
+    <form method="post" enctype="multipart/form-data" data-loading="正在校验并导入名单…">
       {% csrf_token %}
       <p>
         <label for="file">学生名单（CSV / XLSX）</label>
@@ -47,7 +47,7 @@
     </div>
   {% endif %}
   {% if ready %}
-    <form method="post" class="card form-card space-top">
+    <form method="post" class="card form-card space-top" data-loading="正在导入名单…">
       {% csrf_token %}
       <input type="hidden" name="confirm" value="yes">
       <label for="password">本批新账号的临时密码（留空使用 123456）</label>

@@ -9,7 +9,7 @@
       </p>
     </div>
     <div class="actions">
-      <a class="button secondary small" href="{% url 'quality_markdown' entry.pk %}">下载 Markdown 报告</a>
+      <a class="button secondary small" data-no-loading href="{% url 'quality_markdown' entry.pk %}">下载 Markdown 报告</a>
     </div>
   </div>
   <div class="rule-strip">
@@ -70,8 +70,8 @@
     <table>
       <thead>
         <tr>
-          <th>作业编号</th>
-          <th>该题目需要用到的python基础知识点</th>
+          <th>题目编号</th>
+          <th>作业考察的知识点</th>
           <th>缺陷及所在代码行</th>
           <th>修改建议</th>
         </tr>
@@ -100,6 +100,10 @@
               {% empty %}
                 未发现静态缺陷
               {% endfor %}
+              {% if task.issue_omitted %}
+                <br>
+                <span class="subtle">另有 {{ task.issue_omitted }} 条提示未列出</span>
+              {% endif %}
             </td>
             <td>
               {% for i in task.issues %}

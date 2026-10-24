@@ -80,6 +80,46 @@ def radar_png(analysis: pipeline.StudentAnalysis, dimensions: Sequence[models.Di
         return target.read_bytes()
 
 
+_SEVERITY_ORDER = {"fatal": 0, "error": 1, "warning": 2, "convention": 3}
+_REPORT_LIMIT = 8
+
+
+def report_issues(result: models.TaskResult) -> tuple[list[dict], int]:
+    """报告表格里的缺陷：语义缺陷优先，pylint 规范提示排在后面。
+
+    同一句提示在多行出现时合并行号（例如多个单字母变量各报一次命名），
+    合并后超过 8 条的只列前 8 条，其余计入 omitted。
+    """
+    ranked = sorted(
+        result.issues,
+        key=lambda issue: (
+            _SEVERITY_ORDER.get(issue.severity, 4),
+            issue.dimension == models.STYLE,
+            issue.line,
+        ),
+    )
+    merged: dict[tuple[str, str], dict] = {}
+    for issue in ranked:
+        key = (issue.dimension, issue.message)
+        if key in merged:
+            merged[key]["lines"].append(issue.line)
+            continue
+        merged[key] = {
+            "message": issue.message,
+            "advice": issue.advice,
+            "severity": issue.severity,
+            "dimension": issue.dimension,
+            "lines": [issue.line],
+        }
+
+    items = list(merged.values())
+    for item in items:
+        lines = list(dict.fromkeys(item.pop("lines")))
+        item["line"] = "、".join(str(line) for line in lines)
+        item["count"] = len(lines)
+    return items[:_REPORT_LIMIT], max(0, len(items) - _REPORT_LIMIT)
+
+
 def payload(
     analysis: pipeline.StudentAnalysis,
     dimensions: Sequence[models.Dimension],
@@ -88,6 +128,7 @@ def payload(
 ) -> dict:
     tasks = []
     for result in analysis.results:
+        issues, omitted = report_issues(result)
         tasks.append(
             {
                 "task_id": result.spec.task_id,
@@ -103,14 +144,16 @@ def payload(
                 ],
                 "issues": [
                     {
-                        "line": issue.line,
-                        "message": issue.message,
-                        "advice": issue.advice,
-                        "severity": issue.severity,
-                        "dimension": issue.dimension,
+                        "line": issue["line"],
+                        "message": issue["message"],
+                        "advice": issue["advice"],
+                        "severity": issue["severity"],
+                        "dimension": issue["dimension"],
+                        "count": issue["count"],
                     }
-                    for issue in result.defects
+                    for issue in issues
                 ],
+                "issue_omitted": omitted,
             }
         )
     return {
@@ -159,7 +202,7 @@ def markdown(
     lines.extend(
         [
             "",
-            "| 作业编号 | 该题目需要用到的python基础知识点 | 缺陷及所在代码行 | 修改建议 |",
+            "| 题目编号 | 作业考察的知识点 | 缺陷及所在代码行 | 修改建议 |",
             "| --- | --- | --- | --- |",
         ]
     )
@@ -173,11 +216,15 @@ def markdown(
             points = "未配置知识点模板（仅通用检查）"
         if not result.parsed:
             points = "语法未通过，未能验证"
-        defects = result.defects
-        if defects:
-            detail = "<br>".join(f"第 {issue.line} 行：{issue.message}" for issue in defects)
+        issues, omitted = report_issues(result)
+        if issues:
+            detail = "<br>".join(
+                f"第 {issue['line']} 行：{issue['message']}" for issue in issues
+            )
+            if omitted:
+                detail += f"<br>（另有 {omitted} 条提示未列出）"
             advice = "<br>".join(
-                dict.fromkeys(issue.advice for issue in defects if issue.advice)
+                dict.fromkeys(issue["advice"] for issue in issues if issue["advice"])
             )
         else:
             detail, advice = "未发现静态缺陷", "—"
