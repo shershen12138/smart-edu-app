@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Sequence
 
 from . import agent_graph, curriculum, lint, models, rubric
 from .config import CourseContext, build_context
@@ -54,8 +55,16 @@ def _analyze_source(
     dimensions: list[models.Dimension],
     name: str,
     file_name: str,
+    *,
+    items: Sequence[tuple[str, str]] = (),
+    problem_text: str = "",
+    reference_source: str = "",
+    points_by_function: dict[str, list[str]] | None = None,
 ) -> StudentAnalysis:
-    """执行 LangGraph 评测图，再把最终状态组装成学生报告数据。"""
+    """执行 LangGraph 评测图，再把最终状态组装成学生报告数据。
+
+    `specs` 为空时由图中的 `resolve_specs` 节点按题目、题面与参考答案推断考点。
+    """
     state = agent_graph.invoke(
         {
             "source": source,
@@ -64,6 +73,10 @@ def _analyze_source(
             "dimensions": dimensions,
             "name": name,
             "file_name": file_name,
+            "items": list(items),
+            "problem_text": problem_text,
+            "reference_source": reference_source,
+            "points_by_function": points_by_function or {},
         }
     )
     return StudentAnalysis(
@@ -93,13 +106,29 @@ def analyze_text(
     dimensions: list[models.Dimension],
     workdir: Path,
     name: str = "student",
+    *,
+    items: Sequence[tuple[str, str]] = (),
+    problem_text: str = "",
+    reference_source: str = "",
+    points_by_function: dict[str, list[str]] | None = None,
 ) -> StudentAnalysis:
     """从内存中的源码分析（数据库提交使用）。pylint 需要真实文件，临时落盘后删除。"""
     workdir.mkdir(parents=True, exist_ok=True)
     lint_path = workdir / f"lint-{name}.py"
     lint_path.write_text(source, encoding="utf-8")
     try:
-        return _analyze_source(source, lint_path, specs, dimensions, name, f"{name}.py")
+        return _analyze_source(
+            source,
+            lint_path,
+            specs,
+            dimensions,
+            name,
+            f"{name}.py",
+            items=items,
+            problem_text=problem_text,
+            reference_source=reference_source,
+            points_by_function=points_by_function,
+        )
     finally:
         try:
             lint_path.unlink()

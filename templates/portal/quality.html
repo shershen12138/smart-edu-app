@@ -88,7 +88,7 @@
               {% if not task.parsed %}
                 <span class="subtle">语法未通过，未能验证</span>
               {% elif task.points %}
-                {% for p in task.points %}{{ p.label }} {% if p.ok %}✓{% else %}✗{% endif %}{% if not forloop.last %}；{% endif %}{% endfor %}
+                {% for p in task.points %}{{ p.label }}{% if p.judged %} {% if p.ok %}✓{% else %}✗{% endif %}{% endif %}{% if not forloop.last %}；{% endif %}{% endfor %}
               {% else %}
                 <span class="subtle">未配置知识点模板（仅通用检查）</span>
               {% endif %}

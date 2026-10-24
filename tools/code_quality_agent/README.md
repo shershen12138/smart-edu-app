@@ -45,6 +45,7 @@ tools/code_quality_agent/
                 │
                 ▼
 编排层 pipeline → agent_graph（LangGraph 状态图）
+  resolve_specs  已有 specs 时跳过；否则按数据库题目 → 参考答案 → 题面 → 兜底推断考点
   prepare   split_functions 按函数切块，逐题独立解析；parse_whole 判断整文件可否解析
      ├─(可解析)→ lint     pylint 子进程 → 中文消息 → 维度归类
      └─(不可解析)→ 跳过 pylint，直接进入 tasks
@@ -97,7 +98,7 @@ LLM 是可选扩展点：图本身不调用大模型，所有结论来自 AST �
 | `rubric.py` | 量表解析（Markdown 表格 / 列表写法）与维度打分 | `dimensions_from_text`、`load_rubric`、`score_student`、`weighted_total` |
 | `pipeline.py` | 入口：文件发现、临时落盘、组装 `StudentAnalysis` / `Evaluation` | `analyze_text`、`run` |
 | `agent_graph.py` | LangGraph 状态图：节点注册、条件路由、编译缓存 | `build_graph`、`compiled_graph`、`invoke`、`node_names` |
-| `stages.py` | 评测各阶段实现，输入输出都是图状态 | `prepare`、`run_lint`、`build_tasks`、`collect_notes`、`score` |
+| `stages.py` | 评测各阶段实现，输入输出都是图状态 | `resolve_specs`、`prepare`、`run_lint`、`build_tasks`、`collect_notes`、`score` |
 | `charts.py` | matplotlib 极坐标雷达图 | `render` |
 | `report.py` | CLI 批量 Markdown 报告 | `build` |
 | `service.py` | Django 适配接口：内存源码进、报告出 | `build_specs`、`analyze`、`radar_png`、`markdown`、`payload` |

@@ -289,3 +289,52 @@ class QualityReportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'if / else 分支')
         self.assertNotContains(response, '未配置知识点模板')
+
+    def test_report_uses_coursework_rubric_knowledge_points(self):
+        """逐题明细的知识点列取作业评分标准，而不是评测器按题库规格推断的标签。"""
+        self.client.force_login(self.student)
+        self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        CourseworkRubric.objects.create(
+            coursework=self.work,
+            markdown='## 一、作业考察的知识点\n\n## 二、5 分制量表\n',
+            knowledge_points=[
+                {
+                    'name': '列表切片边界换算',
+                    'detail': '1 起始计数换算为 0 起始下标',
+                    'tasks': ['func301'],
+                }
+            ],
+            dimensions=[],
+            source='rule',
+        )
+        response = self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '列表切片边界换算')
+        self.assertNotContains(response, '未配置知识点模板')
+        self.assertNotContains(response, '列表合并（+ / extend）')
+
+        report = QualityReport.objects.get(submission=self.entry)
+        points = report.payload['tasks'][0]['points']
+        self.assertEqual([point['label'] for point in points], ['列表切片边界换算'])
+        # 模型自定义名称无法对应到题库检测标签，只展示、不给出 ✓/✗
+        self.assertFalse(points[0]['judged'])
+        markdown = read_private(report.markdown_key)
+        self.assertIn('列表切片边界换算', markdown)
+        self.assertNotIn('列表切片边界换算 ✓', markdown)
+
+    def test_knowledge_point_matching_curriculum_label_is_judged(self):
+        """评分标准里的知识点与题库标签同名时，仍能判断学生代码是否用到。"""
+        CourseworkRubric.objects.create(
+            coursework=self.work,
+            markdown='## 一、作业考察的知识点\n',
+            knowledge_points=[{'name': '列表合并（+ / extend）', 'tasks': ['func301']}],
+            dimensions=[],
+            source='rule',
+        )
+        self.client.force_login(self.student)
+        self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        report = QualityReport.objects.get(submission=self.entry)
+        point = report.payload['tasks'][0]['points'][0]
+        self.assertEqual(point['label'], '列表合并（+ / extend）')
+        self.assertTrue(point['judged'])
+        self.assertTrue(point['ok'])

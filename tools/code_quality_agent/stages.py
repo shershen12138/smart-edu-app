@@ -4,7 +4,7 @@
 - `agent_graph` 把阶段串成状态图并做条件路由；
 - 单元测试单独验证某一步（例如只测知识点检测，不跑 pylint）。
 
-阶段顺序：prepare → lint（可选）→ tasks → notes → score。
+阶段顺序：resolve_specs → prepare → lint（可选）→ tasks → notes → score。
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import ast
 from pathlib import Path
 from typing import TypedDict
 
-from . import lint, models, rubric, rules, static_analysis
+from . import lint, models, rubric, rules, specs as spec_parser, static_analysis
 
 
 class ReviewState(TypedDict, total=False):
@@ -26,6 +26,12 @@ class ReviewState(TypedDict, total=False):
     dimensions: list[models.Dimension]
     name: str
     file_name: str
+
+    # 考点解析（specs 为空时由 specs 节点按题面/参考答案推断）
+    items: list
+    problem_text: str
+    reference_source: str
+    points_by_function: dict
 
     # prepare
     blocks: list
@@ -70,6 +76,27 @@ def _task_issue(
         source=source,
         advice=advice,
     )
+
+
+def resolve_specs(state: ReviewState) -> dict:
+    """确定每题的考点。
+
+    调用方已给出 `specs`（命令行题库路径）时直接沿用；否则按数据库题目、
+    题面与参考答案推断，保证新增作业也有考点可展示。
+    """
+    if state.get("specs"):
+        return {}
+    rows = state.get("items") or []
+    if not rows:
+        return {"specs": ()}
+    return {
+        "specs": spec_parser.resolve_specs(
+            rows,
+            problem_text=state.get("problem_text", ""),
+            reference_source=state.get("reference_source", ""),
+            points_by_function=state.get("points_by_function"),
+        )
+    }
 
 
 def prepare(state: ReviewState) -> dict:
