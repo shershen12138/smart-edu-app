@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>教师端 · 交互式原型</title>
+    <link rel="stylesheet" href="assets/prototype.css" />
+  </head>
+  <body data-page="teacher">
+    <div class="topbar">
+      <div class="brand"><span>&gt;_</span>课码 · 教师工作空间</div>
+      <div class="spacer"></div>
+      <small class="muted">示例账号：教师（原型演示）</small>
+    </div>
+
+    <div class="shell">
+      <nav class="side">
+        <div class="group">作业</div>
+        <a href="#hw">作业列表</a>
+        <a href="#create">创建作业</a>
+        <div class="group">批阅</div>
+        <a href="#entries">提交记录</a>
+        <a href="#rubric">评分量规与质量报告</a>
+        <div class="group">原型</div>
+        <a href="index.html">返回首页</a>
+        <a href="admin.html">管理员端原型</a>
+        <a href="student.html">学生端原型</a>
+      </nav>
+
+      <main class="card" id="teacherTabs">
+        <div class="tabs">
+          <button data-tab="hw">作业列表</button>
+          <button data-tab="create">创建作业</button>
+          <button data-tab="entries">提交记录</button>
+          <button data-tab="rubric">评分量规与质量报告</button>
+        </div>
+
+        <section class="panel" data-panel="hw">
+          <h2>作业列表</h2>
+          <table>
+            <thead>
+              <tr><th>作业名称</th><th>批阅方式</th><th>截止时间</th><th>已提交 / 应交</th><th>状态</th><th>操作</th></tr>
+            </thead>
+            <tbody id="hwList"></tbody>
+          </table>
+          <div class="grid three" style="margin-top: 16px">
+            <div class="stat"><small class="muted">班级均分</small><b>82.4</b></div>
+            <div class="stat"><small class="muted">最高 / 最低</small><b>100 / 46.7</b></div>
+            <div class="stat"><small class="muted">已批阅 / 应交</small><b>4 / 5</b></div>
+          </div>
+          <p class="note" style="margin-top: 12px">
+            均分只统计本班已批阅学生；未批阅与批阅异常显示“—”，不按 0 分计入。
+          </p>
+        </section>
+
+        <section class="panel" data-panel="create" hidden>
+          <h2>创建作业</h2>
+          <div class="field">
+            <label>作业名称</label>
+            <input id="hwTitle" placeholder="如：03-列表习题说明" />
+          </div>
+          <div class="field">
+            <label>批阅方式</label>
+            <select id="modeSwitch">
+              <option value="automatic">机器批阅</option>
+              <option value="manual">非机器批阅</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>截止时间</label>
+            <input id="hwDeadline" type="datetime-local" />
+          </div>
+          <div class="field">
+            <label id="uploadLabel">机器批阅包</label>
+            <input type="file" />
+          </div>
+          <div id="autoHint" class="note">
+            机器批阅包需为完整章节 ZIP。网站只静态解析，标准答案在工作进程的 Docker 容器中验证一次并生成私有标准结果，验证通过后等待中的提交自动入队。
+          </div>
+          <div id="manualHint" class="hint" hidden>
+            非机器批阅包只需 DOCX 说明与数据材料，不调用 Docker；教师逐题人工评分，材料更新不影响已有成绩。
+          </div>
+          <div class="row end" style="margin-top: 14px"><button id="saveHw">创建作业</button></div>
+        </section>
+
+        <section class="panel" data-panel="entries" hidden>
+          <h2>提交记录</h2>
+          <div class="grid two">
+            <div>
+              <div id="entryBox"></div>
+              <p class="hint" style="margin-top: 12px">
+                点击左侧学生查看明细。机器批阅的期望结果与实际返回值仅教师可见，学生端不显示答案。
+              </p>
+            </div>
+            <div class="card" id="detail" style="box-shadow: none">
+              <div class="empty">请选择左侧的一名学生</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="rubric" hidden>
+          <h2>代码质量报告与六维量规</h2>
+          <p class="muted">
+            六个维度按 5 分制打分：5=全部达标；4=核心达标；3=思路对但有关键错误；2=多处错误；1=未实现或不可解析。
+            拖动下方分值，右侧雷达图与综合分会实时更新（示例数据，不代表任何真实学生成绩）。
+          </p>
+          <div class="radar-wrap">
+            <canvas id="radar"></canvas>
+            <div>
+              <div id="dimBox"></div>
+              <div class="row between" style="margin-top: 10px">
+                <div>
+                  综合（5 分制）<b id="score5">0</b> ·
+                  百分制 <b id="score100">0</b> ·
+                  等级 <b id="scoreGrade">-</b>
+                </div>
+                <button class="subtle" id="resetRubric">重置为 3 分基准</button>
+              </div>
+            </div>
+          </div>
+          <p class="hint" style="margin-top: 14px">
+            静态评测不执行学生代码，缺陷为“疑似”结论，需教师用样例数据复核；报告不把静态推断写成运行通过或运行失败。
+          </p>
+        </section>
+      </main>
+    </div>
+
+    <script src="assets/prototype.js"></script>
+  </body>
+</html>

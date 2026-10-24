@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>管理员端 · 交互式原型</title>
+    <link rel="stylesheet" href="assets/prototype.css" />
+  </head>
+  <body data-page="admin">
+    <div class="topbar">
+      <div class="brand"><span>&gt;_</span>课码 · 管理后台</div>
+      <div class="spacer"></div>
+      <small class="muted">示例账号：管理员（原型演示）</small>
+    </div>
+
+    <div class="shell">
+      <nav class="side">
+        <div class="group">账号与班级</div>
+        <a href="#roster">账号管理</a>
+        <a href="#classes">教学班</a>
+        <a href="#import">名单导入</a>
+        <div class="group">系统配置</div>
+        <a href="#dict">数据字典</a>
+        <a href="#archive">归档管理</a>
+        <div class="group">原型</div>
+        <a href="index.html">返回首页</a>
+        <a href="teacher.html">教师端原型</a>
+        <a href="student.html">学生端原型</a>
+      </nav>
+
+      <main class="card" id="adminTabs">
+        <div class="tabs">
+          <button data-tab="roster">账号管理</button>
+          <button data-tab="classes">教学班</button>
+          <button data-tab="import">名单导入</button>
+          <button data-tab="dict">数据字典</button>
+          <button data-tab="archive">归档管理</button>
+        </div>
+
+        <section class="panel" data-panel="roster">
+          <div class="row between" style="margin-bottom: 12px">
+            <h2>账号管理</h2>
+            <div class="row">
+              <input placeholder="搜索姓名 / 学号" style="width: 200px" />
+              <button id="addStudent">新建学生账号</button>
+            </div>
+          </div>
+          <table id="rosterTable">
+            <thead>
+              <tr><th>学号</th><th>姓名</th><th>教学班</th><th>状态</th><th>操作</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <p class="note" style="margin-top: 12px">
+            新建账号默认使用临时密码并要求首次登录修改；删除会清理该账号的数据库关系与专用文件。
+          </p>
+        </section>
+
+        <section class="panel" data-panel="classes" hidden>
+          <h2>教学班</h2>
+          <table>
+            <thead>
+              <tr><th>班级编号</th><th>班级名称</th><th>课程</th><th>学期</th><th>人数</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">PY-2026-01</td><td>Python 教学班</td><td>Python 程序设计</td><td>2026 秋季</td><td>38</td>
+                <td><button class="subtle">编辑</button> <button class="subtle">授权</button></td>
+              </tr>
+              <tr>
+                <td class="mono">PY-2026-02</td><td>Python 提高班</td><td>Python 程序设计</td><td>2026 秋季</td><td>24</td>
+                <td><button class="subtle">编辑</button> <button class="subtle">授权</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="hint" style="margin-top: 12px">
+            按教学班为教师设置“作业管理 / 成绩查看 / 报表导出”权限；归档班级不在日常页面显示。
+          </p>
+        </section>
+
+        <section class="panel" data-panel="import" hidden>
+          <h2>名单导入</h2>
+          <div class="row" style="margin-bottom: 12px">
+            <button id="pickFile">选择 CSV / XLSX 文件</button>
+            <small class="muted">支持预览后再确认，失败行不会写入</small>
+          </div>
+          <div id="importPanel" hidden>
+            <table>
+              <thead><tr><th>学号</th><th>姓名</th><th>处理结果</th></tr></thead>
+              <tbody id="importBody"></tbody>
+            </table>
+            <div class="row end" style="margin-top: 12px"><button id="doImport">确认导入</button></div>
+          </div>
+          <p class="note" style="margin-top: 12px">导入后显示成功 / 失败明细，同一班级的人数与报表统计口径保持一致。</p>
+        </section>
+
+        <section class="panel" data-panel="dict" hidden>
+          <h2>数据字典</h2>
+          <div id="dictBox"></div>
+        </section>
+
+        <section class="panel" data-panel="archive" hidden>
+          <h2>归档管理</h2>
+          <div id="archiveBox"></div>
+          <p class="note" style="margin-top: 12px">
+            归档保留数据，所有角色的日常页面与旧链接隐藏该班内容；管理员取消勾选后恢复。
+          </p>
+        </section>
+      </main>
+    </div>
+
+    <script src="assets/prototype.js"></script>
+  </body>
+</html>

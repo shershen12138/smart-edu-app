@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>学生端 · 交互式原型</title>
+    <link rel="stylesheet" href="assets/prototype.css" />
+  </head>
+  <body data-page="student">
+    <div class="topbar">
+      <div class="brand"><span>&gt;_</span>课码 · 我的作业</div>
+      <div class="spacer"></div>
+      <small class="muted">示例账号：学生（原型演示）</small>
+    </div>
+
+    <div class="shell">
+      <nav class="side">
+        <div class="group">作业</div>
+        <a href="#mine">我的作业</a>
+        <a href="#submit">提交作业</a>
+        <a href="#result">查看结果</a>
+        <a href="#report">我的质量报告</a>
+        <div class="group">原型</div>
+        <a href="index.html">返回首页</a>
+        <a href="teacher.html">教师端原型</a>
+        <a href="admin.html">管理员端原型</a>
+      </nav>
+
+      <main class="card" id="studentTabs">
+        <div class="tabs">
+          <button data-tab="mine">我的作业</button>
+          <button data-tab="submit">提交作业</button>
+          <button data-tab="result">查看结果</button>
+          <button data-tab="report">我的质量报告</button>
+        </div>
+
+        <section class="panel" data-panel="mine">
+          <h2>我的作业</h2>
+          <table>
+            <thead>
+              <tr><th>作业名称</th><th>类型</th><th>截止时间</th><th>我的状态</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>03-列表习题说明</td><td><span class="tag">机器批阅</span></td><td>2026-11-02 23:59</td>
+                <td><span class="tag">已完成</span></td><td><button class="subtle">去提交</button></td>
+              </tr>
+              <tr>
+                <td>第 10 章综合练习</td><td><span class="tag amber">非机器批阅</span></td><td>2026-11-09 23:59</td>
+                <td><span class="tag grey">未提交</span></td><td><button class="subtle">去提交</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="note" style="margin-top: 12px">每题按通过用例数占该题全部用例的比例计分，当前结果取最后一次提交。</p>
+        </section>
+
+        <section class="panel" data-panel="submit" hidden>
+          <h2>提交作业</h2>
+          <div class="grid two">
+            <div>
+              <h3>机器批阅作业</h3>
+              <p class="muted">上传单个 UTF-8 编码的 .py 文件。</p>
+              <input type="file" id="fileInput" accept=".py" />
+              <div id="fileInfo" style="margin-top: 10px"></div>
+              <div class="row end" style="margin-top: 12px"><button id="doSubmit" disabled>提交</button></div>
+            </div>
+            <div>
+              <h3>非机器批阅作业</h3>
+              <p class="muted">上传包含 1001.py～1005.py 五个源码的 ZIP。</p>
+              <input type="file" id="zipInput" accept=".zip" />
+              <div id="zipInfo" style="margin-top: 10px"></div>
+            </div>
+          </div>
+
+          <div id="progress" hidden style="margin-top: 18px">
+            <h3>批阅进度</h3>
+            <div class="bar"><i id="bar" style="width: 0%"></i></div>
+            <div class="row between" style="margin-top: 6px">
+              <small class="muted" id="progressHint">排队中…</small>
+              <small class="muted"><span id="pctText">0%</span></small>
+            </div>
+            <p class="hint" style="margin-top: 10px">
+              进度条为原型模拟动画，不代表真实批阅。真实环境由工作进程在 Docker 容器中执行，完成后才有成绩。
+            </p>
+          </div>
+
+          <div id="resultBox" hidden class="card" style="margin-top: 14px; box-shadow: none">
+            <h3>我的结果（示例）</h3>
+            <div class="kv">
+              <span>作业</span><span>03-列表习题说明</span>
+              <span>提交次数</span><span>第 2 次</span>
+              <span>通过用例</span><span>13 / 15</span>
+              <span>本次得分</span><span>86.7</span>
+              <span>教师评语</span><span>列表切片边界处理需再检查，命名可更规范。</span>
+            </div>
+            <p class="hint" style="margin-top: 10px">为保护题目，学生端不显示期望结果与参考答案。</p>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="result" hidden>
+          <h2>查看结果</h2>
+          <table>
+            <thead>
+              <tr><th>题目</th><th>通过用例</th><th>本题得分</th><th>评语</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="mono">func301</td><td>3 / 3</td><td>6.0 / 6</td><td>—</td></tr>
+              <tr><td class="mono">func302</td><td>2 / 3</td><td>5.3 / 8</td><td>偶数个元素时中位数取平均有误</td></tr>
+              <tr><td class="mono">func303</td><td>3 / 3</td><td>6.0 / 6</td><td>—</td></tr>
+              <tr><td class="mono">func304</td><td>2 / 3</td><td>4.0 / 6</td><td>空列表未返回 []</td></tr>
+              <tr><td class="mono">func305</td><td>3 / 3</td><td>8.0 / 8</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="panel" data-panel="report" hidden>
+          <h2>我的代码质量报告</h2>
+          <p class="muted">报告由静态分析生成，不执行你的代码；点击按钮加载示例报告。</p>
+          <button id="showReport">加载我的报告</button>
+          <div id="reportBox" hidden class="radar-wrap" style="margin-top: 16px">
+            <canvas id="myRadar"></canvas>
+            <div>
+              <table>
+                <thead><tr><th>维度</th><th>权重</th><th>得分（5 分制）</th></tr></thead>
+                <tbody>
+                  <tr><td>D1 知识点覆盖与运用</td><td>25%</td><td>4.5</td></tr>
+                  <tr><td>D2 语法与静态正确性</td><td>15%</td><td>5.0</td></tr>
+                  <tr><td>D3 边界与健壮性</td><td>15%</td><td>3.0</td></tr>
+                  <tr><td>D4 逻辑与算法正确性</td><td>20%</td><td>4.0</td></tr>
+                  <tr><td>D5 题意一致性与输出契约</td><td>15%</td><td>3.5</td></tr>
+                  <tr><td>D6 代码规范与可读性</td><td>10%</td><td>4.0</td></tr>
+                </tbody>
+              </table>
+              <p class="note" style="margin-top: 10px">综合（5 分制）4.13 · 百分制 82.5 · 等级 B（示例数据）</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="assets/prototype.js"></script>
+  </body>
+</html>

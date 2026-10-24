@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>登录 · 交互式原型</title>
+    <link rel="stylesheet" href="assets/prototype.css" />
+  </head>
+  <body data-page="login">
+    <div class="topbar">
+      <div class="brand"><span>&gt;_</span>课码</div>
+      <div class="spacer"></div>
+      <a href="index.html">原型首页</a>
+    </div>
+
+    <div class="login-layout">
+      <section>
+        <div class="eyebrow muted">COURSE / CODE / GROW</div>
+        <h1>让每一次提交，<br />都有清晰的反馈。</h1>
+        <p class="muted">连接课堂、代码与学习。从第一行 Python，到独立解决一个问题。</p>
+        <div class="code-art">
+          <span># 今天，也进步一点点</span><br />
+          <b>def</b> learn(practice):<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;<b>return</b> practice + 1
+        </div>
+      </section>
+
+      <section class="card login-card">
+        <span class="brand-mark muted mono">&gt;_</span>
+        <h2>欢迎回到课码</h2>
+        <p class="muted">使用管理员为你创建的账号登录</p>
+
+        <form id="loginForm">
+          <div class="field">
+            <label>登录名</label>
+            <input id="username" placeholder="如 admin / teacher / student" autocomplete="username" />
+          </div>
+          <div class="field">
+            <label>密码</label>
+            <input id="password" type="password" autocomplete="current-password" />
+          </div>
+          <label class="row" style="gap: 6px; margin-bottom: 12px">
+            <input type="checkbox" id="firstLogin" /> 首次登录（初始密码需强制修改）
+          </label>
+          <button type="submit" class="full" style="width: 100%">登录工作空间 →</button>
+        </form>
+
+        <div id="changeBox" hidden>
+          <h3>首次登录：请修改初始密码</h3>
+          <form id="changeForm">
+            <div class="field">
+              <label>新密码（至少 10 位）</label>
+              <input id="newPwd" type="password" />
+            </div>
+            <div class="field">
+              <label>确认新密码</label>
+              <input id="newPwd2" type="password" />
+            </div>
+            <button type="submit" style="width: 100%">保存并继续</button>
+          </form>
+        </div>
+
+        <p class="hint" style="margin-top: 14px">
+          原型演示：不会校验真实账号。忘记密码请联系管理员核验身份后重置。
+        </p>
+        <div class="row" style="margin-top: 10px">
+          <button class="subtle" data-fill="admin">填入管理员</button>
+          <button class="subtle" data-fill="teacher">填入教师</button>
+          <button class="subtle" data-fill="student">填入学生</button>
+        </div>
+      </section>
+    </div>
+
+    <script src="assets/prototype.js"></script>
+  </body>
+</html>

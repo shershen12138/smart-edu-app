@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>课码 · 交互式原型首页</title>
+    <link rel="stylesheet" href="assets/prototype.css" />
+  </head>
+  <body data-page="index">
+    <div class="topbar">
+      <div class="brand"><span>&gt;_</span>课码 · Python 作业在线批阅系统</div>
+      <div class="spacer"></div>
+      <small class="muted">交互式原型 · 仅用于需求确认与界面评审</small>
+    </div>
+
+    <div style="padding: 20px; max-width: 1180px; margin: 0 auto" class="stack">
+      <section class="hero">
+        <h1>交互式原型（docs/software/prototype）</h1>
+        <p>
+          本原型由 AI 依据仓库现有页面与需求文档生成，用于演示管理员、教师、学生三类角色的界面与关键交互。
+          页面使用静态示例数据，<b>不连接数据库、不执行任何学生代码、不产生真实批阅成绩</b>。
+        </p>
+        <div class="row" style="margin-top: 12px">
+          <a class="btn" href="login.html" style="color: #fff">进入登录页</a>
+          <a class="btn ghost" href="admin.html" style="color: var(--green)">直接看管理员端</a>
+          <a class="btn ghost" href="teacher.html" style="color: var(--green)">直接看教师端</a>
+          <a class="btn ghost" href="student.html" style="color: var(--green)">直接看学生端</a>
+        </div>
+      </section>
+
+      <div class="grid three">
+        <div class="role-card">
+          <h3>管理员</h3>
+          <ul>
+            <li>教师 / 学生账号 CRUD、CSV 导入预览</li>
+            <li>教学班 CRUD 与归档恢复</li>
+            <li>数据字典与字典项维护</li>
+            <li>按教学班设置作业、成绩、导出权限</li>
+          </ul>
+          <a class="btn ghost" href="admin.html">打开原型</a>
+        </div>
+        <div class="role-card">
+          <h3>教师</h3>
+          <ul>
+            <li>机器 / 非机器批阅作业创建与时限调整</li>
+            <li>提交记录、期望与实际结果查看</li>
+            <li>逐题人工评分与评语、班级统计</li>
+            <li>学生代码质量报告与六维雷达图</li>
+          </ul>
+          <a class="btn ghost" href="teacher.html">打开原型</a>
+        </div>
+        <div class="role-card">
+          <h3>学生</h3>
+          <ul>
+            <li>机器批阅提交单个 .py</li>
+            <li>非机器批阅提交 1001.py～1005.py 的 ZIP</li>
+            <li>查看得分、评语（不显示答案）</li>
+            <li>查看自己的代码质量报告与雷达图</li>
+          </ul>
+          <a class="btn ghost" href="student.html">打开原型</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>原型包含的可交互点</h2>
+        <div class="grid two">
+          <div>
+            <h3>登录页</h3>
+            <p class="muted">账号密码校验提示；勾选“首次登录”后进入强制改密流程，校验新密码长度与两次一致性。</p>
+            <h3>管理员端</h3>
+            <p class="muted">名单分页与启停、删除二次确认、新建账号弹窗（学号重复校验）、批量导入预览（成功 / 失败行）、数据字典增删、班级归档开关。</p>
+          </div>
+          <div>
+            <h3>教师端</h3>
+            <p class="muted">批阅方式切换联动上传说明、作业创建后列表刷新、提交记录切换、逐题评分滑块实时合计与保存、六维量规滑块联动雷达图与综合分。</p>
+            <h3>学生端</h3>
+            <p class="muted">.py / ZIP 文件类型校验、提交进度条（明确标注为原型模拟）、结果页只显示得分与评语、我的质量报告雷达图。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>与真实实现的对应关系</h2>
+        <table>
+          <thead>
+            <tr><th>原型页面</th><th>真实实现位置</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>login.html</td><td>templates/school/login.html、school/views.py</td><td>登录与首次强制改密</td></tr>
+            <tr><td>admin.html</td><td>school/portal/administration_views.py、templates/portal/</td><td>账号、班级、名单导入、字典</td></tr>
+            <tr><td>teacher.html</td><td>school/portal/learning_views.py、rubric_views.py、quality_views.py</td><td>作业、提交记录、评分、质量报告</td></tr>
+            <tr><td>student.html</td><td>school/portal/learning_views.py、templates/portal/work.html</td><td>提交与查看结果</td></tr>
+            <tr><td>六维量规</td><td>school/portal/rubric_agent.py、tools/code_quality_agent/</td><td>评分量规与雷达图渲染</td></tr>
+          </tbody>
+        </table>
+        <p class="hint" style="margin-top: 12px">
+          原型是需求表达工具，不是可运行的系统。真实批阅依赖 Docker Linux 引擎与题目包，结果以系统内记录为准。
+        </p>
+      </div>
+    </div>
+
+    <script src="assets/prototype.js"></script>
+  </body>
+</html>
