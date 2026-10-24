@@ -123,6 +123,10 @@
               <td>{% if e.snapshot.grading_mode == 'manual' %}非机器批阅{% else %}机器批阅{% endif %}</td>
               <td>
                 <a href="{% url 'entry' e.pk %}">{% if work.grading_mode == 'manual' %}查看提交 / 批阅结果{% else %}查看题目 / 用例结果{% endif %}</a>
+                {% if work.grading_mode != 'manual' %}
+                  <br>
+                  <a href="{% url 'quality_report' e.pk %}">查看评测报告</a>
+                {% endif %}
               </td>
             </tr>
           {% empty %}

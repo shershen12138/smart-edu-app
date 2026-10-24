@@ -62,12 +62,14 @@ def _task_issue(
     )
 
 
-def _analyze_student(
-    path: Path,
+def _analyze_source(
+    source: str,
+    lint_path: Path,
     specs: tuple[models.TaskSpec, ...],
     dimensions: list[models.Dimension],
+    name: str,
+    file_name: str,
 ) -> StudentAnalysis:
-    source = path.read_text(encoding="utf-8", errors="replace")
     blocks = static_analysis.split_functions(source)
     by_name = {block.name: block for block in blocks}
     helper_names = set(by_name) - {spec.task_id for spec in specs}
@@ -75,7 +77,7 @@ def _analyze_student(
     module_ast, module_error = static_analysis.parse_whole(source)
     lint_messages: list[lint.LintMessage] = []
     if module_ast is not None:
-        lint_messages, _ = lint.run(path)
+        lint_messages, _ = lint.run(lint_path)
 
     results: list[models.TaskResult] = []
     style_notes: list[str] = []
@@ -188,14 +190,43 @@ def _analyze_student(
     total = rubric.weighted_total(scores, dimensions)
 
     return StudentAnalysis(
-        name=path.stem,
-        file_name=path.name,
+        name=name,
+        file_name=file_name,
         results=results,
         scores=scores,
         total=total,
         style_notes=style_notes[:8],
         module_note=module_error,
     )
+
+
+def _analyze_student(
+    path: Path,
+    specs: tuple[models.TaskSpec, ...],
+    dimensions: list[models.Dimension],
+) -> StudentAnalysis:
+    source = path.read_text(encoding="utf-8", errors="replace")
+    return _analyze_source(source, path, specs, dimensions, path.stem, path.name)
+
+
+def analyze_text(
+    source: str,
+    specs: tuple[models.TaskSpec, ...],
+    dimensions: list[models.Dimension],
+    workdir: Path,
+    name: str = "student",
+) -> StudentAnalysis:
+    """从内存中的源码分析（数据库提交使用）。pylint 需要真实文件，临时落盘后删除。"""
+    workdir.mkdir(parents=True, exist_ok=True)
+    lint_path = workdir / f"lint-{name}.py"
+    lint_path.write_text(source, encoding="utf-8")
+    try:
+        return _analyze_source(source, lint_path, specs, dimensions, name, f"{name}.py")
+    finally:
+        try:
+            lint_path.unlink()
+        except OSError:
+            pass
 
 
 def run(course: str, rubric_path: Path | None = None) -> Evaluation:
