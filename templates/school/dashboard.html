@@ -1,0 +1,92 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <section class="welcome">
+    <div>
+      <div class="eyebrow">{% if student_workspace %}LEARNING SPACE{% else %}TEACHING WORKSPACE{% endif %}</div>
+      <h1>你好，{{ user.full_name|default:user.username }}。</h1>
+      <p>{% if student_workspace %}查看课堂进度，继续今天的编程练习。{% else %}管理课程题目与作业，查看学生成绩和课堂进度。{% endif %}</p>
+    </div>
+    <span class="welcome-symbol">{ py }</span>
+  </section>
+  <div class="stat-grid">
+    {% for label,value in stats %}
+      <div class="stat">
+        <span>{{ label }}</span>
+        <strong>{{ value }}</strong>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="two-columns">
+    <section>
+      <div class="section-heading">
+        <h2>课程作业</h2>
+        <a href="{% url 'classes' %}">全部教学班 →</a>
+      </div>
+      <div class="assignment-grid">
+        {% for a in assignments %}
+          <a class="card assignment-card" href="{% url 'assignment' a.pk %}">
+            <span class="tag">{{ a.classroom.name }}</span>
+            <h3>{{ a.current_version.title }}</h3>
+            <p>{{ a.current_version.description|truncatechars:70 }}</p>
+            <div class="card-meta">
+              <span>截止 {{ a.current_version.rule.deadline|date:'m月d日 H:i' }}</span>
+              <span>打开作业 ↗</span>
+            </div>
+          </a>
+        {% empty %}
+          <div class="empty card">
+            还没有已发布的作业。
+            <br>
+            <small>教师发布后会在这里显示。</small>
+          </div>
+        {% endfor %}
+      </div>
+      {% if drafts %}
+        <div class="section-heading">
+          <h2>待发布草稿</h2>
+        </div>
+        {% for d in drafts %}
+          <a class="list-row card" href="{% url 'assignment' d.assignment_id %}">
+            <span>
+              {{ d.title }}
+              <small>{{ d.assignment.classroom.name }}</small>
+            </span>
+            <span class="tag amber">草稿</span>
+          </a>
+        {% endfor %}
+      {% endif %}
+    </section>
+    <aside>
+      <div class="section-heading">
+        <h2>课堂公告</h2>
+      </div>
+      <section class="card">
+        {% for a in announcements %}
+          <article class="notice">
+            <small>{{ a.classroom.name|default:'全站公告' }} · {{ a.created_at|date:'m/d' }}</small>
+            <h3>{{ a.title }}</h3>
+            <p class="preline">{{ a.content }}</p>
+          </article>
+        {% empty %}
+          <div class="empty">暂时没有公告</div>
+        {% endfor %}
+      </section>
+      {% if student_workspace %}
+        <div class="section-heading">
+          <h2>最近提交</h2>
+          <a href="{% url 'submissions' %}">更多 →</a>
+        </div>
+        <section class="card">
+          {% for s in submissions %}
+            <a class="recent" href="{% url 'submission' s.pk %}">
+              <strong>{{ s.question.problem_version.title }}</strong>
+              <small>#{{ s.pk }} · {{ s.received_at|date:'m/d H:i' }}</small>
+            </a>
+          {% empty %}
+            <div class="empty">从一道练习开始吧。</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+    </aside>
+  </div>
+{% endblock %}

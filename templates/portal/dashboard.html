@@ -1,0 +1,80 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <section class="welcome">
+    <div>
+      <div class="eyebrow">PYTHON CLASSROOM</div>
+      <h1>{{ title }}</h1>
+      <p>{{ user.full_name }}，欢迎回来。{% if portal_role == "teacher" %}上传题目，设置时限，其余交给学生和批阅程序。{% elif portal_role == "admin" %}集中维护账号、班级和基础数据。{% endif %}
+      </p>
+    </div>
+    <div class="welcome-symbol">{ }</div>
+  </section>
+  {% if description %}
+    <p class="tip">{{ description }}</p>
+  {% endif %}
+  {% include "portal/stats.html" %}
+  <div class="actions space-bottom">
+    {% for item in shortcuts %}
+      <a class="button {% if not forloop.first %}secondary{% endif %}"
+         href="{{ item.url }}">{{ item.label }} →</a>
+    {% endfor %}
+  </div>
+  {% if portal_role == "teacher" %}
+    <div class="section-heading" id="assignments">
+      <h2>{{ teacher_filter_label }}</h2>
+      <div class="actions">
+        {% if selected_filter != 'all' %}<a href="{% url 'dashboard' %}?filter=all#assignments">显示全部</a>{% endif %}
+        <a href="{% url 'results' %}">全部报表 →</a>
+      </div>
+    </div>
+    {% if selected_filter == 'classrooms' %}
+      <div class="assignment-grid board-grid">
+        {% for item in card_page %}
+          <article class="card assignment-card">
+            <span class="tag">{{ item.classroom.term }}</span>
+            <h2>{{ item.classroom.name }}</h2>
+            <p>{{ item.classroom.course_name }}</p>
+            <div class="card-meta">
+              <span>班级编号 {{ item.classroom.code }}</span>
+              <span>本班作业 {{ item.work_count }} 项</span>
+            </div>
+          </article>
+        {% empty %}
+          <div class="card empty">当前没有可管理的教学班。</div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="assignment-grid board-grid">
+        {% for s in card_page %}
+          <a class="card assignment-card"
+             href="{% url 'work_results' s.work.pk %}">
+            <div class="tag-row">
+              <span class="tag">{{ s.work.classroom.name }}</span>
+              <span class="tag{% if s.work.grading_mode == 'manual' %} amber{% endif %}">{{ s.work.get_grading_mode_display }}</span>
+            </div>
+            <h2>{{ s.work.title }}</h2>
+            <p>截止 {{ s.work.deadline|date:'Y-m-d H:i' }}</p>
+            <div class="teacher-card-stats">
+              {% for label,value in s.stats %}
+                <span><small>{{ label }}</small><strong>{{ value }}</strong></span>
+              {% endfor %}
+            </div>
+          </a>
+        {% empty %}
+          <div class="card empty">当前筛选条件下没有作业。</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if card_page.has_other_pages %}
+      <nav class="pagination" aria-label="作业进度分页">
+        {% if card_page.has_previous %}
+          <a href="?filter={{ selected_filter|urlencode }}&page={{ card_page.previous_page_number }}#assignments">上一页</a>
+        {% endif %}
+        <span>第 {{ card_page.number }} / {{ card_page.paginator.num_pages }} 页</span>
+        {% if card_page.has_next %}
+          <a href="?filter={{ selected_filter|urlencode }}&page={{ card_page.next_page_number }}#assignments">下一页</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  {% endif %}
+{% endblock %}

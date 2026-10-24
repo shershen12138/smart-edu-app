@@ -1,0 +1,118 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="eyebrow">GRADES & PROGRESS</div>
+    <h1>{{ assignment.current_version.title }} · 成绩</h1>
+    <p>先计算或自动重评，再发布正式成绩。每个历史批次都保留。</p>
+    {% if can_publish %}
+      <div class="actions">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="calculate">
+          <button class="button">计算新成绩批次</button>
+        </form>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="rejudge">
+          <button class="button secondary">按当前题目全部重评</button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+  <section class="card">
+    <h2>成绩批次</h2>
+    {% for r in revisions %}
+      <div class="list-row">
+        <a href="?revision={{ r.pk }}">
+          第 {{ r.number }} 批 · {{ r.reason }}
+          <small>统计截止 {{ r.cutoff|date:'Y-m-d H:i:s' }}</small>
+        </a>
+        <div class="actions">
+          <span class="tag">{{ r.get_status_display }}</span>
+          {% if can_publish and r.status != "published" %}
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="publish">
+              <input type="hidden" name="revision" value="{{ r.pk }}">
+              <button class="button small">发布此批次</button>
+            </form>
+          {% endif %}
+          {% if can_export and r.status == "published" %}
+            <a href="{% url 'grades_export' r.pk %}">导出 CSV</a>
+          {% endif %}
+        </div>
+      </div>
+    {% empty %}
+      <p class="empty">尚未生成成绩批次</p>
+    {% endfor %}
+  </section>
+  {% if selected %}
+    <div class="section-heading">
+      <h2>第 {{ selected.number }} 批 · {{ grades|length }} 人</h2>
+      <span>平均分 {{ average|default_if_none:'—'|floatformat:2 }}</span>
+    </div>
+    <div class="card table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>学工号</th>
+            <th>姓名</th>
+            <th>题目得分</th>
+            <th>总分</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in grades %}
+            <tr>
+              <td>{{ g.number_snapshot }}</td>
+              <td>{{ g.name_snapshot }}</td>
+              <td>
+                {% for q in g.questions.all %}
+                  <span class="tag">{{ q.question_key }}：{{ q.final_score }}</span>
+                {% endfor %}
+              </td>
+              <td>
+                <strong>{{ g.total }}</strong>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">重评批次在评测完成并发布后显示成绩。</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  <div class="section-heading">
+    <h2>最近学生提交</h2>
+  </div>
+  <div class="card table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>学生</th>
+          <th>题目</th>
+          <th>时间</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in recent_submissions %}
+          <tr>
+            <td>{{ s.student.full_name }}</td>
+            <td>{{ s.question.problem_version.title }}</td>
+            <td>{{ s.received_at|date:'m-d H:i' }}</td>
+            <td>
+              <a href="{% url 'submission' s.pk %}">查看代码与结果</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4">尚无提交</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

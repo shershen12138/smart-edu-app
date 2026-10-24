@@ -1,0 +1,73 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <section class="welcome">
+    <div>
+      <div class="eyebrow">LEARN BY DOING</div>
+      <h1>我的作业看板</h1>
+      <p>查看老师的题目文件，完成代码，再上传 Python 作业。</p>
+    </div>
+    <div class="welcome-symbol">.py</div>
+  </section>
+  {% include "portal/stats.html" %}
+  <div class="section-heading" id="assignments">
+    <h2>{{ card_filter_label }}</h2>
+    {% if selected_filter != 'all' %}<a href="{% url 'dashboard' %}?filter=all#assignments">显示全部</a>{% endif %}
+  </div>
+  {% if selected_filter == 'classrooms' %}
+    <div class="assignment-grid board-grid">
+      {% for item in card_page %}
+        <article class="card assignment-card">
+          <span class="tag">{{ item.classroom.term }}</span>
+          <h2>{{ item.classroom.name }}</h2>
+          <p>{{ item.classroom.course_name }}</p>
+          <div class="card-meta">
+            <span>班级编号 {{ item.classroom.code }}</span>
+            <span>本班作业 {{ item.work_count }} 项</span>
+          </div>
+        </article>
+      {% empty %}
+        <div class="card empty">你目前还没有加入教学班。</div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="assignment-grid board-grid">
+      {% for c in card_page %}
+        <article class="card assignment-card">
+          <div class="tag-row">
+            <span class="tag">{{ c.work.classroom.name }}</span>
+            <span class="tag{% if c.work.grading_mode == 'manual' %} amber{% endif %}">{{ c.work.get_grading_mode_display }}</span>
+          </div>
+          <h2>
+            <a href="{% url 'work' c.work.pk %}">{{ c.work.title }}</a>
+          </h2>
+          <p>截止 {{ c.work.deadline|date:'Y-m-d H:i' }} · {% if c.expired %}已截止{% else %}可提交{% endif %}</p>
+          <div class="card-meta">
+            <span>{% if c.entry %}{{ c.entry.get_status_display }}{% else %}尚未提交{% endif %}</span>
+            <span>
+              {% if c.entry and c.entry.total != None %}{{ c.entry.total|floatformat:1 }} / {{ c.entry.snapshot.max_score }} 分{% endif %}
+            </span>
+          </div>
+          <div class="actions space-top">
+            <a class="button small" href="{% url 'work' c.work.pk %}">查看题目 / 提交</a>
+            {% if c.entry %}
+              <a class="button secondary small" href="{% url 'entry' c.entry.pk %}">查看批阅结果</a>
+            {% endif %}
+          </div>
+        </article>
+      {% empty %}
+        <div class="card empty">当前筛选条件下没有作业。</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% if card_page.has_other_pages %}
+    <nav class="pagination" aria-label="作业分页">
+      {% if card_page.has_previous %}
+        <a href="?filter={{ selected_filter|urlencode }}&page={{ card_page.previous_page_number }}#assignments">上一页</a>
+      {% endif %}
+      <span>第 {{ card_page.number }} / {{ card_page.paginator.num_pages }} 页</span>
+      {% if card_page.has_next %}
+        <a href="?filter={{ selected_filter|urlencode }}&page={{ card_page.next_page_number }}#assignments">下一页</a>
+      {% endif %}
+    </nav>
+  {% endif %}
+{% endblock %}

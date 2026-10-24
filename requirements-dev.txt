@@ -1,0 +1,5 @@
+-r requirements.lock.txt
+ruff==0.16.8
+djlint==1.46.2
+pylint>=3.3,<5
+matplotlib>=3.8,<4

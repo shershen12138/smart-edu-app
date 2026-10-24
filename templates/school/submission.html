@@ -1,0 +1,69 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="eyebrow">SUBMISSION #{{ submission.pk }}</div>
+    <h1>{{ submission.question.problem_version.title }}</h1>
+    <p>
+      {{ submission.received_at|date:'Y-m-d H:i:s' }} · {{ submission.get_kind_display }} · 第 {{ submission.sequence }} 次提交
+    </p>
+  </div>
+  <section class="result-card {% if run.verdict == 'AC' %}accepted{% endif %}"
+           {% if poll %}data-poll="{% url 'submission_status' submission.pk %}"{% endif %}>
+    <div>
+      <span class="eyebrow">评测结果</span>
+      <h2>
+        {{ run.get_status_display }}
+        {% if run.verdict %}
+          · {{ run.verdict }}
+        {% endif %}
+      </h2>
+      <p>
+        {% if run.status == "error" %}
+          评测服务出现异常，成绩暂未确定；请联系教师或管理员处理。
+        {% elif poll %}
+          代码已受理，正在等待评测结果。页面会自动更新。
+        {% elif run.status == "superseded" %}
+          此任务已作废或由新任务替代。
+        {% else %}
+          通过 {{ passed }} / {{ formal_count }} 个正式测试用例。
+        {% endif %}
+      </p>
+    </div>
+    <div class="score">
+      {{ run.base_score|default_if_none:'—' }}
+      <small>基础得分</small>
+    </div>
+  </section>
+  <div class="tip space-top">
+    自动评测结果供学习参考，正式成绩以教师发布批次为准。AC：通过；WA：答案错误；CE：语法错误；RE：运行错误；TLE：超时；MLE：内存超限；OLE：输出超限。
+  </div>
+  <div class="two-columns space-top">
+    <section class="card">
+      <h2>代码快照</h2>
+      <pre class="source-code">{{ code }}</pre>
+    </section>
+    <section class="card">
+      <h2>测试反馈</h2>
+      {% for r in results %}
+        <div class="list-row">
+          <span>
+            测试点 {{ forloop.counter }}
+            <small>
+              {% if r.case.is_sample %}
+                公开样例 · 不计分
+              {% elif r.case.hidden %}
+                隐藏用例
+              {% else %}
+                公开用例
+              {% endif %}
+            </small>
+          </span>
+          <span class="tag {% if r.verdict != 'AC' %}amber{% endif %}">{{ r.verdict }}</span>
+        </div>
+      {% empty %}
+        <p class="empty">评测完成后显示各测试点结论。</p>
+      {% endfor %}
+      <p class="help">页面显示测试输入；标准答案与程序输出不对学生公开。</p>
+    </section>
+  </div>
+{% endblock %}

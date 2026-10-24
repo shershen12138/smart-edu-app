@@ -1,0 +1,32 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <div class="eyebrow">CLASSROOMS</div>
+      <h1>教学班</h1>
+      <p>课程、作业与协作都从这里开始。</p>
+    </div>
+    {% if administrator %}
+      <a class="button" href="{% url 'class_create' %}">＋ 新建教学班</a>
+    {% endif %}
+  </div>
+  <div class="assignment-grid">
+    {% for c in classes %}
+      <a class="card assignment-card" href="{% url 'class_detail' c.pk %}">
+        <span class="tag">{{ c.term }}</span>
+        <h2>{{ c.name }}</h2>
+        <p>{{ c.course_name }}</p>
+        <small>
+          {{ c.code }} ·
+          {% if c.archived %}
+            已归档
+          {% else %}
+            教学中
+          {% endif %}
+        </small>
+      </a>
+    {% empty %}
+      <div class="card empty">尚未加入教学班，请联系管理员配置名单或任课权限。</div>
+    {% endfor %}
+  </div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="eyebrow">STUDENT ROSTER</div>
+    <h1>批量导入学生名单</h1>
+    <p>先检查预览，再确认写入。已有相同账号不会重复创建。</p>
+  </div>
+  <section class="card">
+    <a href="{% url 'import_template' %}">下载 CSV 模板 ↓</a>
+    <p class="subtle">支持 UTF-8 CSV 和 Excel（.xlsx），每批最多 500 人。Excel 表头与模板一致；学号建议设为文本格式。</p>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="preview">
+      <input type="file"
+             name="file"
+             accept=".csv,.xlsx"
+             required
+             aria-label="名单文件">
+      <button class="button space-top">预览与校验</button>
+    </form>
+  </section>
+  {% if rows %}
+    <div class="section-heading">
+      <h2>导入预览 · {{ rows|length }} 行</h2>
+    </div>
+    <div class="card table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>行号</th>
+            <th>账号</th>
+            <th>姓名</th>
+            <th>学号</th>
+            <th>班级</th>
+            <th>校验</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>{{ r.line }}</td>
+              <td>{{ r.username }}</td>
+              <td>{{ r.full_name }}</td>
+              <td>{{ r.student_no }}</td>
+              <td>{{ r.class_code }}</td>
+              <td>{{ r.error|default:'通过' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if valid %}
+      <section class="card space-top">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="commit">
+          <label>
+            新账号初始密码
+            <input type="password"
+                   name="password"
+                   minlength="10"
+                   required
+                   autocomplete="new-password">
+          </label>
+          <p class="help">仅用于本批新建账号，首次登录强制改密。请通过约定渠道分别发给学生。</p>
+          <button class="button">确认导入</button>
+        </form>
+      </section>
+    {% endif %}
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends shell_template|default:"school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="eyebrow">WORKSPACE</div>
+    <h1>{{ title }}</h1>
+    {% if description %}
+      <p>{{ description }}</p>
+    {% endif %}
+  </div>
+  <section class="card form-card">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <div class="actions">
+        <button class="button">保存</button>
+        {% if user.must_change_password %}
+          <button class="button secondary" formaction="{% url 'logout' %}" formnovalidate>退出登录</button>
+        {% else %}
+          <a class="button secondary" href="{{ back_url|default:'/' }}">取消并返回</a>
+        {% endif %}
+      </div>
+    </form>
+  </section>
+{% endblock %}

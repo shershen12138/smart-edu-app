@@ -1,0 +1,9 @@
+.git
+.venv
+.runtime
+.env
+.document_work
+交付文档
+__pycache__
+*.pyc
+staticfiles

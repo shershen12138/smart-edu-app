@@ -1,0 +1,17 @@
+<div class="stat-grid">
+  {% for stat in stats %}
+    {% if stat.url %}
+      <a class="stat stat-link{% if stat.active %} active{% endif %}"
+         href="{{ stat.url }}"
+         {% if stat.active %}aria-current="true"{% endif %}>
+        <span>{{ stat.label }}</span>
+        <strong>{{ stat.value }}</strong>
+      </a>
+    {% else %}
+      <div class="stat">
+        <span>{{ stat.0 }}</span>
+        <strong>{{ stat.1 }}</strong>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>

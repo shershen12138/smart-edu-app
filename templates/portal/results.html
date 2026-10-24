@@ -1,0 +1,76 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <h1>{{ title }}</h1>
+      <p>{{ work.classroom.name }} · 以当前在班学生的最后一次提交统计，未批阅不计入均分。</p>
+    </div>
+    {% if export %}
+      <div class="actions"><a class="button" href="{% url 'work_export' work.pk %}">导出 CSV 报表</a>
+      <a class="button secondary"
+   href="{% url 'work_submissions_download' work.pk %}">打包下载作业（每人最后一次）</a></div>
+    {% endif %}
+  </div>
+  {% include "portal/package_update_status.html" %}
+  {% include "portal/stats.html" %}
+  <section class="card score-distribution space-bottom">
+    <div class="section-heading">
+      <div>
+        <h2>全班成绩分布</h2>
+        <p>按每位学生最后一次已完成批阅的成绩占本次作业总分比例统计，共 {{ distribution_graded_count }} 人。</p>
+      </div>
+    </div>
+    {% if distribution_graded_count %}
+      <div class="score-column-chart" role="img" aria-label="全班成绩分布柱状图">
+        {% for bucket in score_distribution %}
+          <div class="score-column"
+               aria-label="{{ bucket.label }}：{{ bucket.count }} 人">
+            <strong>{{ bucket.count }} 人</strong>
+            <div class="score-column-track">
+              <i style="height: {{ bucket.percent }}%"></i>
+            </div>
+            <span>{{ bucket.label }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">当前还没有已完成批阅的成绩，暂时无法生成分布图。</div>
+    {% endif %}
+  </section>
+  <div class="card table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>学号</th>
+          <th>姓名</th>
+          <th>提交状态</th>
+          <th>得分</th>
+          <th>提交时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td>{{ row.student.student_no }}</td>
+            <td>
+              <a href="{% url 'student_results' work.classroom_id row.student.pk %}">{{ row.student.full_name }}</a>
+            </td>
+            <td>{{ row.entry.get_status_display|default:'未提交' }}</td>
+            <td>{% if row.entry.total != None %}{{ row.entry.total|floatformat:1 }}{% else %}—{% endif %}</td>
+            <td>{{ row.entry.submitted_at|date:'m-d H:i'|default:'—' }}</td>
+            <td>
+              {% if row.entry %}
+                <a href="{% url 'entry' row.entry.pk %}">{% if work.grading_mode == "manual" %}人工批阅{% else %}题目 / 用例结果{% endif %}</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" class="empty">本班还没有学生，请联系管理员维护名单。</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

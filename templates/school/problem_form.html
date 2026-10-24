@@ -1,0 +1,24 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div class="eyebrow">{{ classroom.name }}</div>
+    <h1>{{ title }}</h1>
+    <p>填写题意、输入输出格式和数据范围，样例与批阅程序留待接入。</p>
+  </div>
+  <form method="post">
+    {% csrf_token %}
+    <section class="card form-card">
+      {{ form.as_p }}
+    </section>
+    <section class="card space-top">
+      <h2>样例与批阅程序</h2>
+      <span class="tag amber">预留接入</span>
+      <p>此处暂留空，无需逐条填写样例或参考程序。后续接入现有批阅代码。</p>
+      <p class="help">现在可以保存题目和作业草稿；评测就绪后再发布给学生。已有评测配置会保留。</p>
+    </section>
+    <div class="sticky-actions">
+      <a class="button secondary" href="{{ back_url }}">取消并返回</a>
+      <button class="button">保存题目</button>
+    </div>
+  </form>
+{% endblock %}

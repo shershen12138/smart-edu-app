@@ -1,0 +1,26 @@
+{% extends "school/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <h1>站内通知</h1>
+      <p>成绩发布与申请进度，及时知晓。</p>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <button class="button secondary">全部标记为已读</button>
+    </form>
+  </div>
+  <section class="card">
+    {% for n in notifications %}
+      <div class="list-row">
+        <div>
+          <strong>{{ n.message }}</strong>
+          <small>{{ n.created_at|date:'Y-m-d H:i' }}</small>
+        </div>
+        <span class="tag {% if not n.read_at %}amber{% endif %}">{{ n.read_at|yesno:'已读,未读' }}</span>
+      </div>
+    {% empty %}
+      <div class="empty">没有新通知</div>
+    {% endfor %}
+  </section>
+{% endblock %}

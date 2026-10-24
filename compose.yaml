@@ -1,0 +1,72 @@
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: coursejudge
+      MYSQL_USER: coursejudge
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -u coursejudge -e 'SELECT 1' coursejudge"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+  web:
+    build: .
+    env_file: .env
+    environment: &app-environment
+      DATABASE_URL: mysql://coursejudge:${MYSQL_PASSWORD}@db:3306/coursejudge
+      REDIS_URL: redis://redis:6379/0
+      PRIVATE_STORAGE: /storage
+      JUDGE_HOST_STORAGE: ${JUDGE_HOST_STORAGE:?Set absolute host storage path}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ${JUDGE_HOST_STORAGE}:/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    env_file: .env
+    environment: *app-environment
+    volumes:
+      - ${JUDGE_HOST_STORAGE}:/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+  beat:
+    build: .
+    env_file: .env
+    environment: *app-environment
+    command: ["celery", "-A", "config", "beat", "-l", "INFO", "--schedule=/app/.runtime/celerybeat-schedule"]
+    volumes:
+      - ${JUDGE_HOST_STORAGE}:/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+volumes:
+  mysql_data:
+  redis_data:

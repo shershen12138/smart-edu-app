@@ -1,0 +1,94 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{{ title|default:'工作台' }} · 课码</title>
+    <link rel="stylesheet" href="{% static 'app.css' %}">
+    <script src="{% static 'app.js' %}" defer></script>
+  </head>
+  <body>
+    {% if user.is_authenticated %}
+      <aside class="sidebar">
+        <a class="brand" href="{% url 'dashboard' %}">
+          <span class="brand-mark">&gt;_</span>
+          <span>
+            课码
+            <small>PYTHON CLASSROOM</small>
+          </span>
+        </a>
+        <p class="nav-label">课程工作空间</p>
+        <nav>
+          <a href="{% url 'dashboard' %}">▦ &nbsp; 工作台</a>
+          <a href="{% url 'classes' %}">▤ &nbsp; 教学班</a>
+          {% if student_workspace %}
+            <a href="{% url 'submissions' %}">⌘ &nbsp; 我的提交</a>
+            <a href="{% url 'my_grades' %}">◷ &nbsp; 我的成绩</a>
+          {% endif %}
+          <a href="{% url 'notifications' %}">
+            ◇ &nbsp; 站内通知
+            {% if unread_count %}
+              <b>
+                {{ unread_count }}
+              </b>
+            {% endif %}
+          </a>
+          {% if administrator %}
+            <p class="nav-label">平台管理</p>
+            <a href="{% url 'users' %}">♙ &nbsp; 用户与身份</a>
+            <a href="{% url 'users_import' %}">↥ &nbsp; 学生名单导入</a>
+            <a href="{% url 'operations' %}">◎ &nbsp; 监控与审计</a>
+            <a href="{% url 'announcement_create' %}">＋ &nbsp; 平台公告</a>
+          {% endif %}
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="avatar">{{ user.full_name|first|default:'U' }}</div>
+          <strong>{{ user.full_name|default:user.username }}</strong>
+          <small>
+            {% for role in user.roles.all %}
+              {{ role.get_role_display }}
+            {% endfor %}
+          </small>
+          <a href="{% url 'profile' %}">个人中心 · 切换身份</a>
+          <a href="{% url 'password' %}">修改密码</a>
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button class="text-button">退出登录</button>
+          </form>
+        </div>
+      </aside>
+    {% endif %}
+    <main class="main {% if not user.is_authenticated %}auth-main{% endif %}">
+      {% if user.is_authenticated %}
+        <header class="topbar">
+          <span>
+            Python 程序设计
+            <span class="slash">/</span>
+            {{ title|default:'工作台' }}
+          </span>
+          <span class="subtle">一起写好每一行代码</span>
+        </header>
+      {% endif %}
+      <div class="content">
+        {% if user.is_authenticated and request.resolver_match.url_name != "dashboard" %}
+          <div class="page-back">
+            {% if back_url %}
+              <a class="button secondary small"
+                 href="{{ back_url }}">← {{ back_label|default:'返回上一层' }}</a>
+            {% else %}
+              <a class="button secondary small" href="{% url 'dashboard' %}">← 返回工作台</a>
+            {% endif %}
+          </div>
+        {% endif %}
+        {% for message in messages %}
+          <div class="message {{ message.tags }}" role="alert">{{ message }}</div>
+        {% endfor %}
+        {% block content %}{% endblock %}
+      </div>
+      <footer>
+        课码 · Python 编程作业在线评测与批改系统
+      </footer>
+    </main>
+  </body>
+</html>
