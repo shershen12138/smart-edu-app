@@ -55,11 +55,18 @@ def analyze(
     rubric_path: Path,
     workdir: Path,
     name: str = "student",
+    dimensions: Sequence[models.Dimension] | None = None,
+    rubric_note: str | None = None,
 ) -> tuple[pipeline.StudentAnalysis, list[models.Dimension], str]:
+    """dimensions 为空时读取 Markdown 量表，否则使用数据库中的作业评分标准。"""
     specs = build_specs(items)
-    dimensions, rubric_note = rubric.load_rubric(rubric_path)
-    analysis = pipeline.analyze_text(source, specs, dimensions, workdir, name)
-    return analysis, dimensions, rubric_note
+    if dimensions:
+        active = list(dimensions)
+        note = rubric_note or "使用作业评分标准"
+    else:
+        active, note = rubric.load_rubric(rubric_path)
+    analysis = pipeline.analyze_text(source, specs, active, workdir, name)
+    return analysis, active, note
 
 
 def radar_png(analysis: pipeline.StudentAnalysis, dimensions: Sequence[models.Dimension]) -> bytes:

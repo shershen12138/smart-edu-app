@@ -385,3 +385,27 @@ def detect_points(fn: ast.FunctionDef, helper_names: set[str]) -> list[str]:
         except Exception:  # 单条检测器异常不应中断整份评测
             continue
     return covered
+
+
+_NESTING_NODES = (ast.If, ast.For, ast.While, ast.Try, ast.With)
+
+
+def nesting_depth(node: ast.AST) -> int:
+    """分支/循环/异常的嵌套层数。"""
+    deepest = 0
+    stack = [(node, 0)]
+    while stack:
+        current, depth = stack.pop()
+        deepest = max(deepest, depth)
+        for child in ast.iter_child_nodes(current):
+            stack.append((child, depth + 1 if isinstance(child, _NESTING_NODES) else depth))
+    return deepest
+
+
+def function_metrics(fn: ast.FunctionDef) -> dict[str, int]:
+    lines = (getattr(fn, "end_lineno", None) or fn.lineno) - fn.lineno + 1
+    return {
+        "lines": max(lines, 1),
+        "depth": nesting_depth(fn),
+        "statements": sum(1 for item in ast.walk(fn) if isinstance(item, ast.stmt)),
+    }

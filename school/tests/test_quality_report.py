@@ -6,7 +6,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from school.course_models import CourseworkSubmission, QualityReport
+from school.course_models import CourseworkRubric, CourseworkSubmission, QualityReport
 from school.models import (
     Classroom,
     ClassStaff,
@@ -25,6 +25,22 @@ SOURCE = (
 )
 
 MANUAL_ARCHIVE = b'PK\x03\x04fake'
+
+RUBRIC_MARKDOWN = (
+    '## 二、5 分制量表\n\n'
+    '| 维度 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分 |\n'
+    '| --- | --- | --- | --- | --- | --- | --- |\n'
+    '| 知识点掌握 | 50 | A | B | C | D | E |\n'
+    '| 语法规范 | 20 | A | B | C | D | E |\n'
+    '| 边界健壮 | 20 | A | B | C | D | E |\n'
+    '| 逻辑正确 | 10 | A | B | C | D | E |\n'
+)
+
+UPDATED_RUBRIC_MARKDOWN = (
+    RUBRIC_MARKDOWN.replace('| 知识点掌握 | 50 |', '| 知识点掌握 | 30 |')
+    .replace('| 语法规范 | 20 |', '| 语法规范 | 30 |')
+    .replace('| 逻辑正确 | 10 |', '| 逻辑正确 | 20 |')
+)
 
 
 @override_settings(
@@ -161,3 +177,59 @@ class QualityReportTests(TestCase):
         response = self.client.get(reverse('quality_report', args=[entry.pk]))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(QualityReport.objects.filter(submission=entry).exists())
+        page = self.client.get(reverse('work', args=[manual.pk]))
+        self.assertNotContains(page, '查看评测报告')
+
+    def _rubric(self, markdown):
+        return CourseworkRubric.objects.create(
+            coursework=self.work,
+            markdown=markdown,
+            knowledge_points=[],
+            dimensions=[],
+            source='rule',
+        )
+
+    def test_report_uses_coursework_rubric_markdown(self):
+        self._rubric(RUBRIC_MARKDOWN)
+        self.client.force_login(self.student)
+        self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        report = QualityReport.objects.get(submission=self.entry)
+        scores = report.payload['scores']
+        self.assertEqual(
+            [item['key'] for item in scores],
+            ['knowledge', 'syntax', 'boundary', 'logic'],
+        )
+        self.assertEqual([item['weight'] for item in scores], [50, 20, 20, 10])
+        self.assertIn('取自评分标准 Markdown', report.payload['rubric_note'])
+        self.assertContains(
+            self.client.get(reverse('quality_report', args=[self.entry.pk])),
+            '评分维度得分与雷达图',
+        )
+
+    def test_rubric_change_regenerates_report(self):
+        rubric = self._rubric(RUBRIC_MARKDOWN)
+        self.client.force_login(self.student)
+        self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        first = QualityReport.objects.get(submission=self.entry)
+        rubric.markdown = UPDATED_RUBRIC_MARKDOWN
+        rubric.save()
+        self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        second = QualityReport.objects.get(submission=self.entry)
+        self.assertNotEqual(first.markdown_key, second.markdown_key)
+        self.assertEqual(
+            [item['weight'] for item in second.payload['scores']],
+            [30, 30, 20, 20],
+        )
+
+    def test_work_page_shows_report_button(self):
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('work', args=[self.work.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '查看评测报告')
+        self.assertContains(response, reverse('quality_report', args=[self.entry.pk]))
+
+    def test_entry_page_shows_report_button(self):
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('entry', args=[self.entry.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse('quality_report', args=[self.entry.pk]))

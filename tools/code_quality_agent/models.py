@@ -10,6 +10,8 @@ SYNTAX = "syntax"
 BOUNDARY = "boundary"
 LOGIC = "logic"
 STYLE = "style"
+STRUCTURE = "structure"
+READABILITY = "readability"
 
 DIMENSION_LABELS = {
     KNOWLEDGE: "知识点覆盖",
@@ -17,6 +19,8 @@ DIMENSION_LABELS = {
     BOUNDARY: "边界与健壮性",
     LOGIC: "题意一致性",
     STYLE: "代码规范",
+    STRUCTURE: "代码结构",
+    READABILITY: "可读性",
 }
 
 
