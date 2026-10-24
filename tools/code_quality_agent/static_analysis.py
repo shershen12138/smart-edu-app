@@ -348,6 +348,115 @@ def d_modulo(fn, helpers) -> bool:
     )
 
 
+_STR_METHODS = {
+    "upper",
+    "lower",
+    "strip",
+    "lstrip",
+    "rstrip",
+    "split",
+    "rsplit",
+    "replace",
+    "startswith",
+    "endswith",
+    "isdigit",
+    "isalpha",
+    "isupper",
+    "islower",
+    "find",
+    "format",
+}
+
+
+def _is_str_constant(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and isinstance(node.value, str)
+
+
+def d_str_method(fn, helpers) -> bool:
+    return bool(_call_names(fn) & _STR_METHODS)
+
+
+def d_str_join(fn, helpers) -> bool:
+    if "join" in _call_names(fn):
+        return True
+    return any(
+        isinstance(item, ast.BinOp)
+        and isinstance(item.op, ast.Add)
+        and (_is_str_constant(item.left) or _is_str_constant(item.right))
+        for item in _walk(fn)
+    )
+
+
+def _str_key_subscript(node: ast.Subscript) -> bool:
+    return _is_str_constant(node.slice)
+
+
+def d_dict_access(fn, helpers) -> bool:
+    return any(
+        isinstance(item, ast.Subscript) and _str_key_subscript(item)
+        for item in _walk(fn)
+    )
+
+
+def d_dict_update(fn, helpers) -> bool:
+    return any(
+        isinstance(item, ast.Assign)
+        and any(
+            isinstance(target, ast.Subscript) and _str_key_subscript(target)
+            for target in item.targets
+        )
+        for item in _walk(fn)
+    )
+
+
+def d_set_op(fn, helpers) -> bool:
+    return any(isinstance(item, ast.Set) for item in _walk(fn)) or bool(
+        _call_names(fn) & {"set", "frozenset"}
+    )
+
+
+def d_recursion(fn, helpers) -> bool:
+    name = getattr(fn, "name", "")
+    if not name:
+        return False
+    return any(
+        isinstance(item, ast.Call)
+        and isinstance(item.func, ast.Name)
+        and item.func.id == name
+        for item in _walk(fn)
+    )
+
+
+def d_try_except(fn, helpers) -> bool:
+    return any(isinstance(item, ast.Try) for item in _walk(fn))
+
+
+def d_file_open(fn, helpers) -> bool:
+    return "open" in _call_names(fn)
+
+
+def d_class_def(fn, helpers) -> bool:
+    return any(isinstance(item, ast.ClassDef) for item in _walk(fn))
+
+
+def d_enumerate_zip(fn, helpers) -> bool:
+    return bool(_call_names(fn) & {"enumerate", "zip"})
+
+
+def d_loop_control(fn, helpers) -> bool:
+    return any(isinstance(item, (ast.Break, ast.Continue)) for item in _walk(fn))
+
+
+def d_basic_def(fn, helpers) -> bool:
+    """兜底考点：函数有返回值或赋值，任何有效实现都成立。"""
+    if any(isinstance(item, ast.Return) for item in _walk(fn)):
+        return True
+    return any(
+        isinstance(item, (ast.Assign, ast.AnnAssign, ast.AugAssign))
+        for item in _walk(fn)
+    )
+
+
 KNOWLEDGE_DETECTORS = {
     "list_concat": d_list_concat,
     "slice_bounds": d_slice_bounds,
@@ -382,6 +491,18 @@ KNOWLEDGE_DETECTORS = {
     "linear_scan": d_linear_scan,
     "insert": d_insert,
     "modulo": d_modulo,
+    "str_method": d_str_method,
+    "str_join": d_str_join,
+    "dict_access": d_dict_access,
+    "dict_update": d_dict_update,
+    "set_op": d_set_op,
+    "recursion": d_recursion,
+    "try_except": d_try_except,
+    "file_open": d_file_open,
+    "class_def": d_class_def,
+    "enumerate_zip": d_enumerate_zip,
+    "loop_control": d_loop_control,
+    "basic_def": d_basic_def,
 }
 
 
