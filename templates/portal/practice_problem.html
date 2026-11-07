@@ -1,0 +1,71 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <h1>{{ problem.title }}</h1>
+      <p>
+        <span class="tag">{{ problem.knowledge_point }}</span>
+        <span class="tag">{{ problem.difficulty }}</span>
+        <span class="subtle">训练题 · 不计入正式成绩</span>
+      </p>
+    </div>
+  </div>
+
+  <section class="card space-bottom">
+    <h2>题面</h2>
+    <pre style="white-space:pre-wrap">{{ problem.statement }}</pre>
+  </section>
+
+  {% if samples %}
+    <section class="card space-bottom">
+      <h2>样例</h2>
+      <table>
+        <thead><tr><th>输入</th><th>期望输出</th></tr></thead>
+        <tbody>
+          {% for sample in samples %}
+            <tr>
+              <td><pre style="white-space:pre-wrap">{{ sample.input }}</pre></td>
+              <td><pre style="white-space:pre-wrap">{{ sample.output }}</pre></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="subtle">隐藏用例不会展示，批阅按全部用例的通过比例计分。</p>
+    </section>
+  {% endif %}
+
+  <section class="card space-bottom">
+    <h2>提交代码</h2>
+    {% if form %}
+      <form method="post" data-loading="正在保存并批阅代码…">
+        {% csrf_token %}
+        {{ form.code }}
+        <div class="actions space-top">
+          <button class="button">提交批阅</button>
+        </div>
+      </form>
+    {% else %}
+      <p class="tip">已经有批阅记录。如需重做，请从训练计划重新开始练习。</p>
+    {% endif %}
+  </section>
+
+  {% if attempts %}
+    <h2>我的批阅记录</h2>
+    <div class="card table-card">
+      <table>
+        <thead><tr><th>时间</th><th>结果</th><th>通过用例</th><th>得分</th><th>操作</th></tr></thead>
+        <tbody>
+          {% for attempt in attempts %}
+            <tr>
+              <td>{{ attempt.created_at|date:'Y-m-d H:i:s' }}</td>
+              <td>{{ attempt.verdict }}</td>
+              <td>{{ attempt.passed_cases }} / {{ attempt.total_cases }}</td>
+              <td>{% if attempt.score != None %}{{ attempt.score }}{% else %}—{% endif %}</td>
+              <td><a href="{% url 'practice_result' attempt.pk %}">查看结果</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endblock %}

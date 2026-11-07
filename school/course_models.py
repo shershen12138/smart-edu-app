@@ -313,3 +313,113 @@ class CourseworkRubric(models.Model):
     class Meta:
         verbose_name = '题目评分标准'
         verbose_name_plural = '题目评分标准'
+
+
+class PracticePlan(models.Model):
+    """训练题智能体为学生生成的一次个性化训练（画像快照 + 题目集合）。"""
+
+    STATUS = [
+        ('ready', '已生成'),
+        ('failed', '生成失败'),
+    ]
+    SOURCES = [
+        ('llm', '大模型生成'),
+        ('rule', '规则兜底'),
+    ]
+
+    student = models.ForeignKey(
+        'school.User', on_delete=models.CASCADE, related_name='practice_plans'
+    )
+    classroom = models.ForeignKey(
+        'school.Classroom', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='practice_plans',
+    )
+    profile_snapshot = models.JSONField('知识点画像快照', default=dict)
+    status = models.CharField('状态', max_length=10, choices=STATUS, default='ready')
+    source = models.CharField('来源', max_length=8, choices=SOURCES, default='llm')
+    model = models.CharField('模型', max_length=80, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = '个性化训练计划'
+        verbose_name_plural = '个性化训练计划'
+        ordering = ['-created_at', '-pk']
+
+
+class PracticeProblem(models.Model):
+    """大模型生成的训练题。字段名与 ProblemVersion 保持一致，
+    便于把实例直接传给 school.judge.run_case 做受限 Docker 批阅。"""
+
+    DIFFICULTIES = [
+        ('基础', '基础'),
+        ('进阶', '进阶'),
+    ]
+
+    plan = models.ForeignKey(PracticePlan, on_delete=models.CASCADE, related_name='problems')
+    knowledge_point = models.CharField('目标知识点', max_length=100)
+    title = models.CharField('标题', max_length=120)
+    statement = models.TextField('题面')
+    template_code = models.TextField('初始代码', blank=True)
+    reference_code = models.TextField('参考答案（学生不可见）', blank=True)
+    explanation = models.TextField('解析（学生不可见）', blank=True)
+    difficulty = models.CharField('难度', max_length=8, choices=DIFFICULTIES, default='基础')
+    order = models.PositiveIntegerField(default=0)
+    time_ms = models.PositiveIntegerField('时间限制（毫秒）', default=2000)
+    memory_mb = models.PositiveIntegerField('内存限制（MB）', default=128)
+    output_kb = models.PositiveIntegerField('输出限制（KB）', default=64)
+    comparison = models.CharField(
+        '输出比较', max_length=16,
+        choices=[('trim', '忽略行尾空格与末尾换行'), ('exact', '精确匹配')],
+        default='trim',
+    )
+    runtime = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        verbose_name = '训练题'
+        verbose_name_plural = '训练题'
+        ordering = ['order', 'pk']
+        constraints = [
+            models.UniqueConstraint(fields=['plan', 'order'], name='practice_order_unique')
+        ]
+
+    def __str__(self):
+        return f'{self.knowledge_point} · {self.title}'
+
+
+class PracticeCase(models.Model):
+    problem = models.ForeignKey(PracticeProblem, on_delete=models.CASCADE, related_name='cases')
+    order = models.PositiveIntegerField()
+    input_path = models.CharField(max_length=200)
+    output_path = models.CharField(max_length=200)
+    is_sample = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = '训练题用例'
+        verbose_name_plural = '训练题用例'
+        ordering = ['order']
+        constraints = [
+            models.UniqueConstraint(fields=['problem', 'order'], name='practice_case_order_unique')
+        ]
+
+
+class PracticeAttempt(models.Model):
+    """学生对训练题的一次提交与批阅结果，不计入正式作业成绩。"""
+
+    problem = models.ForeignKey(
+        PracticeProblem, on_delete=models.CASCADE, related_name='attempts'
+    )
+    student = models.ForeignKey(
+        'school.User', on_delete=models.CASCADE, related_name='practice_attempts'
+    )
+    code_path = models.CharField(max_length=200)
+    score = models.DecimalField(max_digits=5, decimal_places=1, null=True)
+    passed_cases = models.PositiveIntegerField(default=0)
+    total_cases = models.PositiveIntegerField(default=0)
+    verdict = models.CharField(max_length=20, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True)
+
+    class Meta:
+        verbose_name = '训练题提交'
+        verbose_name_plural = '训练题提交'
+        ordering = ['-created_at', '-pk']

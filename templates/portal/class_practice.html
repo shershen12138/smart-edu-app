@@ -1,0 +1,67 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <h1>{{ classroom.name }} · 知识点弱项分布</h1>
+      <p class="subtle">按学生机器批阅结果聚合各知识点得分率；点击学生可查看其训练计划状态。</p>
+    </div>
+  </div>
+
+  <section class="card space-bottom">
+    <h2>全班知识点平均得分率</h2>
+    {% if summary %}
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>知识点</th><th>平均得分率</th><th>弱项人数 / 班级人数</th></tr>
+          </thead>
+          <tbody>
+            {% for item in summary %}
+              <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.avg_percent }}%</td>
+                <td>{{ item.weak_students }} / {{ item.student_count }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="subtle space-top">平均得分率越低的知识点越需要课堂重点讲解；弱项人数按个体得分率低于阈值统计。</p>
+    {% else %}
+      <p class="tip space-top">还没有可聚合的机器批阅数据（需要作业生成评分标准且学生完成机器批阅提交）。</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>学生训练计划</h2>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr><th>学生</th><th>最近训练计划</th><th>来源</th><th>生成时间</th></tr>
+        </thead>
+        <tbody>
+          {% for row in students %}
+            <tr>
+              <td>{{ row.student.full_name }}（{{ row.student.student_no|default:row.student.username }}）</td>
+              <td>
+                {% if row.plan %}
+                  {{ row.plan.problems.count }} 道训练题
+                {% else %}
+                  尚未生成
+                {% endif %}
+              </td>
+              <td>
+                {% if row.plan %}
+                  {% if row.plan.source == "llm" %}大模型{% else %}规则兜底{% endif %}
+                {% else %}—{% endif %}
+              </td>
+              <td>{% if row.plan %}{{ row.plan.created_at|date:'Y-m-d H:i' }}{% else %}—{% endif %}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="empty">班级暂无在读学生。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

@@ -1,9 +1,22 @@
 from django.urls import path
 
 from . import learning_views as views
+from . import practice_views
 from . import quality_views
 
 urlpatterns = [
+    path('practice/', practice_views.practice_home, name='practice'),
+    path(
+        'practice/problem/<int:pk>/',
+        practice_views.practice_problem,
+        name='practice_problem',
+    ),
+    path(
+        'practice/problem/<int:pk>/submit/',
+        practice_views.practice_submit,
+        name='practice_submit',
+    ),
+    path('practice/result/<int:pk>/', practice_views.practice_result, name='practice_result'),
     path('work/<int:pk>/', views.work_detail, name='work'),
     path('work/<int:pk>/file/<str:kind>/', views.work_file, name='work_file'),
     path('entries/<int:pk>/', views.entry_detail, name='entry'),

@@ -1,0 +1,47 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <h1>{{ problem.title }}</h1>
+      <p>
+        <span class="tag">{{ problem.knowledge_point }}</span>
+        <span class="subtle">训练题批阅结果 · 不计入正式成绩</span>
+      </p>
+    </div>
+  </div>
+
+  <section class="result-card {% if attempt.verdict == 'AC' %}accepted{% endif %}">
+    <div>
+      <h2>{% if attempt.verdict == 'AC' %}全部通过{% elif attempt.verdict == 'WA' %}部分用例未通过{% elif attempt.verdict == 'ERROR' %}批阅服务异常{% else %}{{ attempt.verdict }}{% endif %}</h2>
+      <p>训练题按通过用例数占全部用例的比例计分；隐藏用例的期望结果不展示。</p>
+    </div>
+    <div class="score">
+      {% if attempt.score != None %}{{ attempt.score }}{% else %}—{% endif %}
+      <small>通过 {{ attempt.passed_cases }} / {{ attempt.total_cases }} 组用例</small>
+    </div>
+  </section>
+
+  {% if problem.explanation %}
+    <section class="card space-bottom">
+      <h2>解题思路</h2>
+      <p>{{ problem.explanation }}</p>
+    </section>
+  {% endif %}
+
+  {% if samples %}
+    <section class="card space-bottom">
+      <h2>样例</h2>
+      <table>
+        <thead><tr><th>输入</th><th>期望输出</th></tr></thead>
+        <tbody>
+          {% for sample in samples %}
+            <tr>
+              <td><pre style="white-space:pre-wrap">{{ sample.input }}</pre></td>
+              <td><pre style="white-space:pre-wrap">{{ sample.output }}</pre></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -114,6 +114,8 @@ LLM_BASE_URL = os.getenv('LLM_BASE_URL', '').rstrip('/')
 LLM_API_KEY = os.getenv('LLM_API_KEY', '')
 LLM_MODEL = os.getenv('LLM_MODEL', '')
 LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', '60'))
+# 个性化训练：知识点得分率低于该阈值视为弱项，触发训练题智能体出题。
+PRACTICE_WEAK_THRESHOLD = float(os.getenv('PRACTICE_WEAK_THRESHOLD', '0.6'))
 STORE_RECOVERY_PASSWORDS = os.getenv('STORE_RECOVERY_PASSWORDS', '1' if DEBUG else '0') == '1'
 REDIS_URL = os.getenv('REDIS_URL', '')
 CELERY_BROKER_URL = REDIS_URL or 'redis://127.0.0.1:6379/0'

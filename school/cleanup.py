@@ -21,6 +21,8 @@ from .models import (
     ProblemVersion,
     Submission,
     TestCase,
+    PracticeAttempt,
+    PracticeCase,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,8 @@ FILE_FIELDS = {
     ProblemVersion: ('reference_path',),
     Submission: ('code_path',),
     TestCase: ('input_path', 'output_path'),
+    PracticeCase: ('input_path', 'output_path'),
+    PracticeAttempt: ('code_path',),
 }
 
 

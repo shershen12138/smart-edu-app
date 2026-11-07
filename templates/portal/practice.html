@@ -1,0 +1,92 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <h1>个性化训练</h1>
+      <p class="subtle">按知识点统计你在已批阅作业上的表现，针对弱项生成训练题；训练题不计入正式成绩。</p>
+    </div>
+  </div>
+
+  <section class="card space-bottom">
+    <h2>知识点画像</h2>
+    {% if weak %}
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>弱项知识点</th><th>得分率</th><th>得分 / 满分</th><th>覆盖题数</th></tr>
+          </thead>
+          <tbody>
+            {% for item in weak %}
+              <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.percent }}%</td>
+                <td>{{ item.earned }} / {{ item.total }}</td>
+                <td>{{ item.attempts }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="tip space-top">当前没有得分率偏低的弱项知识点。完成新的机器批阅作业后画像会自动更新。</p>
+    {% endif %}
+    {% if mastered %}
+      <p class="subtle space-top">已掌握：{% for item in mastered %}{{ item.name }}（{{ item.percent }}%）{% if not forloop.last %}、{% endif %}{% endfor %}</p>
+    {% endif %}
+  </section>
+
+  <section class="card space-bottom">
+    <h2>训练题智能体</h2>
+    <p class="subtle">{{ llm_status }}</p>
+    {% if plan %}
+      <p>
+        <span class="tag">{% if plan.source == "llm" %}大模型生成{% else %}规则兜底{% endif %}</span>
+        {% if plan.model %}<span class="subtle">模型：{{ plan.model }}</span>{% endif %}
+        <span class="subtle">生成时间：{{ plan.created_at|date:'Y-m-d H:i' }}</span>
+      </p>
+    {% endif %}
+    <div class="actions space-top">
+      <form method="post" data-loading="正在调用大模型生成训练题，可能需要几十秒…">
+        {% csrf_token %}
+        <button class="button" {% if not llm_ready or not weak %}disabled{% endif %}>调用大模型生成训练题</button>
+      </form>
+      <form method="post" data-loading="正在按规则生成训练题…">
+        {% csrf_token %}
+        <input type="hidden" name="mode" value="offline">
+        <button class="button secondary" {% if not weak %}disabled{% endif %}>规则兜底生成（离线演示）</button>
+      </form>
+    </div>
+    {% if not llm_ready %}
+      <p class="tip space-top">
+        未配置大模型端点，主按钮不可用。规则兜底只从题库挑选现成题目，
+        结果会标注“规则兜底”，不当作大模型结论。
+      </p>
+    {% endif %}
+  </section>
+
+  {% if plan %}
+    <h2>本次训练计划</h2>
+    <p class="subtle">训练题独立于正式作业，提交后同样在受限容器中按用例通过比例计分。</p>
+    {% for point, problems in grouped.items %}
+      <section class="card space-bottom">
+        <h3><span class="tag">{{ point }}</span></h3>
+        <table>
+          <thead>
+            <tr><th>题目</th><th>难度</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            {% for problem in problems %}
+              <tr>
+                <td>{{ problem.title }}</td>
+                <td>{{ problem.difficulty }}</td>
+                <td><a href="{% url 'practice_problem' problem.pk %}">开始练习</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% empty %}
+      <p class="tip">本次计划没有可用题目。</p>
+    {% endfor %}
+  {% endif %}
+{% endblock %}

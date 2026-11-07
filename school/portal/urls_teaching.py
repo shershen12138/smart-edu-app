@@ -1,10 +1,16 @@
 from django.urls import path
 
+from . import practice_views
 from . import rubric_views
 from . import teaching_views as views
 from .downloads import submissions_download
 
 urlpatterns = [
+    path(
+        'classes/<int:class_id>/practice/',
+        practice_views.practice_overview,
+        name='class_practice',
+    ),
     path(
         'work/<int:pk>/submissions.zip',
         submissions_download,

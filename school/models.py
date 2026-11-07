@@ -479,4 +479,5 @@ from .course_models import (  # noqa: E402,F401
     DataDictionary, DictionaryItem, EvaluationPackage, Coursework, CourseworkItem,
     CourseworkSubmission, CourseworkQuestionResult, CourseworkCaseResult, PrivateFileCleanup,
     CourseworkPackageUpdate, CourseworkGradeHistory,
+    PracticePlan, PracticeProblem, PracticeCase, PracticeAttempt,
 )
