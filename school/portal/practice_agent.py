@@ -5,7 +5,7 @@
   演示或离线运行必须显式 `offline=True`，结果标注来源，不把兜底当成模型结论；
 - 生成的训练题必须带 stdin/stdout 测试用例，落库后经 school.judge.run_case
   在受限 Docker 中批阅，按用例通过比例计分，不计入正式作业成绩；
-- 规则兜底只从既有题库按知识点匹配现成题，不凭空编题。
+- 规则兜底根据现有题库按知识点关键词匹配现成题，不凭空编题。
 """
 
 from __future__ import annotations
@@ -176,28 +176,69 @@ def parse_practice(text: str, weak_names: list[str]) -> list[dict[str, Any]]:
     return questions
 
 
-def rule_based(weak: list[dict]) -> list[dict[str, Any]]:
-    """离线兜底：从既有题库按知识点文本匹配现成题，不凭空编题。
+_TOKEN_SPLIT_RE = re.compile(r'[\s/、，,（）()\[\]【】·。.:：;；]+')
+_TOKEN_STRIP = '与和的或及·、'
+_STOPWORDS = {'相关', '及其', '应用', '使用', '练习'}
 
-    匹配不到的知识点不出题（弱项本身已记录在画像快照中），避免造假数据。
+
+def weak_keywords(name: str) -> list[str]:
+    """把“切片与 1 起始计数换算”这类弱项名拆成 ['切片', '起始计数换算'] 等关键词。"""
+    tokens: list[str] = []
+    for raw in _TOKEN_SPLIT_RE.split(name):
+        token = raw.strip(_TOKEN_STRIP).strip().lower()
+        if not token or token in _STOPWORDS or len(token) == 1:
+            continue
+        tokens.append(token)
+    return tokens
+
+
+def _match_versions(name: str) -> list[tuple[int, ProblemVersion]]:
+    """按关键词给题库题目打分：knowledge 命中权重 2，title 命中权重 1。
+
+    返回按得分降序的 (得分, 题目版本)，无命中时为空列表。
+    """
+    keywords = weak_keywords(name)
+    if not keywords:
+        return []
+    scored: list[tuple[int, ProblemVersion]] = []
+    for version in ProblemVersion.objects.all().order_by('problem__code', 'number'):
+        knowledge = (version.knowledge or '').lower()
+        title = (version.title or '').lower()
+        score = 2 * sum(1 for keyword in keywords if keyword in knowledge)
+        score += sum(1 for keyword in keywords if keyword in title)
+        if score > 0:
+            scored.append((score, version))
+    scored.sort(key=lambda pair: (-pair[0], pair[1].problem_id, pair[1].number))
+    return scored
+
+
+def bank_matches_exist(weak: list[dict]) -> bool:
+    """题库中是否存在至少一个能按关键词匹配任一弱项、且带用例的题目。"""
+    for item in weak:
+        if _match_versions(item['name']):
+            return True
+    return False
+
+
+def rule_based(weak: list[dict]) -> list[dict[str, Any]]:
+    """离线兜底：根据现有题库按知识点关键词匹配现成题，不凭空编题。
+
+    匹配到的题目按关键词得分排序（命中 knowledge 标签优先于命中题名），
+    每个弱项最多取 MAX_QUESTIONS_PER_POINT 题。完全匹配不到时不出题，
+    弱项本身已记录在画像快照中，避免造假数据。
     """
     questions: list[dict[str, Any]] = []
     for item in weak:
+        matched = _match_versions(item['name'])
+        taken: list[dict[str, Any]] = []
         seen_problems: set[int] = set()
-        versions = ProblemVersion.objects.filter(knowledge__icontains=item['name']).order_by(
-            'problem__code', 'number'
-        )
-        for version in versions:
+        for _score, version in matched:
             if version.problem_id in seen_problems:
                 continue
             seen_problems.add(version.problem_id)
             if not version.cases.exists():
                 continue
-            if len(
-                [q for q in questions if q['knowledge_point'] == item['name']]
-            ) >= MAX_QUESTIONS_PER_POINT:
-                break
-            questions.append(
+            taken.append(
                 {
                     'knowledge_point': item['name'],
                     'title': version.title,
@@ -216,6 +257,9 @@ def rule_based(weak: list[dict]) -> list[dict[str, Any]]:
                     ],
                 }
             )
+            if len(taken) >= MAX_QUESTIONS_PER_POINT:
+                break
+        questions.extend(taken)
     return questions
 
 

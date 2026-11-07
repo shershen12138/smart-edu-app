@@ -266,6 +266,69 @@ class PracticeAgentTests(TestCase):
             practice_agent.generate_practice_plan(self.student, offline=True)
         self.assertFalse(PracticePlan.objects.filter(student=self.student).exists())
 
+    def test_offline_keyword_match_ignores_label_wording(self):
+        """题库标签写“for 循环”，弱项叫“for 遍历”，也应按关键词匹配到。"""
+        problem = Problem.objects.create(
+            code='PRACTICE-3',
+            classroom=self.classroom,
+            created_by=self.teacher,
+        )
+        version = ProblemVersion.objects.create(
+            problem=problem,
+            title='遍历求和',
+            statement='读入一行整数，输出所有元素之和。',
+            input_format='一行整数',
+            output_format='一个整数',
+            knowledge='for 循环',
+            reference_path=save_private('print(sum(map(int, input().split())))', suffix='.py'),
+        )
+        version.cases.create(
+            order=1,
+            input_path=save_private('1 2 3'),
+            output_path=save_private('6'),
+        )
+        self.assertTrue(practice_agent.bank_matches_exist([{'name': 'for 遍历'}]))
+        questions = practice_agent.rule_based([{'name': 'for 遍历'}])
+        self.assertEqual(len(questions), 1)
+        self.assertEqual(questions[0]['title'], '遍历求和')
+        self.assertEqual(questions[0]['knowledge_point'], 'for 遍历')
+        self.assertEqual(questions[0]['cases'][0]['input'], '1 2 3')
+
+    def test_keyword_match_prefers_knowledge_over_title(self):
+        """knowledge 标签命中得分高于题名命中，排序时排在前。"""
+        problem = Problem.objects.create(
+            code='PRACTICE-4',
+            classroom=self.classroom,
+            created_by=self.teacher,
+        )
+        by_knowledge = ProblemVersion.objects.create(
+            problem=problem,
+            title='综合练习一',
+            statement='题面一。',
+            input_format='',
+            output_format='',
+            knowledge='for 循环 列表遍历',
+            reference_path=save_private('print(input())', suffix='.py'),
+        )
+        by_title = ProblemVersion.objects.create(
+            problem=problem,
+            number=2,
+            title='for 循环遍历求和',
+            statement='题面二。',
+            input_format='',
+            output_format='',
+            knowledge='列表',
+            reference_path=save_private('print(input())', suffix='.py'),
+        )
+        by_knowledge.cases.create(
+            order=1, input_path=save_private('1'), output_path=save_private('1')
+        )
+        by_title.cases.create(
+            order=1, input_path=save_private('2'), output_path=save_private('2')
+        )
+        matched = practice_agent._match_versions('for 遍历')
+        self.assertEqual([version.pk for _score, version in matched][0], by_knowledge.pk)
+
     def test_llm_generation_with_mock(self):
         payload = {
             'questions': [
