@@ -9,10 +9,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from . import models
 
@@ -117,6 +120,7 @@ def pylint_available() -> bool:
             timeout=30,
         )
     except (OSError, subprocess.SubprocessError):
+        logger.warning('pylint 可用性检测失败，报告将降级为仅有语法/语义分析', exc_info=True)
         return False
     return proc.returncode == 0
 

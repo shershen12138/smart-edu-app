@@ -289,7 +289,8 @@ class QualityReportTests(TestCase):
         self.client.force_login(self.student)
         response = self.client.get(reverse('quality_report', args=[entry.pk]))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'if / else 分支')
+        # 知识点名统一为《Python教学Tag库》标准名（if_else → if-else 双分支）
+        self.assertContains(response, 'if-else 双分支')
         self.assertNotContains(response, '未配置知识点模板')
 
     def test_missing_rubric_is_generated_and_saved(self):
@@ -450,6 +451,91 @@ class QualityReportTests(TestCase):
         self.assertEqual(
             [axis['label'] for axis in radar['axes']],
             [ability['label'] for ability in abilities],
+        )
+
+    def test_knowledge_axes_are_top_tags(self):
+        """雷达图六轴：该作业最主要的六个知识点 Tag，分数取 Tag 检测点覆盖率。"""
+        from tools.code_quality_agent import models as agent_models
+        from tools.code_quality_agent.pipeline import StudentAnalysis
+
+        knowledge_points = {
+            'func301': ('列表拼接', '列表切片'),
+            'func303': ('步长切片',),
+        }
+        results = [
+            agent_models.TaskResult(
+                spec=agent_models.TaskSpec('func301', '合并截取', ('list_concat', 'slice_bounds')),
+                parsed=True,
+                covered=['list_concat'],
+            ),
+            agent_models.TaskResult(
+                spec=agent_models.TaskSpec('func303', '回文判断', ('slice_reverse',)),
+                parsed=True,
+                covered=['slice_reverse'],
+            ),
+        ]
+        analysis = StudentAnalysis(
+            name='学生', file_name='a.py', results=results,
+            scores={'knowledge': 80.0}, total=80.0,
+        )
+        # func301 分值 20（每 tag 重要度 3.0）> func303 分值 10（2.0）
+        axes = quality_service.knowledge_axes(
+            knowledge_points, {'func301': 20, 'func303': 10}, analysis
+        )
+        self.assertIsNotNone(axes)
+        dimensions, tag_scores = axes
+        labels = [dimension.label for dimension in dimensions]
+        self.assertEqual(
+            labels, ['列表切片', '列表拼接', '步长切片']
+        )
+        # 权重归一化
+        self.assertAlmostEqual(sum(item.weight for item in dimensions), 1.0, places=2)
+        # 步长切片：func303 的 slice_reverse 已覆盖 → 100 分
+        self.assertEqual(tag_scores['tag:步长切片'], 100.0)
+        # 列表拼接：func301 的 list_concat 已覆盖 → 100 分；列表切片：slice_bounds 未覆盖 → 0 分
+        self.assertEqual(tag_scores['tag:列表拼接'], 100.0)
+        self.assertEqual(tag_scores['tag:列表切片'], 0.0)
+
+    def test_knowledge_axes_fall_back_for_legacy_names(self):
+        """旧评分标准的自定义知识点名无法归一到词表时，退回主能力轴。"""
+        from tools.code_quality_agent.pipeline import StudentAnalysis
+
+        analysis = StudentAnalysis(
+            name='学生', file_name='a.py', results=[],
+            scores={'knowledge': 80.0}, total=80.0,
+        )
+        axes = quality_service.knowledge_axes(
+            {'func301': ('切片起始换算', '通用程序设计')}, {'func301': 10}, analysis
+        )
+        self.assertIsNone(axes)
+
+    def test_report_radar_uses_tag_axes(self):
+        """评分标准知识点为 Tag 标准名时，报告页六轴展示考察重点。"""
+        CourseworkRubric.objects.create(
+            coursework=self.work,
+            markdown=(
+                '## 一、作业考察的知识点\n\n'
+                '| 序号 | 知识点 | 说明 | 涉及题目 |\n| --- | --- | --- | --- |\n'
+                '| 1 | 列表拼接 | + 拼接 | func301 |\n'
+                '| 2 | 列表切片 | 1 起始换算 | func301 |\n'
+            ),
+            knowledge_points=[
+                {'name': '列表拼接', 'detail': '', 'tasks': ['func301']},
+                {'name': '列表切片', 'detail': '', 'tasks': ['func301']},
+            ],
+            dimensions=[],
+            source='rule',
+        )
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        self.assertEqual(response.status_code, 200)
+        report = QualityReport.objects.get(submission=self.entry)
+        self.assertEqual(report.payload['axis_label'], '考察重点')
+        labels = [item['label'] for item in report.payload['scores']]
+        # 同重要度按名称排序：列表切片 < 列表拼接
+        self.assertEqual(labels, ['列表切片', '列表拼接'])
+        self.assertEqual(
+            [axis['label'] for axis in report.payload['radar']['axes']], labels
         )
 
     # ---- 学生提交后后台预生成质量报告 ----

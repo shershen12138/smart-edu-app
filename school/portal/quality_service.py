@@ -21,16 +21,18 @@ from django.db import close_old_connections, transaction
 from school import storage
 from school.course_models import CourseworkSubmission, PrivateFileCleanup, QualityReport
 
+from tools.code_quality_agent import curriculum as agent_curriculum
 from tools.code_quality_agent import models as agent_models
 from tools.code_quality_agent import rubric as agent_rubric
 from tools.code_quality_agent import service as agent
+from tools.taglib import loader as taglib
 
 from . import rubric_agent
 
 logger = logging.getLogger(__name__)
 
-# 雷达图几何版本：坐标算法调整后，旧报告自动重算，避免页面回退到静态图片。
-RADAR_VERSION = 'radar-v1'
+# 雷达图几何版本：坐标算法或轴定义调整后，旧报告自动重算，避免页面回退到旧图。
+RADAR_VERSION = 'radar-v2'
 
 def ensure_rubric(coursework):
     """确保该作业有一份自己的评分标准，返回它（可能为 None）。
@@ -53,6 +55,9 @@ def ensure_rubric(coursework):
     try:
         return rubric_agent.generate_for(coursework, offline=True, force=True)
     except Exception:
+        logger.warning(
+            '规则兜底生成评分标准失败 coursework=%s', coursework.pk, exc_info=True
+        )
         return stored
 
 
@@ -183,6 +188,7 @@ def display_dimensions(dimensions, abilities) -> list[agent_models.Dimension]:
     """把评分维度换成主能力名称，分数仍取所绑定维度的分数。
 
     维度数量与主能力对不上时（例如只用内置 5 维量表）保持原样，避免少轴或错配。
+    旧评分标准没有 Tag 化知识点时，雷达图退回主能力轴。
     """
     if len(abilities) != 6:
         return list(dimensions)
@@ -196,6 +202,54 @@ def display_dimensions(dimensions, abilities) -> list[agent_models.Dimension]:
     if len(shown) != len(dimensions):
         return list(dimensions)
     return shown
+
+
+def knowledge_axes(
+    knowledge_points: dict[str, tuple[str, ...]],
+    items,
+    analysis,
+) -> tuple[list[agent_models.Dimension], dict[str, float]] | None:
+    """雷达图的六根轴：该作业最主要的六个知识点 Tag（考察重点）。
+
+    重要度由“覆盖题数 + 题目分值”共同决定（见 taglib.top_tags），不是单纯出现频次；
+    每根轴的分数取该 Tag 下全部检测点在学生代码中的覆盖率，
+    没有可机检检测点的 Tag 退回“知识点覆盖”维度的得分。
+    只统计能归一到《Python教学Tag库》标准名的知识点；旧评分标准的
+    自定义名称全部无法归一时返回 None，由调用方退回主能力轴。
+    """
+    tag_tasks: dict[str, list[str]] = {}
+    for function, names in knowledge_points.items():
+        for name in names:
+            tag = taglib.normalize_tag(name)
+            if tag:
+                tag_tasks.setdefault(tag, []).append(function)
+    if not tag_tasks:
+        return None
+    weights = dict(items)
+    top = taglib.top_tags(tag_tasks, weights, limit=6)
+    if not top:
+        return None
+
+    results = list(analysis.results)
+    covered_by_task = {result.spec.task_id: set(result.covered) for result in results}
+    points_by_task = {result.spec.task_id: set(result.spec.points) for result in results}
+    knowledge_score = float(analysis.scores.get('knowledge', 0.0))
+
+    dimensions: list[agent_models.Dimension] = []
+    scores: dict[str, float] = {}
+    for name, share in top:
+        key = f'tag:{name}'
+        task_keys = agent_curriculum.TAG_TO_POINTS.get(name, ())
+        judged = ok = 0
+        for task in tag_tasks[name]:
+            required = [point for point in task_keys if point in points_by_task.get(task, ())]
+            judged += len(required)
+            covered = covered_by_task.get(task, set())
+            ok += len([point for point in required if point in covered])
+        score = 100.0 * ok / judged if judged else knowledge_score
+        dimensions.append(agent_models.Dimension(key, name, share))
+        scores[key] = round(score, 1)
+    return dimensions, scores
 
 
 def radar_geometry(scores, width: int = 480, height: int = 360, radius: float = 104) -> dict:
@@ -311,6 +365,9 @@ def generate(entry, force: bool = False) -> QualityReport:
     items = [
         (item.function_name, item.title) for item in entry.coursework.items.all()
     ]
+    task_weights = {
+        item.function_name: item.points for item in entry.coursework.items.all()
+    }
     # 每个任务使用自己的评分标准：缺失时按该任务的题目自动生成并存库。
     stored = ensure_rubric(entry.coursework)
     dimensions, rubric_note = dimensions_for(entry.coursework, stored)
@@ -350,13 +407,22 @@ def generate(entry, force: bool = False) -> QualityReport:
         dimensions=dimensions,
         rubric_note=rubric_note,
     )
-    # 雷达图与得分表换成 6 个主能力，分数仍是所绑定评分维度的分数。
-    shown = display_dimensions(dimensions, abilities)
-    uses_abilities = [item.label for item in shown] != [item.label for item in dimensions]
+    # 雷达图六轴优先用该作业最主要的六个知识点（考察重点），
+    # 旧评分标准没有 Tag 化知识点时退回 6 个主能力轴。
+    axes = knowledge_axes(knowledge_points, task_weights, analysis)
+    if axes:
+        shown, tag_scores = axes
+        analysis.scores.update(tag_scores)
+        axis_label = '考察重点'
+    else:
+        shown = display_dimensions(dimensions, abilities)
+        axis_label = '主能力' if [item.label for item in shown] != [
+            item.label for item in dimensions
+        ] else '评分维度'
     radar = agent.radar_png(analysis, shown)
     markdown = agent.markdown(analysis, shown, rubric_note, knowledge_points)
     payload = agent.payload(analysis, shown, rubric_note, bool(radar), knowledge_points)
-    payload['axis_label'] = '主能力' if uses_abilities else '评分维度'
+    payload['axis_label'] = axis_label
     payload['radar'] = radar_geometry(payload['scores'])
     payload['rubric_signature'] = signature
 

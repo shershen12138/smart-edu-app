@@ -334,6 +334,13 @@ class ParseResponseTests(TestCase):
         result = rubric_agent.parse_response(json.dumps(payload, ensure_ascii=False), self.context())
         self.assertIn('5 分制量表', result['markdown'])
 
+    def test_axes_section_rewritten_to_tag_axes(self):
+        """模型自拟的“主能力”第三节统一改写为考察重点，与报告页雷达图六轴一致。"""
+        result = rubric_agent.parse_response(valid_llm_payload(), self.context())
+        self.assertIn('## 三、考察重点（雷达图维度）', result['markdown'])
+        self.assertNotIn('主能力（雷达图维度）', result['markdown'])
+        self.assertIn('列表切片', result['markdown'])
+
     def test_no_points_rejected(self):
         payload = json.loads(valid_llm_payload())
         payload['knowledge_points'] = []
@@ -365,8 +372,10 @@ class ReferenceAnalysisTests(RubricAgentTestCase):
         context = rubric_agent.coursework_context(self.work)
         result = rubric_agent.rule_based(context)
         names = {point['name'] for point in result['points']}
-        self.assertIn('列表合并（+ / extend）', names)
-        self.assertIn('切片与 1 起始计数换算', names)
+        # 知识点名统一为《Python教学Tag库》标准名
+        self.assertIn('列表拼接', names)
+        self.assertIn('列表切片', names)
+        self.assertNotIn('列表合并（+ / extend）', names)
         self.assertEqual(len(result['dimensions']), 6)
         self.assertIn('# 列表作业 · 评分标准', result['markdown'])
 
@@ -381,7 +390,7 @@ class ReferenceAnalysisTests(RubricAgentTestCase):
         reference = 'def func801(x):\n    return x % 2 == 0\n'
         result = rubric_agent.rule_based(context, reference_code=reference)
         names = {point['name'] for point in result['points']}
-        self.assertIn('取余 %', names)
+        self.assertIn('取模 %', names)
 
     def test_rule_based_falls_back_to_generic(self):
         context = {
@@ -422,8 +431,10 @@ class GenerateForTests(RubricAgentTestCase):
         rubric = rubric_agent.generate_for(self.work, offline=True)
         self.assertEqual(rubric.source, 'rule')
         self.assertEqual(rubric.model, '')
-        self.assertIn('列表合并', rubric.markdown)
+        self.assertIn('列表拼接', rubric.markdown)
         self.assertEqual(len(rubric.dimensions), 6)
+        # 第三节为考察重点（雷达图六轴）：最主要的六个知识点 Tag
+        self.assertIn('## 三、考察重点（雷达图维度）', rubric.markdown)
 
     def test_unconfigured_llm_raises_without_offline(self):
         with self.assertRaises(rubric_agent.LLMNotConfigured):

@@ -9,9 +9,12 @@
 
 from __future__ import annotations
 
+import logging
 import tempfile
 from pathlib import Path
 from typing import Iterable, Sequence
+
+logger = logging.getLogger(__name__)
 
 from . import curriculum, models, pipeline, rubric
 from . import specs as spec_parser
@@ -94,6 +97,7 @@ def radar_png(analysis: pipeline.StudentAnalysis, dimensions: Sequence[models.Di
     try:
         from . import charts
     except Exception:
+        logger.warning('雷达图模块不可用，报告将降级为无雷达图', exc_info=True)
         return b""
     with tempfile.TemporaryDirectory() as directory:
         target = charts.render(analysis, list(dimensions), Path(directory) / "radar.png")
@@ -140,6 +144,18 @@ def report_issues(result: models.TaskResult) -> tuple[list[dict], int]:
     return items[:_REPORT_LIMIT], max(0, len(items) - _REPORT_LIMIT)
 
 
+def _point_keys(name: str) -> tuple[str, ...]:
+    """知识点名 → 检测标签列表。
+
+    依次尝试：课程中文标签（旧评分标准）→《Python教学Tag库》标准名
+    （一个 tag 可能对应多个检测器，如“内置聚合函数 len/max/min/sum”）。
+    """
+    direct = curriculum.LABEL_TO_POINT.get(name)
+    if direct:
+        return (direct,)
+    return curriculum.TAG_TO_POINTS.get(name, ())
+
+
 def _display_points(
     result: models.TaskResult,
     knowledge_points: dict[str, Sequence[str]] | None,
@@ -148,7 +164,8 @@ def _display_points(
 
     优先用作业评分标准（`CourseworkRubric.knowledge_points`）中属于该函数的知识点，
     它才是这份作业真正考察的内容；评分标准缺失时才回退到题库规格的标签。
-    名称能与题库标签对应时仍给出 ✓/✗，模型自定义的名称只展示、不做机器判定。
+    名称能还原成检测标签（课程标签或 Tag 库标准名）时仍给出 ✓/✗，
+    无法还原的名称只展示、不做机器判定。
     """
     names = list((knowledge_points or {}).get(result.spec.task_id) or ())
     if not names:
@@ -163,13 +180,13 @@ def _display_points(
         ]
     points = []
     for name in names:
-        tag = curriculum.LABEL_TO_POINT.get(name)
-        judged = bool(tag and tag in result.spec.points)
+        keys = _point_keys(name)
+        judged = bool(keys and any(key in result.spec.points for key in keys))
         points.append(
             {
-                "tag": tag or "",
+                "tag": keys[0] if judged else "",
                 "label": name,
-                "ok": bool(judged and tag in result.covered),
+                "ok": bool(judged and any(key in result.covered for key in keys)),
                 "judged": judged,
             }
         )

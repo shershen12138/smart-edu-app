@@ -785,6 +785,13 @@ class QuestionBankTests(TestCase):
         # 同一弱项每次选题不超过 2 题，且不重复
         self.assertEqual(len(matched), 2)
 
+    def test_find_questions_by_exact_tag(self):
+        """弱项为 Tag 标准名时走题库打标精确匹配。"""
+        matched = [q['code'] for q in question_bank.find_questions('算术运算符')]
+        self.assertIn('Q1-01', matched)
+        # Tag 命中题目不足 limit 时，用关键词模糊匹配补齐
+        self.assertTrue(matched)
+
     def test_find_questions_exclude(self):
         first = question_bank.find_questions('列表切片')
         second = question_bank.find_questions(

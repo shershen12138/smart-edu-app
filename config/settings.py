@@ -137,3 +137,24 @@ else:
             'LOCATION': RUNTIME / 'cache',
         }
     }
+
+# 日志：项目与智能体模块的告警统一输出到控制台（运行时重定向到 .runtime 下的日志文件）。
+# DEBUG 环境默认 INFO 便于开发排查，生产用环境变量 LOG_LEVEL 调整。
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO' if DEBUG else 'WARNING')
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'console': {
+            'format': '%(asctime)s %(levelname)s %(name)s %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'console'},
+    },
+    'loggers': {
+        'school': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
+        'tools': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
+    },
+}

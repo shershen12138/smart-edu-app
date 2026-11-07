@@ -1,8 +1,12 @@
+import logging
+
 from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
 from django.core.cache import cache
 from .models import JudgeRun, ProblemVersion
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task
@@ -79,6 +83,9 @@ def dispatch_coursework():
         try:
             validate_course_package.delay(pk)
         except Exception:
+            logger.warning(
+                '批阅包验证任务投递失败 package=%s，已回退为待验证', pk, exc_info=True
+            )
             EvaluationPackage.objects.filter(pk=pk, status='validating').update(status='pending')
     for pk in CourseworkSubmission.objects.filter(status='pending').values_list('pk', flat=True)[
         :100
@@ -89,4 +96,7 @@ def dispatch_coursework():
             try:
                 evaluate_coursework.delay(pk)
             except Exception:
+                logger.warning(
+                    '评测任务投递失败 submission=%s，已回退为待评测', pk, exc_info=True
+                )
                 CourseworkSubmission.objects.filter(pk=pk, status='queued').update(status='pending')

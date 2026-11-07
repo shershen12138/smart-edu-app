@@ -1,0 +1,4442 @@
+{
+  "meta": {
+    "schema": "qbank-tags/v2",
+    "generated": "2026-11-07",
+    "taglib": "Python教学Tag库_v1.0.md",
+    "taglib_version": "1.0",
+    "units": 15,
+    "modules": 77,
+    "tags_total": 856,
+    "questions": 44,
+    "note": "标签唯一键=tag；role=primary 决定能否做对，secondary 影响解法优劣；weight 同题内归一化为 1"
+  },
+  "questions": [
+    {
+      "qid": "Q1-01",
+      "func": "func0101",
+      "title": "摄氏温度换算为华氏温度",
+      "star": "★☆☆",
+      "score": 10,
+      "domain": "基础语法：变量、数据类型与类型转换",
+      "tags": [
+        {
+          "tag": "算术运算符",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.4
+        },
+        {
+          "tag": "浮点误差",
+          "module_id": "U02-M02",
+          "module": "U02-M02 数值类型",
+          "unit": "U02",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "round 四舍五入",
+          "module_id": "U06-M06",
+          "module": "U06-M06 内置函数与工具函数",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.15
+        },
+        {
+          "tag": "显式类型转换",
+          "module_id": "U02-M06",
+          "module": "U02-M06 类型转换与类型判断",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.1
+        }
+      ],
+      "primary": [
+        "算术运算符",
+        "浮点误差"
+      ],
+      "secondary": [
+        "round 四舍五入",
+        "显式类型转换"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "输出格式不符"
+      ],
+      "legacy_tags": [
+        "基础语法/变量与赋值",
+        "基础语法/数据类型转换",
+        "基础语法/算术运算符",
+        "输入输出/浮点数精度"
+      ]
+    },
+    {
+      "qid": "Q1-02",
+      "func": "func0102",
+      "title": "求非负整数各位数字之和",
+      "star": "★☆☆",
+      "score": 10,
+      "domain": "基础语法：变量、数据类型与类型转换",
+      "tags": [
+        {
+          "tag": "数字拆分",
+          "module_id": "U14-M08",
+          "module": "U14-M08 数学与数论题",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.4
+        },
+        {
+          "tag": "累加器",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "整除 //",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.15
+        },
+        {
+          "tag": "字符串遍历",
+          "module_id": "U02-M03",
+          "module": "U02-M03 字符串基础",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "数字拆分",
+        "累加器"
+      ],
+      "secondary": [
+        "整除 //",
+        "字符串遍历"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "累加初始值错误"
+      ],
+      "legacy_tags": [
+        "基础语法/类型转换",
+        "基础语法/字符串遍历",
+        "循环/累加求和"
+      ]
+    },
+    {
+      "qid": "Q1-03",
+      "func": "func0103",
+      "title": "秒数转换为「时:分:秒」",
+      "star": "★★☆",
+      "score": 10,
+      "domain": "基础语法：变量、数据类型与类型转换",
+      "tags": [
+        {
+          "tag": "整除 //",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "取模 %",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "格式宽度与精度",
+          "module_id": "U02-M05",
+          "module": "U02-M05 格式化与输入输出",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "运算符优先级",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "整除 //",
+        "取模 %"
+      ],
+      "secondary": [
+        "格式宽度与精度",
+        "运算符优先级"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "输出格式不符"
+      ],
+      "legacy_tags": [
+        "基础语法/整除与取余",
+        "输入输出/格式化输出",
+        "运算符/运算符优先级"
+      ]
+    },
+    {
+      "qid": "Q1-04",
+      "func": "func0104",
+      "title": "两数整除、取余与商",
+      "star": "★★☆",
+      "score": 10,
+      "domain": "基础语法：变量、数据类型与类型转换",
+      "tags": [
+        {
+          "tag": "整除 //",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "取模 %",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "真除法",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.15
+        },
+        {
+          "tag": "特殊用例考虑",
+          "module_id": "U14-M01",
+          "module": "U14-M01 复杂度与算法思维",
+          "unit": "U14",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "整除 //",
+        "取模 %"
+      ],
+      "secondary": [
+        "真除法",
+        "特殊用例考虑"
+      ],
+      "ability": [
+        "代码编写题",
+        "边界处理"
+      ],
+      "error_modes": [
+        "类型不匹配"
+      ],
+      "legacy_tags": [
+        "基础语法/算术运算符",
+        "基础语法/整除与取余",
+        "基础语法/负数与运算规则"
+      ]
+    },
+    {
+      "qid": "Q2-01",
+      "func": "func0201",
+      "title": "统计整数的二进制中 1 的个数",
+      "star": "★★☆",
+      "score": 10,
+      "domain": "运算符与表达式",
+      "tags": [
+        {
+          "tag": "位与 &",
+          "module_id": "U03-M03",
+          "module": "U03-M03 赋值与位运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "位运算应用场景",
+          "module_id": "U03-M03",
+          "module": "U03-M03 赋值与位运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "进制转换",
+          "module_id": "U14-M08",
+          "module": "U14-M08 数学与数论题",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.2
+        },
+        {
+          "tag": "循环终止条件",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "位与 &",
+        "位运算应用场景",
+        "进制转换"
+      ],
+      "secondary": [
+        "循环终止条件"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "循环边界 off-by-one"
+      ],
+      "legacy_tags": [
+        "运算符/位运算",
+        "基础语法/进制转换",
+        "内置函数/bin"
+      ]
+    },
+    {
+      "qid": "Q2-02",
+      "func": "func0202",
+      "title": "三位整数的逆序重建",
+      "star": "★★☆",
+      "score": 10,
+      "domain": "运算符与表达式",
+      "tags": [
+        {
+          "tag": "数字拆分",
+          "module_id": "U14-M08",
+          "module": "U14-M08 数学与数论题",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.4
+        },
+        {
+          "tag": "整除 //",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "取模 %",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "运算符优先级",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.1
+        }
+      ],
+      "primary": [
+        "数字拆分",
+        "整除 //"
+      ],
+      "secondary": [
+        "取模 %",
+        "运算符优先级"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "逻辑与需求不符"
+      ],
+      "legacy_tags": [
+        "基础语法/整除与取余",
+        "运算符/运算符优先级",
+        "基础语法/数值拆位"
+      ]
+    },
+    {
+      "qid": "Q2-03",
+      "func": "func0203",
+      "title": "按位与、或、异或",
+      "star": "★★☆",
+      "score": 10,
+      "domain": "运算符与表达式",
+      "tags": [
+        {
+          "tag": "位与 &",
+          "module_id": "U03-M03",
+          "module": "U03-M03 赋值与位运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "位或 |",
+          "module_id": "U03-M03",
+          "module": "U03-M03 赋值与位运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "异或 ^",
+          "module_id": "U03-M03",
+          "module": "U03-M03 赋值与位运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "运算符优先级",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.1
+        }
+      ],
+      "primary": [
+        "位与 &",
+        "位或 |",
+        "异或 ^"
+      ],
+      "secondary": [
+        "运算符优先级"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "运算符/位运算",
+        "运算符/运算符优先级"
+      ]
+    },
+    {
+      "qid": "Q3-01",
+      "func": "func0301",
+      "title": "统计字符串中的字母与数字个数",
+      "star": "★☆☆",
+      "score": 10,
+      "domain": "字符串处理",
+      "tags": [
+        {
+          "tag": "isdigit 与 isalpha 判断",
+          "module_id": "U02-M04",
+          "module": "U02-M04 字符串处理",
+          "unit": "U02",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "字符串遍历",
+          "module_id": "U02-M03",
+          "module": "U02-M03 字符串基础",
+          "unit": "U02",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "计数器",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "循环与条件组合",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "isdigit 与 isalpha 判断",
+        "字符串遍历"
+      ],
+      "secondary": [
+        "计数器",
+        "循环与条件组合"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "条件覆盖不全"
+      ],
+      "legacy_tags": [
+        "字符串/遍历与判断",
+        "字符串/isalpha与isdigit",
+        "内置函数/len"
+      ]
+    },
+    {
+      "qid": "Q3-02",
+      "func": "func0302",
+      "title": "回文字符串判断",
+      "star": "★★☆",
+      "score": 10,
+      "domain": "字符串处理",
+      "tags": [
+        {
+          "tag": "回文判断",
+          "module_id": "U14-M02",
+          "module": "U14-M02 字符串与数组题",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "字符串切片",
+          "module_id": "U02-M03",
+          "module": "U02-M03 字符串基础",
+          "unit": "U02",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "大小写转换",
+          "module_id": "U02-M04",
+          "module": "U02-M04 字符串处理",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "条件表达式（三元运算）",
+          "module_id": "U03-M02",
+          "module": "U03-M02 比较与逻辑运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "回文判断",
+        "字符串切片"
+      ],
+      "secondary": [
+        "大小写转换",
+        "条件表达式（三元运算）"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "字符串/切片",
+        "字符串/大小写转换",
+        "控制流程/条件表达式"
+      ]
+    },
+    {
+      "qid": "Q3-03",
+      "func": "func0303",
+      "title": "统计单词数并找出最长单词",
+      "star": "★★☆",
+      "score": 10,
+      "domain": "字符串处理",
+      "tags": [
+        {
+          "tag": "split 分割",
+          "module_id": "U02-M04",
+          "module": "U02-M04 字符串处理",
+          "unit": "U02",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "最值索引查找",
+          "module_id": "U14-M02",
+          "module": "U14-M02 字符串与数组题",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "内置聚合函数 len/max/min/sum",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "sorted 的 key 参数",
+          "module_id": "U06-M04",
+          "module": "U06-M04 高阶函数",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "split 分割",
+        "最值索引查找"
+      ],
+      "secondary": [
+        "内置聚合函数 len/max/min/sum",
+        "sorted 的 key 参数"
+      ],
+      "ability": [
+        "代码编写题",
+        "边界处理"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "字符串/split分割",
+        "内置函数/max与key参数",
+        "字符串/统计"
+      ]
+    },
+    {
+      "qid": "Q3-04",
+      "func": "func0304",
+      "title": "大小写转换与长度统计",
+      "star": "★☆☆",
+      "score": 10,
+      "domain": "字符串处理",
+      "tags": [
+        {
+          "tag": "大小写转换",
+          "module_id": "U02-M04",
+          "module": "U02-M04 字符串处理",
+          "unit": "U02",
+          "role": "primary",
+          "weight": 0.4
+        },
+        {
+          "tag": "字符串长度",
+          "module_id": "U02-M03",
+          "module": "U02-M03 字符串基础",
+          "unit": "U02",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "列表创建",
+          "module_id": "U05-M01",
+          "module": "U05-M01 列表基础",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.15
+        },
+        {
+          "tag": "字符串比较",
+          "module_id": "U02-M04",
+          "module": "U02-M04 字符串处理",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "大小写转换",
+        "字符串长度"
+      ],
+      "secondary": [
+        "列表创建",
+        "字符串比较"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "字符串/大小写转换",
+        "内置函数/len",
+        "字符串/常用方法"
+      ]
+    },
+    {
+      "qid": "Q4-01",
+      "func": "func0401",
+      "title": "求列表最大值、最小值与平均值",
+      "star": "★☆☆",
+      "score": 10,
+      "domain": "列表与切片",
+      "tags": [
+        {
+          "tag": "列表求最值",
+          "module_id": "U05-M02",
+          "module": "U05-M02 列表操作",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "内置聚合函数 len/max/min/sum",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "浮点误差",
+          "module_id": "U02-M02",
+          "module": "U02-M02 数值类型",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "真除法",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "列表求最值",
+        "内置聚合函数 len/max/min/sum"
+      ],
+      "secondary": [
+        "浮点误差",
+        "真除法"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "除零错误"
+      ],
+      "legacy_tags": [
+        "列表/创建与遍历",
+        "内置函数/max与min",
+        "输入输出/浮点数精度"
+      ]
+    },
+    {
+      "qid": "Q4-02",
+      "func": "func0402",
+      "title": "列表切片四连击",
+      "star": "★★☆",
+      "score": 10,
+      "domain": "列表与切片",
+      "tags": [
+        {
+          "tag": "列表切片",
+          "module_id": "U05-M01",
+          "module": "U05-M01 列表基础",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "步长切片",
+          "module_id": "U02-M03",
+          "module": "U02-M03 字符串基础",
+          "unit": "U02",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "负索引",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.2
+        },
+        {
+          "tag": "序列切片通用规则",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "列表切片",
+        "步长切片",
+        "负索引"
+      ],
+      "secondary": [
+        "序列切片通用规则"
+      ],
+      "ability": [
+        "结果预测题",
+        "代码编写题"
+      ],
+      "error_modes": [
+        "索引越界"
+      ],
+      "legacy_tags": [
+        "列表/切片",
+        "列表/步长切片",
+        "列表/负索引"
+      ]
+    },
+    {
+      "qid": "Q4-03",
+      "func": "func0403",
+      "title": "用冒泡排序实现升序排列",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "列表与切片",
+      "tags": [
+        {
+          "tag": "冒泡排序",
+          "module_id": "U14-M03",
+          "module": "U14-M03 查找与排序",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.4
+        },
+        {
+          "tag": "嵌套循环",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "变量交换",
+          "module_id": "U02-M01",
+          "module": "U02-M01 变量与对象",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.15
+        },
+        {
+          "tag": "时间复杂度",
+          "module_id": "U14-M01",
+          "module": "U14-M01 复杂度与算法思维",
+          "unit": "U14",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "冒泡排序",
+        "嵌套循环"
+      ],
+      "secondary": [
+        "变量交换",
+        "时间复杂度"
+      ],
+      "ability": [
+        "代码编写题",
+        "复杂度优化"
+      ],
+      "error_modes": [
+        "循环边界 off-by-one"
+      ],
+      "legacy_tags": [
+        "算法/冒泡排序",
+        "列表/原地交换",
+        "循环/嵌套循环"
+      ]
+    },
+    {
+      "qid": "Q4-04",
+      "func": "func0404",
+      "title": "列表去重并保持原顺序",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "列表与切片",
+      "tags": [
+        {
+          "tag": "列表去重",
+          "module_id": "U05-M02",
+          "module": "U05-M02 列表操作",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "成员运算符 in",
+          "module_id": "U03-M04",
+          "module": "U03-M04 成员与身份运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "append 追加",
+          "module_id": "U05-M02",
+          "module": "U05-M02 列表操作",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "列表遍历",
+          "module_id": "U05-M01",
+          "module": "U05-M01 列表基础",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "列表去重",
+        "成员运算符 in"
+      ],
+      "secondary": [
+        "append 追加",
+        "列表遍历"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "逻辑与需求不符"
+      ],
+      "legacy_tags": [
+        "列表/去重",
+        "列表/成员判断",
+        "循环/遍历与构建新列表"
+      ]
+    },
+    {
+      "qid": "Q5-01",
+      "func": "func0501",
+      "title": "统计出现次数最多的单词",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "元组、字典与集合",
+      "tags": [
+        {
+          "tag": "字典计数",
+          "module_id": "U14-M04",
+          "module": "U14-M04 哈希与计数",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "get 安全取值",
+          "module_id": "U05-M04",
+          "module": "U05-M04 字典",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "items 视图",
+          "module_id": "U05-M04",
+          "module": "U05-M04 字典",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "sorted 的 key 参数",
+          "module_id": "U06-M04",
+          "module": "U06-M04 高阶函数",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "字典计数",
+        "get 安全取值"
+      ],
+      "secondary": [
+        "items 视图",
+        "sorted 的 key 参数"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "键不存在"
+      ],
+      "legacy_tags": [
+        "字典/计数",
+        "字典/get与默认值",
+        "字典/items遍历",
+        "内置函数/sorted与key"
+      ]
+    },
+    {
+      "qid": "Q5-02",
+      "func": "func0502",
+      "title": "班级成绩统计",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "元组、字典与集合",
+      "tags": [
+        {
+          "tag": "修改值",
+          "module_id": "U05-M04",
+          "module": "U05-M04 字典",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "嵌套列表",
+          "module_id": "U05-M01",
+          "module": "U05-M01 列表基础",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "内置聚合函数 len/max/min/sum",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "浮点误差",
+          "module_id": "U02-M02",
+          "module": "U02-M02 数值类型",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "修改值",
+        "嵌套列表"
+      ],
+      "secondary": [
+        "内置聚合函数 len/max/min/sum",
+        "浮点误差"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "除零错误"
+      ],
+      "legacy_tags": [
+        "字典/累积统计",
+        "列表/遍历",
+        "输入输出/浮点数精度"
+      ]
+    },
+    {
+      "qid": "Q5-03",
+      "func": "func0503",
+      "title": "集合的交、并、差",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "元组、字典与集合",
+      "tags": [
+        {
+          "tag": "交集 &",
+          "module_id": "U05-M05",
+          "module": "U05-M05 集合",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "并集 |",
+          "module_id": "U05-M05",
+          "module": "U05-M05 集合",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "差集 -",
+          "module_id": "U05-M05",
+          "module": "U05-M05 集合",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "集合去重",
+          "module_id": "U05-M05",
+          "module": "U05-M05 集合",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "交集 &",
+        "并集 |",
+        "差集 -"
+      ],
+      "secondary": [
+        "集合去重"
+      ],
+      "ability": [
+        "结果预测题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "集合/交并差运算",
+        "集合/去重",
+        "内置函数/sorted"
+      ]
+    },
+    {
+      "qid": "Q5-04",
+      "func": "func0504",
+      "title": "按成绩降序输出学生名单",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "元组、字典与集合",
+      "tags": [
+        {
+          "tag": "多关键字排序",
+          "module_id": "U14-M03",
+          "module": "U14-M03 查找与排序",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "sorted 的 key 参数",
+          "module_id": "U06-M04",
+          "module": "U06-M04 高阶函数",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "元组解包",
+          "module_id": "U05-M03",
+          "module": "U05-M03 元组",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "元组 tuple",
+          "module_id": "U05-M03",
+          "module": "U05-M03 元组",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "多关键字排序",
+        "sorted 的 key 参数"
+      ],
+      "secondary": [
+        "元组解包",
+        "元组 tuple"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "逻辑与需求不符"
+      ],
+      "legacy_tags": [
+        "元组/创建与解包",
+        "列表/sort与key",
+        "列表/多关键字排序"
+      ]
+    },
+    {
+      "qid": "Q6-01",
+      "func": "func0601",
+      "title": "百分制成绩转等级",
+      "star": "★☆☆",
+      "score": 10,
+      "domain": "条件分支与循环",
+      "tags": [
+        {
+          "tag": "elif 多分支",
+          "module_id": "U04-M01",
+          "module": "U04-M01 条件分支",
+          "unit": "U04",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "if-else 双分支",
+          "module_id": "U04-M01",
+          "module": "U04-M01 条件分支",
+          "unit": "U04",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "分支覆盖完整性",
+          "module_id": "U04-M01",
+          "module": "U04-M01 条件分支",
+          "unit": "U04",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "比较运算符",
+          "module_id": "U03-M02",
+          "module": "U03-M02 比较与逻辑运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "elif 多分支",
+        "if-else 双分支"
+      ],
+      "secondary": [
+        "分支覆盖完整性",
+        "比较运算符"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "条件覆盖不全",
+        "分支顺序错误"
+      ],
+      "legacy_tags": [
+        "控制流程/if-elif-else",
+        "控制流程/多分支判定",
+        "运算符/比较运算符"
+      ]
+    },
+    {
+      "qid": "Q6-02",
+      "func": "func0602",
+      "title": "区间内的水仙花数",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "条件分支与循环",
+      "tags": [
+        {
+          "tag": "数字拆分",
+          "module_id": "U14-M08",
+          "module": "U14-M08 数学与数论题",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "for 循环",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "循环与条件组合",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "字符串拼接",
+          "module_id": "U02-M04",
+          "module": "U02-M04 字符串处理",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "数字拆分",
+        "for 循环"
+      ],
+      "secondary": [
+        "循环与条件组合",
+        "字符串拼接"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "输出格式不符"
+      ],
+      "legacy_tags": [
+        "循环/for遍历区间",
+        "控制流程/条件筛选",
+        "基础语法/数值拆位"
+      ]
+    },
+    {
+      "qid": "Q6-03",
+      "func": "func0603",
+      "title": "统计不超过 n 的素数个数",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "条件分支与循环",
+      "tags": [
+        {
+          "tag": "质数判断",
+          "module_id": "U14-M08",
+          "module": "U14-M08 数学与数论题",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.4
+        },
+        {
+          "tag": "嵌套循环",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "break 跳出",
+          "module_id": "U04-M03",
+          "module": "U04-M03 循环控制",
+          "unit": "U04",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "时间复杂度",
+          "module_id": "U14-M01",
+          "module": "U14-M01 复杂度与算法思维",
+          "unit": "U14",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "质数判断",
+        "嵌套循环"
+      ],
+      "secondary": [
+        "break 跳出",
+        "时间复杂度"
+      ],
+      "ability": [
+        "代码编写题",
+        "复杂度优化"
+      ],
+      "error_modes": [
+        "循环边界 off-by-one",
+        "条件覆盖不全"
+      ],
+      "legacy_tags": [
+        "循环/嵌套循环",
+        "循环/break提前退出",
+        "算法/素数判定",
+        "算法/时间复杂度"
+      ]
+    },
+    {
+      "qid": "Q6-04",
+      "func": "func0604",
+      "title": "被 3 整除但不被 5 整除之和",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "条件分支与循环",
+      "tags": [
+        {
+          "tag": "累加器",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "range 序列",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "逻辑与 and",
+          "module_id": "U03-M02",
+          "module": "U03-M02 比较与逻辑运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "取模 %",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "累加器",
+        "range 序列"
+      ],
+      "secondary": [
+        "逻辑与 and",
+        "取模 %"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "累加初始值错误"
+      ],
+      "legacy_tags": [
+        "循环/for与range",
+        "控制流程/条件组合",
+        "循环/累加器",
+        "运算符/逻辑运算符"
+      ]
+    },
+    {
+      "qid": "Q7-01",
+      "func": "func0701",
+      "title": "带默认参数的圆面积函数",
+      "star": "★☆☆",
+      "score": 10,
+      "domain": "函数与参数传递",
+      "tags": [
+        {
+          "tag": "默认参数",
+          "module_id": "U06-M02",
+          "module": "U06-M02 参数机制",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.4
+        },
+        {
+          "tag": "round 四舍五入",
+          "module_id": "U06-M06",
+          "module": "U06-M06 内置函数与工具函数",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "函数定义 def",
+          "module_id": "U06-M01",
+          "module": "U06-M01 函数基础",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "参数顺序规则",
+          "module_id": "U06-M02",
+          "module": "U06-M02 参数机制",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "默认参数",
+        "round 四舍五入"
+      ],
+      "secondary": [
+        "函数定义 def",
+        "参数顺序规则"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "默认参数陷阱",
+        "参数顺序错误"
+      ],
+      "legacy_tags": [
+        "函数/定义与调用",
+        "函数/默认参数",
+        "输入输出/浮点数精度"
+      ]
+    },
+    {
+      "qid": "Q7-02",
+      "func": "func0702",
+      "title": "返回多个值的整除函数",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "函数与参数传递",
+      "tags": [
+        {
+          "tag": "元组作为返回值",
+          "module_id": "U05-M03",
+          "module": "U05-M03 元组",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "整除 //",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "元组解包",
+          "module_id": "U05-M03",
+          "module": "U05-M03 元组",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "返回值 return",
+          "module_id": "U06-M01",
+          "module": "U06-M01 函数基础",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "元组作为返回值",
+        "整除 //"
+      ],
+      "secondary": [
+        "元组解包",
+        "返回值 return"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "返回值遗漏"
+      ],
+      "legacy_tags": [
+        "函数/返回多值",
+        "元组/解包赋值",
+        "函数/返回值设计"
+      ]
+    },
+    {
+      "qid": "Q7-03",
+      "func": "func0703",
+      "title": "求最大值与次大值（函数拆分）",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "函数与参数传递",
+      "tags": [
+        {
+          "tag": "列表求最值",
+          "module_id": "U05-M02",
+          "module": "U05-M02 列表操作",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "sort 排序",
+          "module_id": "U05-M02",
+          "module": "U05-M02 列表操作",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "函数封装思想",
+          "module_id": "U06-M01",
+          "module": "U06-M01 函数基础",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "列表去重",
+          "module_id": "U05-M02",
+          "module": "U05-M02 列表操作",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.15
+        },
+        {
+          "tag": "返回值 return",
+          "module_id": "U06-M01",
+          "module": "U06-M01 函数基础",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.1
+        }
+      ],
+      "primary": [
+        "列表求最值",
+        "sort 排序"
+      ],
+      "secondary": [
+        "函数封装思想",
+        "列表去重",
+        "返回值 return"
+      ],
+      "ability": [
+        "代码编写题",
+        "结构设计"
+      ],
+      "error_modes": [
+        "循环边界 off-by-one"
+      ],
+      "legacy_tags": [
+        "函数/定义与调用",
+        "函数/返回值设计",
+        "列表/排序与去重"
+      ]
+    },
+    {
+      "qid": "Q7-04",
+      "func": "func0704",
+      "title": "字典转「键=值」字符串",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "函数与参数传递",
+      "tags": [
+        {
+          "tag": "items 视图",
+          "module_id": "U05-M04",
+          "module": "U05-M04 字典",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "join 合并",
+          "module_id": "U02-M04",
+          "module": "U02-M04 字符串处理",
+          "unit": "U02",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "参数传递机制",
+          "module_id": "U06-M02",
+          "module": "U06-M02 参数机制",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "字符串拼接",
+          "module_id": "U02-M04",
+          "module": "U02-M04 字符串处理",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "items 视图",
+        "join 合并"
+      ],
+      "secondary": [
+        "参数传递机制",
+        "字符串拼接"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "类型不匹配"
+      ],
+      "legacy_tags": [
+        "函数/参数传递",
+        "字典/items遍历",
+        "字符串/join"
+      ]
+    },
+    {
+      "qid": "Q8-01",
+      "func": "func0801",
+      "title": "递归求阶乘",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "递归与迭代",
+      "tags": [
+        {
+          "tag": "递归定义",
+          "module_id": "U06-M05",
+          "module": "U06-M05 递归",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "递归出口",
+          "module_id": "U06-M05",
+          "module": "U06-M05 递归",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "阶乘计算",
+          "module_id": "U14-M08",
+          "module": "U14-M08 数学与数论题",
+          "unit": "U14",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "递归调用栈",
+          "module_id": "U06-M05",
+          "module": "U06-M05 递归",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "递归定义",
+        "递归出口"
+      ],
+      "secondary": [
+        "阶乘计算",
+        "递归调用栈"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "返回值遗漏"
+      ],
+      "legacy_tags": [
+        "函数/递归",
+        "函数/终止条件",
+        "算法/阶乘"
+      ]
+    },
+    {
+      "qid": "Q8-02",
+      "func": "func0802",
+      "title": "递归求斐波那契数列第 n 项",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "递归与迭代",
+      "tags": [
+        {
+          "tag": "斐波那契递归",
+          "module_id": "U06-M05",
+          "module": "U06-M05 递归",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "递归定义",
+          "module_id": "U06-M05",
+          "module": "U06-M05 递归",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "递归重复计算",
+          "module_id": "U06-M05",
+          "module": "U06-M05 递归",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "时间复杂度",
+          "module_id": "U14-M01",
+          "module": "U14-M01 复杂度与算法思维",
+          "unit": "U14",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "斐波那契递归",
+        "递归定义"
+      ],
+      "secondary": [
+        "递归重复计算",
+        "时间复杂度"
+      ],
+      "ability": [
+        "代码编写题",
+        "复杂度优化"
+      ],
+      "error_modes": [
+        "复杂度超限"
+      ],
+      "legacy_tags": [
+        "函数/递归",
+        "函数/递归调用树",
+        "算法/斐波那契",
+        "算法/时间复杂度"
+      ]
+    },
+    {
+      "qid": "Q8-03",
+      "func": "func0803",
+      "title": "递归求最大公约数",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "递归与迭代",
+      "tags": [
+        {
+          "tag": "最大公约数",
+          "module_id": "U14-M08",
+          "module": "U14-M08 数学与数论题",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "递归出口",
+          "module_id": "U06-M05",
+          "module": "U06-M05 递归",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "取模 %",
+          "module_id": "U03-M01",
+          "module": "U03-M01 算术运算",
+          "unit": "U03",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "递归调用栈",
+          "module_id": "U06-M05",
+          "module": "U06-M05 递归",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "最大公约数",
+        "递归出口"
+      ],
+      "secondary": [
+        "取模 %",
+        "递归调用栈"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "函数/递归",
+        "函数/递归终止条件",
+        "算法/欧几里得算法",
+        "基础语法/取余"
+      ]
+    },
+    {
+      "qid": "Q9-01",
+      "func": "func0901",
+      "title": "用列表推导式求偶数的平方",
+      "star": "★☆☆",
+      "score": 10,
+      "domain": "推导式、生成器与匿名函数",
+      "tags": [
+        {
+          "tag": "列表推导式",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.5
+        },
+        {
+          "tag": "条件筛选推导式",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "range 序列",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "列表推导式",
+        "条件筛选推导式"
+      ],
+      "secondary": [
+        "range 序列"
+      ],
+      "ability": [
+        "代码改写题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "推导式/列表推导式",
+        "推导式/条件过滤",
+        "内置函数/range"
+      ]
+    },
+    {
+      "qid": "Q9-02",
+      "func": "func0902",
+      "title": "用字典推导式统计字符出现次数",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "推导式、生成器与匿名函数",
+      "tags": [
+        {
+          "tag": "字典推导式",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.4
+        },
+        {
+          "tag": "字典计数",
+          "module_id": "U14-M04",
+          "module": "U14-M04 哈希与计数",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "count 计数",
+          "module_id": "U02-M04",
+          "module": "U02-M04 字符串处理",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.15
+        },
+        {
+          "tag": "集合去重",
+          "module_id": "U05-M05",
+          "module": "U05-M05 集合",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "字典推导式",
+        "字典计数"
+      ],
+      "secondary": [
+        "count 计数",
+        "集合去重"
+      ],
+      "ability": [
+        "代码改写题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "推导式/字典推导式",
+        "字符串/count计数",
+        "数据结构/去重"
+      ]
+    },
+    {
+      "qid": "Q9-03",
+      "func": "func0903",
+      "title": "用生成器表达式求条件平方和",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "推导式、生成器与匿名函数",
+      "tags": [
+        {
+          "tag": "生成器表达式",
+          "module_id": "U11-M01",
+          "module": "U11-M01 迭代器与生成器",
+          "unit": "U11",
+          "role": "primary",
+          "weight": 0.4
+        },
+        {
+          "tag": "惰性求值",
+          "module_id": "U11-M01",
+          "module": "U11-M01 迭代器与生成器",
+          "unit": "U11",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "sum 求和",
+          "module_id": "U06-M06",
+          "module": "U06-M06 内置函数与工具函数",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "条件筛选推导式",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "生成器表达式",
+        "惰性求值"
+      ],
+      "secondary": [
+        "sum 求和",
+        "条件筛选推导式"
+      ],
+      "ability": [
+        "代码改写题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "推导式/生成器表达式",
+        "内置函数/sum",
+        "迭代器/惰性求值"
+      ]
+    },
+    {
+      "qid": "Q9-04",
+      "func": "func0904",
+      "title": "用 lambda + filter + map 处理数列",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "推导式、生成器与匿名函数",
+      "tags": [
+        {
+          "tag": "lambda 匿名函数",
+          "module_id": "U06-M04",
+          "module": "U06-M04 高阶函数",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "filter 过滤",
+          "module_id": "U06-M04",
+          "module": "U06-M04 高阶函数",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "map 映射",
+          "module_id": "U06-M04",
+          "module": "U06-M04 高阶函数",
+          "unit": "U06",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "函数作为参数",
+          "module_id": "U06-M04",
+          "module": "U06-M04 高阶函数",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "lambda 匿名函数",
+        "filter 过滤",
+        "map 映射"
+      ],
+      "secondary": [
+        "函数作为参数"
+      ],
+      "ability": [
+        "代码改写题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "函数/lambda匿名函数",
+        "函数/高阶函数",
+        "内置函数/map与filter",
+        "迭代器/惰性求值"
+      ]
+    },
+    {
+      "qid": "Q10-01",
+      "func": "func1001",
+      "title": "不会崩溃的整数除法",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "异常处理",
+      "tags": [
+        {
+          "tag": "try-except 捕获",
+          "module_id": "U09-M02",
+          "module": "U09-M02 异常处理",
+          "unit": "U09",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "ZeroDivisionError 除零错误",
+          "module_id": "U09-M01",
+          "module": "U09-M01 异常基础",
+          "unit": "U09",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "ValueError 值错误",
+          "module_id": "U09-M01",
+          "module": "U09-M01 异常基础",
+          "unit": "U09",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "异常与返回值的选择",
+          "module_id": "U09-M02",
+          "module": "U09-M02 异常处理",
+          "unit": "U09",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "try-except 捕获",
+        "ZeroDivisionError 除零错误"
+      ],
+      "secondary": [
+        "ValueError 值错误",
+        "异常与返回值的选择"
+      ],
+      "ability": [
+        "代码编写题",
+        "调试排错"
+      ],
+      "error_modes": [
+        "异常捕获过宽"
+      ],
+      "legacy_tags": [
+        "异常处理/try-except",
+        "异常处理/ZeroDivisionError",
+        "异常处理/ValueError",
+        "健壮性/输入校验"
+      ]
+    },
+    {
+      "qid": "Q10-02",
+      "func": "func1002",
+      "title": "跳过非法数据的平均值",
+      "star": "★★★",
+      "score": 20,
+      "domain": "异常处理",
+      "tags": [
+        {
+          "tag": "try-except 捕获",
+          "module_id": "U09-M02",
+          "module": "U09-M02 异常处理",
+          "unit": "U09",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "异常处理粒度",
+          "module_id": "U09-M02",
+          "module": "U09-M02 异常处理",
+          "unit": "U09",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "ValueError 值错误",
+          "module_id": "U09-M01",
+          "module": "U09-M01 异常基础",
+          "unit": "U09",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "列表遍历",
+          "module_id": "U05-M01",
+          "module": "U05-M01 列表基础",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "try-except 捕获",
+        "异常处理粒度"
+      ],
+      "secondary": [
+        "ValueError 值错误",
+        "列表遍历"
+      ],
+      "ability": [
+        "代码编写题",
+        "边界处理"
+      ],
+      "error_modes": [
+        "异常捕获过宽",
+        "除零错误"
+      ],
+      "legacy_tags": [
+        "异常处理/try-except",
+        "异常处理/循环内捕获",
+        "异常处理/ValueError",
+        "列表/遍历与统计"
+      ]
+    },
+    {
+      "qid": "Q10-03",
+      "func": "func1003",
+      "title": "自定义异常做年龄校验",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "异常处理",
+      "tags": [
+        {
+          "tag": "自定义异常类",
+          "module_id": "U09-M02",
+          "module": "U09-M02 异常处理",
+          "unit": "U09",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "主动抛出 raise",
+          "module_id": "U09-M02",
+          "module": "U09-M02 异常处理",
+          "unit": "U09",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "except as 获取异常对象",
+          "module_id": "U09-M02",
+          "module": "U09-M02 异常处理",
+          "unit": "U09",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "参数合法性校验",
+          "module_id": "U06-M02",
+          "module": "U06-M02 参数机制",
+          "unit": "U06",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "自定义异常类",
+        "主动抛出 raise"
+      ],
+      "secondary": [
+        "except as 获取异常对象",
+        "参数合法性校验"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "异常处理/自定义异常",
+        "异常处理/raise抛出",
+        "异常处理/异常捕获与信息",
+        "函数/参数校验"
+      ]
+    },
+    {
+      "qid": "Q11-01",
+      "func": "func1101",
+      "title": "统计每个学生的总分",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "二维列表与记录处理",
+      "tags": [
+        {
+          "tag": "二维列表访问",
+          "module_id": "U05-M01",
+          "module": "U05-M01 列表基础",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "新增键值",
+          "module_id": "U05-M04",
+          "module": "U05-M04 字典",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "列表遍历",
+          "module_id": "U05-M01",
+          "module": "U05-M01 列表基础",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "元组解包",
+          "module_id": "U05-M03",
+          "module": "U05-M03 元组",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "二维列表访问",
+        "新增键值"
+      ],
+      "secondary": [
+        "列表遍历",
+        "元组解包"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "键不存在"
+      ],
+      "legacy_tags": [
+        "文件与数据解析/二维记录",
+        "字典/聚合统计",
+        "列表/保持顺序"
+      ]
+    },
+    {
+      "qid": "Q11-02",
+      "func": "func1102",
+      "title": "统计文本的行数、单词数与字符数",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "二维列表与记录处理",
+      "tags": [
+        {
+          "tag": "split 分割",
+          "module_id": "U02-M04",
+          "module": "U02-M04 字符串处理",
+          "unit": "U02",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "字符统计",
+          "module_id": "U14-M02",
+          "module": "U14-M02 字符串与数组题",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "内置聚合函数 len/max/min/sum",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.25
+        },
+        {
+          "tag": "字符串长度",
+          "module_id": "U02-M03",
+          "module": "U02-M03 字符串基础",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "split 分割",
+        "字符统计"
+      ],
+      "secondary": [
+        "内置聚合函数 len/max/min/sum",
+        "字符串长度"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "逻辑与需求不符"
+      ],
+      "legacy_tags": [
+        "文件与数据解析/多行文本",
+        "字符串/split分割",
+        "内置函数/len",
+        "字符串/join"
+      ]
+    },
+    {
+      "qid": "Q11-03",
+      "func": "func1103",
+      "title": "筛选与排序成绩单",
+      "star": "★★★",
+      "score": 20,
+      "domain": "二维列表与记录处理",
+      "tags": [
+        {
+          "tag": "条件筛选推导式",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "多关键字排序",
+          "module_id": "U14-M03",
+          "module": "U14-M03 查找与排序",
+          "unit": "U14",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "二维列表访问",
+          "module_id": "U05-M01",
+          "module": "U05-M01 列表基础",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "列表推导式",
+          "module_id": "U05-M06",
+          "module": "U05-M06 序列通用操作与推导式",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "条件筛选推导式",
+        "多关键字排序"
+      ],
+      "secondary": [
+        "二维列表访问",
+        "列表推导式"
+      ],
+      "ability": [
+        "代码编写题",
+        "边界处理"
+      ],
+      "error_modes": [
+        "条件覆盖不全"
+      ],
+      "legacy_tags": [
+        "文件与数据解析/二维记录",
+        "列表/筛选",
+        "列表/多关键字排序",
+        "控制流程/边界处理"
+      ]
+    },
+    {
+      "qid": "Q12-01",
+      "func": "func1201",
+      "title": "矩形类的面积与周长",
+      "star": "★☆☆",
+      "score": 10,
+      "domain": "面向对象编程基础",
+      "tags": [
+        {
+          "tag": "类 class",
+          "module_id": "U10-M01",
+          "module": "U10-M01 类与对象",
+          "unit": "U10",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "__init__ 构造方法",
+          "module_id": "U10-M01",
+          "module": "U10-M01 类与对象",
+          "unit": "U10",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "self 参数",
+          "module_id": "U10-M01",
+          "module": "U10-M01 类与对象",
+          "unit": "U10",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "实例方法",
+          "module_id": "U10-M01",
+          "module": "U10-M01 类与对象",
+          "unit": "U10",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "类 class",
+        "__init__ 构造方法"
+      ],
+      "secondary": [
+        "self 参数",
+        "实例方法"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "作用域误用"
+      ],
+      "legacy_tags": [
+        "面向对象/类与对象",
+        "面向对象/__init__构造方法",
+        "面向对象/实例属性与self",
+        "面向对象/实例方法"
+      ]
+    },
+    {
+      "qid": "Q12-02",
+      "func": "func1202",
+      "title": "重写 __str__ 输出学生信息",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "面向对象编程基础",
+      "tags": [
+        {
+          "tag": "对象打印 __str__",
+          "module_id": "U10-M01",
+          "module": "U10-M01 类与对象",
+          "unit": "U10",
+          "role": "primary",
+          "weight": 0.4
+        },
+        {
+          "tag": "实例属性",
+          "module_id": "U10-M01",
+          "module": "U10-M01 类与对象",
+          "unit": "U10",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "f-string 格式化",
+          "module_id": "U02-M05",
+          "module": "U02-M05 格式化与输入输出",
+          "unit": "U02",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "魔法方法调用时机",
+          "module_id": "U10-M05",
+          "module": "U10-M05 常用魔法方法",
+          "unit": "U10",
+          "role": "secondary",
+          "weight": 0.15
+        }
+      ],
+      "primary": [
+        "对象打印 __str__",
+        "实例属性"
+      ],
+      "secondary": [
+        "f-string 格式化",
+        "魔法方法调用时机"
+      ],
+      "ability": [
+        "代码改写题"
+      ],
+      "error_modes": [
+        "输出格式不符"
+      ],
+      "legacy_tags": [
+        "面向对象/魔术方法",
+        "面向对象/__str__",
+        "面向对象/实例属性",
+        "字符串/格式化"
+      ]
+    },
+    {
+      "qid": "Q12-03",
+      "func": "func1203",
+      "title": "继承与方法重写：动物叫声",
+      "star": "★★☆",
+      "score": 15,
+      "domain": "面向对象编程基础",
+      "tags": [
+        {
+          "tag": "方法重写 override",
+          "module_id": "U10-M03",
+          "module": "U10-M03 继承",
+          "unit": "U10",
+          "role": "primary",
+          "weight": 0.35
+        },
+        {
+          "tag": "继承语法",
+          "module_id": "U10-M03",
+          "module": "U10-M03 继承",
+          "unit": "U10",
+          "role": "primary",
+          "weight": 0.25
+        },
+        {
+          "tag": "多态概念",
+          "module_id": "U10-M04",
+          "module": "U10-M04 多态",
+          "unit": "U10",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "父类与子类",
+          "module_id": "U10-M03",
+          "module": "U10-M03 继承",
+          "unit": "U10",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "方法重写 override",
+        "继承语法"
+      ],
+      "secondary": [
+        "多态概念",
+        "父类与子类"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [],
+      "legacy_tags": [
+        "面向对象/继承",
+        "面向对象/方法重写",
+        "面向对象/多态",
+        "字典/映射分发"
+      ]
+    },
+    {
+      "qid": "Q12-04",
+      "func": "func1204",
+      "title": "用类维护账户余额",
+      "star": "★★★",
+      "score": 20,
+      "domain": "面向对象编程基础",
+      "tags": [
+        {
+          "tag": "实例属性",
+          "module_id": "U10-M01",
+          "module": "U10-M01 类与对象",
+          "unit": "U10",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "属性合法性校验",
+          "module_id": "U10-M02",
+          "module": "U10-M02 封装",
+          "unit": "U10",
+          "role": "primary",
+          "weight": 0.3
+        },
+        {
+          "tag": "循环与条件组合",
+          "module_id": "U04-M02",
+          "module": "U04-M02 循环结构",
+          "unit": "U04",
+          "role": "secondary",
+          "weight": 0.2
+        },
+        {
+          "tag": "修改值",
+          "module_id": "U05-M04",
+          "module": "U05-M04 字典",
+          "unit": "U05",
+          "role": "secondary",
+          "weight": 0.2
+        }
+      ],
+      "primary": [
+        "实例属性",
+        "属性合法性校验"
+      ],
+      "secondary": [
+        "循环与条件组合",
+        "修改值"
+      ],
+      "ability": [
+        "代码编写题"
+      ],
+      "error_modes": [
+        "逻辑与需求不符"
+      ],
+      "legacy_tags": [
+        "面向对象/类的状态维护",
+        "面向对象/方法返回值",
+        "面向对象/业务规则校验",
+        "循环/遍历操作序列"
+      ]
+    }
+  ],
+  "tag_index": {
+    "变量交换": {
+      "module": "U02-M01 变量与对象",
+      "module_id": "U02-M01",
+      "unit": "U02",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q4-03"
+      ]
+    },
+    "浮点误差": {
+      "module": "U02-M02 数值类型",
+      "module_id": "U02-M02",
+      "unit": "U02",
+      "primary": 1,
+      "secondary": 2,
+      "questions": [
+        "Q1-01",
+        "Q4-01",
+        "Q5-02"
+      ]
+    },
+    "字符串遍历": {
+      "module": "U02-M03 字符串基础",
+      "module_id": "U02-M03",
+      "unit": "U02",
+      "primary": 1,
+      "secondary": 1,
+      "questions": [
+        "Q1-02",
+        "Q3-01"
+      ]
+    },
+    "字符串长度": {
+      "module": "U02-M03 字符串基础",
+      "module_id": "U02-M03",
+      "unit": "U02",
+      "primary": 1,
+      "secondary": 1,
+      "questions": [
+        "Q3-04",
+        "Q11-02"
+      ]
+    },
+    "字符串切片": {
+      "module": "U02-M03 字符串基础",
+      "module_id": "U02-M03",
+      "unit": "U02",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q3-02"
+      ]
+    },
+    "步长切片": {
+      "module": "U02-M03 字符串基础",
+      "module_id": "U02-M03",
+      "unit": "U02",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q4-02"
+      ]
+    },
+    "split 分割": {
+      "module": "U02-M04 字符串处理",
+      "module_id": "U02-M04",
+      "unit": "U02",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q3-03",
+        "Q11-02"
+      ]
+    },
+    "大小写转换": {
+      "module": "U02-M04 字符串处理",
+      "module_id": "U02-M04",
+      "unit": "U02",
+      "primary": 1,
+      "secondary": 1,
+      "questions": [
+        "Q3-02",
+        "Q3-04"
+      ]
+    },
+    "字符串拼接": {
+      "module": "U02-M04 字符串处理",
+      "module_id": "U02-M04",
+      "unit": "U02",
+      "primary": 0,
+      "secondary": 2,
+      "questions": [
+        "Q6-02",
+        "Q7-04"
+      ]
+    },
+    "count 计数": {
+      "module": "U02-M04 字符串处理",
+      "module_id": "U02-M04",
+      "unit": "U02",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q9-02"
+      ]
+    },
+    "isdigit 与 isalpha 判断": {
+      "module": "U02-M04 字符串处理",
+      "module_id": "U02-M04",
+      "unit": "U02",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q3-01"
+      ]
+    },
+    "join 合并": {
+      "module": "U02-M04 字符串处理",
+      "module_id": "U02-M04",
+      "unit": "U02",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q7-04"
+      ]
+    },
+    "字符串比较": {
+      "module": "U02-M04 字符串处理",
+      "module_id": "U02-M04",
+      "unit": "U02",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q3-04"
+      ]
+    },
+    "f-string 格式化": {
+      "module": "U02-M05 格式化与输入输出",
+      "module_id": "U02-M05",
+      "unit": "U02",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q12-02"
+      ]
+    },
+    "格式宽度与精度": {
+      "module": "U02-M05 格式化与输入输出",
+      "module_id": "U02-M05",
+      "unit": "U02",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q1-03"
+      ]
+    },
+    "显式类型转换": {
+      "module": "U02-M06 类型转换与类型判断",
+      "module_id": "U02-M06",
+      "unit": "U02",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q1-01"
+      ]
+    },
+    "取模 %": {
+      "module": "U03-M01 算术运算",
+      "module_id": "U03-M01",
+      "unit": "U03",
+      "primary": 2,
+      "secondary": 3,
+      "questions": [
+        "Q1-03",
+        "Q1-04",
+        "Q2-02",
+        "Q6-04",
+        "Q8-03"
+      ]
+    },
+    "整除 //": {
+      "module": "U03-M01 算术运算",
+      "module_id": "U03-M01",
+      "unit": "U03",
+      "primary": 4,
+      "secondary": 1,
+      "questions": [
+        "Q1-02",
+        "Q1-03",
+        "Q1-04",
+        "Q2-02",
+        "Q7-02"
+      ]
+    },
+    "运算符优先级": {
+      "module": "U03-M01 算术运算",
+      "module_id": "U03-M01",
+      "unit": "U03",
+      "primary": 0,
+      "secondary": 3,
+      "questions": [
+        "Q1-03",
+        "Q2-02",
+        "Q2-03"
+      ]
+    },
+    "真除法": {
+      "module": "U03-M01 算术运算",
+      "module_id": "U03-M01",
+      "unit": "U03",
+      "primary": 0,
+      "secondary": 2,
+      "questions": [
+        "Q1-04",
+        "Q4-01"
+      ]
+    },
+    "算术运算符": {
+      "module": "U03-M01 算术运算",
+      "module_id": "U03-M01",
+      "unit": "U03",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q1-01"
+      ]
+    },
+    "条件表达式（三元运算）": {
+      "module": "U03-M02 比较与逻辑运算",
+      "module_id": "U03-M02",
+      "unit": "U03",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q3-02"
+      ]
+    },
+    "比较运算符": {
+      "module": "U03-M02 比较与逻辑运算",
+      "module_id": "U03-M02",
+      "unit": "U03",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q6-01"
+      ]
+    },
+    "逻辑与 and": {
+      "module": "U03-M02 比较与逻辑运算",
+      "module_id": "U03-M02",
+      "unit": "U03",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q6-04"
+      ]
+    },
+    "位与 &": {
+      "module": "U03-M03 赋值与位运算",
+      "module_id": "U03-M03",
+      "unit": "U03",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q2-01",
+        "Q2-03"
+      ]
+    },
+    "位或 |": {
+      "module": "U03-M03 赋值与位运算",
+      "module_id": "U03-M03",
+      "unit": "U03",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q2-03"
+      ]
+    },
+    "位运算应用场景": {
+      "module": "U03-M03 赋值与位运算",
+      "module_id": "U03-M03",
+      "unit": "U03",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q2-01"
+      ]
+    },
+    "异或 ^": {
+      "module": "U03-M03 赋值与位运算",
+      "module_id": "U03-M03",
+      "unit": "U03",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q2-03"
+      ]
+    },
+    "成员运算符 in": {
+      "module": "U03-M04 成员与身份运算",
+      "module_id": "U03-M04",
+      "unit": "U03",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q4-04"
+      ]
+    },
+    "elif 多分支": {
+      "module": "U04-M01 条件分支",
+      "module_id": "U04-M01",
+      "unit": "U04",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q6-01"
+      ]
+    },
+    "if-else 双分支": {
+      "module": "U04-M01 条件分支",
+      "module_id": "U04-M01",
+      "unit": "U04",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q6-01"
+      ]
+    },
+    "分支覆盖完整性": {
+      "module": "U04-M01 条件分支",
+      "module_id": "U04-M01",
+      "unit": "U04",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q6-01"
+      ]
+    },
+    "循环与条件组合": {
+      "module": "U04-M02 循环结构",
+      "module_id": "U04-M02",
+      "unit": "U04",
+      "primary": 0,
+      "secondary": 3,
+      "questions": [
+        "Q3-01",
+        "Q6-02",
+        "Q12-04"
+      ]
+    },
+    "range 序列": {
+      "module": "U04-M02 循环结构",
+      "module_id": "U04-M02",
+      "unit": "U04",
+      "primary": 1,
+      "secondary": 1,
+      "questions": [
+        "Q6-04",
+        "Q9-01"
+      ]
+    },
+    "嵌套循环": {
+      "module": "U04-M02 循环结构",
+      "module_id": "U04-M02",
+      "unit": "U04",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q4-03",
+        "Q6-03"
+      ]
+    },
+    "累加器": {
+      "module": "U04-M02 循环结构",
+      "module_id": "U04-M02",
+      "unit": "U04",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q1-02",
+        "Q6-04"
+      ]
+    },
+    "for 循环": {
+      "module": "U04-M02 循环结构",
+      "module_id": "U04-M02",
+      "unit": "U04",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q6-02"
+      ]
+    },
+    "循环终止条件": {
+      "module": "U04-M02 循环结构",
+      "module_id": "U04-M02",
+      "unit": "U04",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q2-01"
+      ]
+    },
+    "计数器": {
+      "module": "U04-M02 循环结构",
+      "module_id": "U04-M02",
+      "unit": "U04",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q3-01"
+      ]
+    },
+    "break 跳出": {
+      "module": "U04-M03 循环控制",
+      "module_id": "U04-M03",
+      "unit": "U04",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q6-03"
+      ]
+    },
+    "列表遍历": {
+      "module": "U05-M01 列表基础",
+      "module_id": "U05-M01",
+      "unit": "U05",
+      "primary": 0,
+      "secondary": 3,
+      "questions": [
+        "Q4-04",
+        "Q10-02",
+        "Q11-01"
+      ]
+    },
+    "二维列表访问": {
+      "module": "U05-M01 列表基础",
+      "module_id": "U05-M01",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 1,
+      "questions": [
+        "Q11-01",
+        "Q11-03"
+      ]
+    },
+    "列表切片": {
+      "module": "U05-M01 列表基础",
+      "module_id": "U05-M01",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q4-02"
+      ]
+    },
+    "列表创建": {
+      "module": "U05-M01 列表基础",
+      "module_id": "U05-M01",
+      "unit": "U05",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q3-04"
+      ]
+    },
+    "嵌套列表": {
+      "module": "U05-M01 列表基础",
+      "module_id": "U05-M01",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q5-02"
+      ]
+    },
+    "列表去重": {
+      "module": "U05-M02 列表操作",
+      "module_id": "U05-M02",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 1,
+      "questions": [
+        "Q4-04",
+        "Q7-03"
+      ]
+    },
+    "列表求最值": {
+      "module": "U05-M02 列表操作",
+      "module_id": "U05-M02",
+      "unit": "U05",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q4-01",
+        "Q7-03"
+      ]
+    },
+    "append 追加": {
+      "module": "U05-M02 列表操作",
+      "module_id": "U05-M02",
+      "unit": "U05",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q4-04"
+      ]
+    },
+    "sort 排序": {
+      "module": "U05-M02 列表操作",
+      "module_id": "U05-M02",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q7-03"
+      ]
+    },
+    "元组解包": {
+      "module": "U05-M03 元组",
+      "module_id": "U05-M03",
+      "unit": "U05",
+      "primary": 0,
+      "secondary": 3,
+      "questions": [
+        "Q5-04",
+        "Q7-02",
+        "Q11-01"
+      ]
+    },
+    "元组 tuple": {
+      "module": "U05-M03 元组",
+      "module_id": "U05-M03",
+      "unit": "U05",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q5-04"
+      ]
+    },
+    "元组作为返回值": {
+      "module": "U05-M03 元组",
+      "module_id": "U05-M03",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q7-02"
+      ]
+    },
+    "items 视图": {
+      "module": "U05-M04 字典",
+      "module_id": "U05-M04",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 1,
+      "questions": [
+        "Q5-01",
+        "Q7-04"
+      ]
+    },
+    "修改值": {
+      "module": "U05-M04 字典",
+      "module_id": "U05-M04",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 1,
+      "questions": [
+        "Q5-02",
+        "Q12-04"
+      ]
+    },
+    "get 安全取值": {
+      "module": "U05-M04 字典",
+      "module_id": "U05-M04",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q5-01"
+      ]
+    },
+    "新增键值": {
+      "module": "U05-M04 字典",
+      "module_id": "U05-M04",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q11-01"
+      ]
+    },
+    "集合去重": {
+      "module": "U05-M05 集合",
+      "module_id": "U05-M05",
+      "unit": "U05",
+      "primary": 0,
+      "secondary": 2,
+      "questions": [
+        "Q5-03",
+        "Q9-02"
+      ]
+    },
+    "交集 &": {
+      "module": "U05-M05 集合",
+      "module_id": "U05-M05",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q5-03"
+      ]
+    },
+    "差集 -": {
+      "module": "U05-M05 集合",
+      "module_id": "U05-M05",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q5-03"
+      ]
+    },
+    "并集 |": {
+      "module": "U05-M05 集合",
+      "module_id": "U05-M05",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q5-03"
+      ]
+    },
+    "内置聚合函数 len/max/min/sum": {
+      "module": "U05-M06 序列通用操作与推导式",
+      "module_id": "U05-M06",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 3,
+      "questions": [
+        "Q3-03",
+        "Q4-01",
+        "Q5-02",
+        "Q11-02"
+      ]
+    },
+    "条件筛选推导式": {
+      "module": "U05-M06 序列通用操作与推导式",
+      "module_id": "U05-M06",
+      "unit": "U05",
+      "primary": 2,
+      "secondary": 1,
+      "questions": [
+        "Q9-01",
+        "Q9-03",
+        "Q11-03"
+      ]
+    },
+    "列表推导式": {
+      "module": "U05-M06 序列通用操作与推导式",
+      "module_id": "U05-M06",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 1,
+      "questions": [
+        "Q9-01",
+        "Q11-03"
+      ]
+    },
+    "字典推导式": {
+      "module": "U05-M06 序列通用操作与推导式",
+      "module_id": "U05-M06",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q9-02"
+      ]
+    },
+    "序列切片通用规则": {
+      "module": "U05-M06 序列通用操作与推导式",
+      "module_id": "U05-M06",
+      "unit": "U05",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q4-02"
+      ]
+    },
+    "负索引": {
+      "module": "U05-M06 序列通用操作与推导式",
+      "module_id": "U05-M06",
+      "unit": "U05",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q4-02"
+      ]
+    },
+    "返回值 return": {
+      "module": "U06-M01 函数基础",
+      "module_id": "U06-M01",
+      "unit": "U06",
+      "primary": 0,
+      "secondary": 2,
+      "questions": [
+        "Q7-02",
+        "Q7-03"
+      ]
+    },
+    "函数定义 def": {
+      "module": "U06-M01 函数基础",
+      "module_id": "U06-M01",
+      "unit": "U06",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q7-01"
+      ]
+    },
+    "函数封装思想": {
+      "module": "U06-M01 函数基础",
+      "module_id": "U06-M01",
+      "unit": "U06",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q7-03"
+      ]
+    },
+    "参数传递机制": {
+      "module": "U06-M02 参数机制",
+      "module_id": "U06-M02",
+      "unit": "U06",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q7-04"
+      ]
+    },
+    "参数合法性校验": {
+      "module": "U06-M02 参数机制",
+      "module_id": "U06-M02",
+      "unit": "U06",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q10-03"
+      ]
+    },
+    "参数顺序规则": {
+      "module": "U06-M02 参数机制",
+      "module_id": "U06-M02",
+      "unit": "U06",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q7-01"
+      ]
+    },
+    "默认参数": {
+      "module": "U06-M02 参数机制",
+      "module_id": "U06-M02",
+      "unit": "U06",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q7-01"
+      ]
+    },
+    "sorted 的 key 参数": {
+      "module": "U06-M04 高阶函数",
+      "module_id": "U06-M04",
+      "unit": "U06",
+      "primary": 1,
+      "secondary": 2,
+      "questions": [
+        "Q3-03",
+        "Q5-01",
+        "Q5-04"
+      ]
+    },
+    "filter 过滤": {
+      "module": "U06-M04 高阶函数",
+      "module_id": "U06-M04",
+      "unit": "U06",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q9-04"
+      ]
+    },
+    "lambda 匿名函数": {
+      "module": "U06-M04 高阶函数",
+      "module_id": "U06-M04",
+      "unit": "U06",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q9-04"
+      ]
+    },
+    "map 映射": {
+      "module": "U06-M04 高阶函数",
+      "module_id": "U06-M04",
+      "unit": "U06",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q9-04"
+      ]
+    },
+    "函数作为参数": {
+      "module": "U06-M04 高阶函数",
+      "module_id": "U06-M04",
+      "unit": "U06",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q9-04"
+      ]
+    },
+    "递归出口": {
+      "module": "U06-M05 递归",
+      "module_id": "U06-M05",
+      "unit": "U06",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q8-01",
+        "Q8-03"
+      ]
+    },
+    "递归定义": {
+      "module": "U06-M05 递归",
+      "module_id": "U06-M05",
+      "unit": "U06",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q8-01",
+        "Q8-02"
+      ]
+    },
+    "递归调用栈": {
+      "module": "U06-M05 递归",
+      "module_id": "U06-M05",
+      "unit": "U06",
+      "primary": 0,
+      "secondary": 2,
+      "questions": [
+        "Q8-01",
+        "Q8-03"
+      ]
+    },
+    "斐波那契递归": {
+      "module": "U06-M05 递归",
+      "module_id": "U06-M05",
+      "unit": "U06",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q8-02"
+      ]
+    },
+    "递归重复计算": {
+      "module": "U06-M05 递归",
+      "module_id": "U06-M05",
+      "unit": "U06",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q8-02"
+      ]
+    },
+    "round 四舍五入": {
+      "module": "U06-M06 内置函数与工具函数",
+      "module_id": "U06-M06",
+      "unit": "U06",
+      "primary": 1,
+      "secondary": 1,
+      "questions": [
+        "Q1-01",
+        "Q7-01"
+      ]
+    },
+    "sum 求和": {
+      "module": "U06-M06 内置函数与工具函数",
+      "module_id": "U06-M06",
+      "unit": "U06",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q9-03"
+      ]
+    },
+    "ValueError 值错误": {
+      "module": "U09-M01 异常基础",
+      "module_id": "U09-M01",
+      "unit": "U09",
+      "primary": 0,
+      "secondary": 2,
+      "questions": [
+        "Q10-01",
+        "Q10-02"
+      ]
+    },
+    "ZeroDivisionError 除零错误": {
+      "module": "U09-M01 异常基础",
+      "module_id": "U09-M01",
+      "unit": "U09",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q10-01"
+      ]
+    },
+    "try-except 捕获": {
+      "module": "U09-M02 异常处理",
+      "module_id": "U09-M02",
+      "unit": "U09",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q10-01",
+        "Q10-02"
+      ]
+    },
+    "except as 获取异常对象": {
+      "module": "U09-M02 异常处理",
+      "module_id": "U09-M02",
+      "unit": "U09",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q10-03"
+      ]
+    },
+    "主动抛出 raise": {
+      "module": "U09-M02 异常处理",
+      "module_id": "U09-M02",
+      "unit": "U09",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q10-03"
+      ]
+    },
+    "异常与返回值的选择": {
+      "module": "U09-M02 异常处理",
+      "module_id": "U09-M02",
+      "unit": "U09",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q10-01"
+      ]
+    },
+    "异常处理粒度": {
+      "module": "U09-M02 异常处理",
+      "module_id": "U09-M02",
+      "unit": "U09",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q10-02"
+      ]
+    },
+    "自定义异常类": {
+      "module": "U09-M02 异常处理",
+      "module_id": "U09-M02",
+      "unit": "U09",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q10-03"
+      ]
+    },
+    "实例属性": {
+      "module": "U10-M01 类与对象",
+      "module_id": "U10-M01",
+      "unit": "U10",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q12-02",
+        "Q12-04"
+      ]
+    },
+    "__init__ 构造方法": {
+      "module": "U10-M01 类与对象",
+      "module_id": "U10-M01",
+      "unit": "U10",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q12-01"
+      ]
+    },
+    "self 参数": {
+      "module": "U10-M01 类与对象",
+      "module_id": "U10-M01",
+      "unit": "U10",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q12-01"
+      ]
+    },
+    "实例方法": {
+      "module": "U10-M01 类与对象",
+      "module_id": "U10-M01",
+      "unit": "U10",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q12-01"
+      ]
+    },
+    "对象打印 __str__": {
+      "module": "U10-M01 类与对象",
+      "module_id": "U10-M01",
+      "unit": "U10",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q12-02"
+      ]
+    },
+    "类 class": {
+      "module": "U10-M01 类与对象",
+      "module_id": "U10-M01",
+      "unit": "U10",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q12-01"
+      ]
+    },
+    "属性合法性校验": {
+      "module": "U10-M02 封装",
+      "module_id": "U10-M02",
+      "unit": "U10",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q12-04"
+      ]
+    },
+    "方法重写 override": {
+      "module": "U10-M03 继承",
+      "module_id": "U10-M03",
+      "unit": "U10",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q12-03"
+      ]
+    },
+    "父类与子类": {
+      "module": "U10-M03 继承",
+      "module_id": "U10-M03",
+      "unit": "U10",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q12-03"
+      ]
+    },
+    "继承语法": {
+      "module": "U10-M03 继承",
+      "module_id": "U10-M03",
+      "unit": "U10",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q12-03"
+      ]
+    },
+    "多态概念": {
+      "module": "U10-M04 多态",
+      "module_id": "U10-M04",
+      "unit": "U10",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q12-03"
+      ]
+    },
+    "魔法方法调用时机": {
+      "module": "U10-M05 常用魔法方法",
+      "module_id": "U10-M05",
+      "unit": "U10",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q12-02"
+      ]
+    },
+    "惰性求值": {
+      "module": "U11-M01 迭代器与生成器",
+      "module_id": "U11-M01",
+      "unit": "U11",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q9-03"
+      ]
+    },
+    "生成器表达式": {
+      "module": "U11-M01 迭代器与生成器",
+      "module_id": "U11-M01",
+      "unit": "U11",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q9-03"
+      ]
+    },
+    "时间复杂度": {
+      "module": "U14-M01 复杂度与算法思维",
+      "module_id": "U14-M01",
+      "unit": "U14",
+      "primary": 0,
+      "secondary": 3,
+      "questions": [
+        "Q4-03",
+        "Q6-03",
+        "Q8-02"
+      ]
+    },
+    "特殊用例考虑": {
+      "module": "U14-M01 复杂度与算法思维",
+      "module_id": "U14-M01",
+      "unit": "U14",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q1-04"
+      ]
+    },
+    "回文判断": {
+      "module": "U14-M02 字符串与数组题",
+      "module_id": "U14-M02",
+      "unit": "U14",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q3-02"
+      ]
+    },
+    "字符统计": {
+      "module": "U14-M02 字符串与数组题",
+      "module_id": "U14-M02",
+      "unit": "U14",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q11-02"
+      ]
+    },
+    "最值索引查找": {
+      "module": "U14-M02 字符串与数组题",
+      "module_id": "U14-M02",
+      "unit": "U14",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q3-03"
+      ]
+    },
+    "多关键字排序": {
+      "module": "U14-M03 查找与排序",
+      "module_id": "U14-M03",
+      "unit": "U14",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q5-04",
+        "Q11-03"
+      ]
+    },
+    "冒泡排序": {
+      "module": "U14-M03 查找与排序",
+      "module_id": "U14-M03",
+      "unit": "U14",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q4-03"
+      ]
+    },
+    "字典计数": {
+      "module": "U14-M04 哈希与计数",
+      "module_id": "U14-M04",
+      "unit": "U14",
+      "primary": 2,
+      "secondary": 0,
+      "questions": [
+        "Q5-01",
+        "Q9-02"
+      ]
+    },
+    "数字拆分": {
+      "module": "U14-M08 数学与数论题",
+      "module_id": "U14-M08",
+      "unit": "U14",
+      "primary": 3,
+      "secondary": 0,
+      "questions": [
+        "Q1-02",
+        "Q2-02",
+        "Q6-02"
+      ]
+    },
+    "最大公约数": {
+      "module": "U14-M08 数学与数论题",
+      "module_id": "U14-M08",
+      "unit": "U14",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q8-03"
+      ]
+    },
+    "质数判断": {
+      "module": "U14-M08 数学与数论题",
+      "module_id": "U14-M08",
+      "unit": "U14",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q6-03"
+      ]
+    },
+    "进制转换": {
+      "module": "U14-M08 数学与数论题",
+      "module_id": "U14-M08",
+      "unit": "U14",
+      "primary": 1,
+      "secondary": 0,
+      "questions": [
+        "Q2-01"
+      ]
+    },
+    "阶乘计算": {
+      "module": "U14-M08 数学与数论题",
+      "module_id": "U14-M08",
+      "unit": "U14",
+      "primary": 0,
+      "secondary": 1,
+      "questions": [
+        "Q8-01"
+      ]
+    }
+  },
+  "module_index": {
+    "U02-M01": [
+      "变量交换"
+    ],
+    "U02-M02": [
+      "浮点误差"
+    ],
+    "U02-M03": [
+      "字符串切片",
+      "字符串遍历",
+      "字符串长度",
+      "步长切片"
+    ],
+    "U02-M04": [
+      "count 计数",
+      "isdigit 与 isalpha 判断",
+      "join 合并",
+      "split 分割",
+      "大小写转换",
+      "字符串拼接",
+      "字符串比较"
+    ],
+    "U02-M05": [
+      "f-string 格式化",
+      "格式宽度与精度"
+    ],
+    "U02-M06": [
+      "显式类型转换"
+    ],
+    "U03-M01": [
+      "取模 %",
+      "整除 //",
+      "真除法",
+      "算术运算符",
+      "运算符优先级"
+    ],
+    "U03-M02": [
+      "条件表达式（三元运算）",
+      "比较运算符",
+      "逻辑与 and"
+    ],
+    "U03-M03": [
+      "位与 &",
+      "位或 |",
+      "位运算应用场景",
+      "异或 ^"
+    ],
+    "U03-M04": [
+      "成员运算符 in"
+    ],
+    "U04-M01": [
+      "elif 多分支",
+      "if-else 双分支",
+      "分支覆盖完整性"
+    ],
+    "U04-M02": [
+      "for 循环",
+      "range 序列",
+      "嵌套循环",
+      "循环与条件组合",
+      "循环终止条件",
+      "累加器",
+      "计数器"
+    ],
+    "U04-M03": [
+      "break 跳出"
+    ],
+    "U05-M01": [
+      "二维列表访问",
+      "列表切片",
+      "列表创建",
+      "列表遍历",
+      "嵌套列表"
+    ],
+    "U05-M02": [
+      "append 追加",
+      "sort 排序",
+      "列表去重",
+      "列表求最值"
+    ],
+    "U05-M03": [
+      "元组 tuple",
+      "元组作为返回值",
+      "元组解包"
+    ],
+    "U05-M04": [
+      "get 安全取值",
+      "items 视图",
+      "修改值",
+      "新增键值"
+    ],
+    "U05-M05": [
+      "交集 &",
+      "差集 -",
+      "并集 |",
+      "集合去重"
+    ],
+    "U05-M06": [
+      "内置聚合函数 len/max/min/sum",
+      "列表推导式",
+      "字典推导式",
+      "序列切片通用规则",
+      "条件筛选推导式",
+      "负索引"
+    ],
+    "U06-M01": [
+      "函数定义 def",
+      "函数封装思想",
+      "返回值 return"
+    ],
+    "U06-M02": [
+      "参数传递机制",
+      "参数合法性校验",
+      "参数顺序规则",
+      "默认参数"
+    ],
+    "U06-M04": [
+      "filter 过滤",
+      "lambda 匿名函数",
+      "map 映射",
+      "sorted 的 key 参数",
+      "函数作为参数"
+    ],
+    "U06-M05": [
+      "斐波那契递归",
+      "递归出口",
+      "递归定义",
+      "递归调用栈",
+      "递归重复计算"
+    ],
+    "U06-M06": [
+      "round 四舍五入",
+      "sum 求和"
+    ],
+    "U09-M01": [
+      "ValueError 值错误",
+      "ZeroDivisionError 除零错误"
+    ],
+    "U09-M02": [
+      "except as 获取异常对象",
+      "try-except 捕获",
+      "主动抛出 raise",
+      "异常与返回值的选择",
+      "异常处理粒度",
+      "自定义异常类"
+    ],
+    "U10-M01": [
+      "__init__ 构造方法",
+      "self 参数",
+      "实例属性",
+      "实例方法",
+      "对象打印 __str__",
+      "类 class"
+    ],
+    "U10-M02": [
+      "属性合法性校验"
+    ],
+    "U10-M03": [
+      "方法重写 override",
+      "父类与子类",
+      "继承语法"
+    ],
+    "U10-M04": [
+      "多态概念"
+    ],
+    "U10-M05": [
+      "魔法方法调用时机"
+    ],
+    "U11-M01": [
+      "惰性求值",
+      "生成器表达式"
+    ],
+    "U14-M01": [
+      "时间复杂度",
+      "特殊用例考虑"
+    ],
+    "U14-M02": [
+      "回文判断",
+      "字符统计",
+      "最值索引查找"
+    ],
+    "U14-M03": [
+      "冒泡排序",
+      "多关键字排序"
+    ],
+    "U14-M04": [
+      "字典计数"
+    ],
+    "U14-M08": [
+      "数字拆分",
+      "最大公约数",
+      "质数判断",
+      "进制转换",
+      "阶乘计算"
+    ]
+  },
+  "unit_index": {
+    "U02": {
+      "name": "变量与基础数据类型",
+      "tags": [
+        "count 计数",
+        "f-string 格式化",
+        "isdigit 与 isalpha 判断",
+        "join 合并",
+        "split 分割",
+        "变量交换",
+        "大小写转换",
+        "字符串切片",
+        "字符串拼接",
+        "字符串比较",
+        "字符串遍历",
+        "字符串长度",
+        "显式类型转换",
+        "格式宽度与精度",
+        "步长切片",
+        "浮点误差"
+      ],
+      "questions": [
+        "Q1-01",
+        "Q1-02",
+        "Q1-03",
+        "Q11-02",
+        "Q12-02",
+        "Q3-01",
+        "Q3-02",
+        "Q3-03",
+        "Q3-04",
+        "Q4-01",
+        "Q4-02",
+        "Q4-03",
+        "Q5-02",
+        "Q6-02",
+        "Q7-04",
+        "Q9-02"
+      ]
+    },
+    "U03": {
+      "name": "运算符与表达式",
+      "tags": [
+        "位与 &",
+        "位或 |",
+        "位运算应用场景",
+        "取模 %",
+        "异或 ^",
+        "成员运算符 in",
+        "整除 //",
+        "条件表达式（三元运算）",
+        "比较运算符",
+        "真除法",
+        "算术运算符",
+        "运算符优先级",
+        "逻辑与 and"
+      ],
+      "questions": [
+        "Q1-01",
+        "Q1-02",
+        "Q1-03",
+        "Q1-04",
+        "Q2-01",
+        "Q2-02",
+        "Q2-03",
+        "Q3-02",
+        "Q4-01",
+        "Q4-04",
+        "Q6-01",
+        "Q6-04",
+        "Q7-02",
+        "Q8-03"
+      ]
+    },
+    "U04": {
+      "name": "流程控制",
+      "tags": [
+        "break 跳出",
+        "elif 多分支",
+        "for 循环",
+        "if-else 双分支",
+        "range 序列",
+        "分支覆盖完整性",
+        "嵌套循环",
+        "循环与条件组合",
+        "循环终止条件",
+        "累加器",
+        "计数器"
+      ],
+      "questions": [
+        "Q1-02",
+        "Q12-04",
+        "Q2-01",
+        "Q3-01",
+        "Q4-03",
+        "Q6-01",
+        "Q6-02",
+        "Q6-03",
+        "Q6-04",
+        "Q9-01"
+      ]
+    },
+    "U05": {
+      "name": "容器数据类型",
+      "tags": [
+        "append 追加",
+        "get 安全取值",
+        "items 视图",
+        "sort 排序",
+        "二维列表访问",
+        "交集 &",
+        "修改值",
+        "元组 tuple",
+        "元组作为返回值",
+        "元组解包",
+        "内置聚合函数 len/max/min/sum",
+        "列表切片",
+        "列表创建",
+        "列表去重",
+        "列表推导式",
+        "列表求最值",
+        "列表遍历",
+        "字典推导式",
+        "嵌套列表",
+        "差集 -",
+        "并集 |",
+        "序列切片通用规则",
+        "新增键值",
+        "条件筛选推导式",
+        "负索引",
+        "集合去重"
+      ],
+      "questions": [
+        "Q10-02",
+        "Q11-01",
+        "Q11-02",
+        "Q11-03",
+        "Q12-04",
+        "Q3-03",
+        "Q3-04",
+        "Q4-01",
+        "Q4-02",
+        "Q4-04",
+        "Q5-01",
+        "Q5-02",
+        "Q5-03",
+        "Q5-04",
+        "Q7-02",
+        "Q7-03",
+        "Q7-04",
+        "Q9-01",
+        "Q9-02",
+        "Q9-03"
+      ]
+    },
+    "U06": {
+      "name": "函数",
+      "tags": [
+        "filter 过滤",
+        "lambda 匿名函数",
+        "map 映射",
+        "round 四舍五入",
+        "sorted 的 key 参数",
+        "sum 求和",
+        "函数作为参数",
+        "函数定义 def",
+        "函数封装思想",
+        "参数传递机制",
+        "参数合法性校验",
+        "参数顺序规则",
+        "斐波那契递归",
+        "返回值 return",
+        "递归出口",
+        "递归定义",
+        "递归调用栈",
+        "递归重复计算",
+        "默认参数"
+      ],
+      "questions": [
+        "Q1-01",
+        "Q10-03",
+        "Q3-03",
+        "Q5-01",
+        "Q5-04",
+        "Q7-01",
+        "Q7-02",
+        "Q7-03",
+        "Q7-04",
+        "Q8-01",
+        "Q8-02",
+        "Q8-03",
+        "Q9-03",
+        "Q9-04"
+      ]
+    },
+    "U09": {
+      "name": "异常处理与调试",
+      "tags": [
+        "ValueError 值错误",
+        "ZeroDivisionError 除零错误",
+        "except as 获取异常对象",
+        "try-except 捕获",
+        "主动抛出 raise",
+        "异常与返回值的选择",
+        "异常处理粒度",
+        "自定义异常类"
+      ],
+      "questions": [
+        "Q10-01",
+        "Q10-02",
+        "Q10-03"
+      ]
+    },
+    "U10": {
+      "name": "面向对象编程",
+      "tags": [
+        "__init__ 构造方法",
+        "self 参数",
+        "多态概念",
+        "实例属性",
+        "实例方法",
+        "对象打印 __str__",
+        "属性合法性校验",
+        "方法重写 override",
+        "父类与子类",
+        "类 class",
+        "继承语法",
+        "魔法方法调用时机"
+      ],
+      "questions": [
+        "Q12-01",
+        "Q12-02",
+        "Q12-03",
+        "Q12-04"
+      ]
+    },
+    "U11": {
+      "name": "高阶特性",
+      "tags": [
+        "惰性求值",
+        "生成器表达式"
+      ],
+      "questions": [
+        "Q9-03"
+      ]
+    },
+    "U14": {
+      "name": "算法与编程题专项",
+      "tags": [
+        "冒泡排序",
+        "回文判断",
+        "多关键字排序",
+        "字典计数",
+        "字符统计",
+        "数字拆分",
+        "时间复杂度",
+        "最值索引查找",
+        "最大公约数",
+        "特殊用例考虑",
+        "质数判断",
+        "进制转换",
+        "阶乘计算"
+      ],
+      "questions": [
+        "Q1-02",
+        "Q1-04",
+        "Q11-02",
+        "Q11-03",
+        "Q2-01",
+        "Q2-02",
+        "Q3-02",
+        "Q3-03",
+        "Q4-03",
+        "Q5-01",
+        "Q5-04",
+        "Q6-02",
+        "Q6-03",
+        "Q8-01",
+        "Q8-02",
+        "Q8-03",
+        "Q9-02"
+      ]
+    }
+  }
+}

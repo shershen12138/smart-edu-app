@@ -1,3 +1,4 @@
+import logging
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
 from django.conf import settings
@@ -26,6 +27,9 @@ from .models import (
 )
 from .permissions import require_admin, require_staff, is_member
 from .storage import save_private, code_digest
+
+
+logger = logging.getLogger(__name__)
 
 
 def audit(user, action, target, detail=None, request=None):
@@ -137,7 +141,7 @@ def dispatch(run_id):
             )
         except Exception:
             # 事务中已经保留待派发记录；beat 或 run_judge 可恢复。
-            pass
+            logger.warning('评测任务投递失败 run=%s，等待定时派发恢复', run_id, exc_info=True)
 
 
 def dispatch_reference(version_id):
@@ -152,10 +156,11 @@ def dispatch_reference(version_id):
 
             verify_problem.delay(version_id)
     except Exception:
+        logger.warning('标准验证任务投递失败 version=%s', version_id, exc_info=True)
         try:
             cache.delete(key)
         except Exception:
-            pass
+            logger.debug('投递锁清理失败 key=%s', key, exc_info=True)
 
 
 @transaction.atomic

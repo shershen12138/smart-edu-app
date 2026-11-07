@@ -61,6 +61,62 @@ POINT_LABELS: dict[str, str] = {
 # 从而判断学生在代码里是否真的用到了该知识点；自定义名称无法还原，只展示不判定。
 LABEL_TO_POINT: dict[str, str] = {label: tag for tag, label in POINT_LABELS.items()}
 
+# 检测标签 → 《Python教学Tag库》标准 tag 名：评分标准与报告的知识点统一用词表名词，
+# 避免课程自造标签与题库、薄弱点练习的 tag 对不上。无法映射的检测标签沿用 POINT_LABELS。
+POINT_TO_TAG: dict[str, str] = {
+    "list_concat": "列表拼接",
+    "slice_bounds": "列表切片",
+    "slice_reverse": "步长切片",
+    "len": "内置聚合函数 len/max/min/sum",
+    "index_arith": "列表索引",
+    "floor_div": "整除 //",
+    "compare": "比较运算符",
+    "if_else": "if-else 双分支",
+    "elif_chain": "elif 多分支",
+    "loop": "for 循环",
+    "while_loop": "while 循环",
+    "nested_loop": "嵌套循环",
+    "negative_index": "负索引",
+    "list_mutation": "append 追加",
+    "del_or_rebuild": "del 删除元素",
+    "comprehension": "列表推导式",
+    "type_check": "isinstance 判断",
+    "helper_function": "函数复用",
+    "counter": "计数器",
+    "nested_list": "嵌套列表",
+    "sort_key": "自定义排序规则",
+    "lambda": "lambda 匿名函数",
+    "range_loop": "range 序列",
+    "int_str_convert": "str 转换",
+    "list_build": "序列拼接",
+    "reverse": "reverse 反转",
+    "builtin_max": "内置聚合函数 len/max/min/sum",
+    "double_loop": "二维列表访问",
+    "append_row": "append 追加",
+    "linear_scan": "列表遍历",
+    "insert": "insert 插入",
+    "modulo": "取模 %",
+    "sort_builtin": "sorted 排序",
+    "str_method": "split 分割",
+    "str_join": "字符串拼接",
+    "dict_access": "键访问",
+    "dict_update": "修改值",
+    "set_op": "集合 set",
+    "recursion": "递归定义",
+    "try_except": "try-except 捕获",
+    "file_open": "文件打开 open",
+    "class_def": "类 class",
+    "enumerate_zip": "enumerate 带索引遍历",
+    "loop_control": "break 跳出",
+    "basic_def": "函数定义 def",
+}
+
+# 反向索引：Tag 标准名 → 检测标签列表（一个 tag 可能覆盖多个检测器）。
+TAG_TO_POINTS: dict[str, tuple[str, ...]] = {}
+for _point, _tag in POINT_TO_TAG.items():
+    TAG_TO_POINTS.setdefault(_tag, []).append(_point)  # type: ignore[union-attr]
+TAG_TO_POINTS = {tag: tuple(points) for tag, points in TAG_TO_POINTS.items()}
+
 LIST_TASKS: tuple[TaskSpec, ...] = (
     TaskSpec(
         "func301",

@@ -2,7 +2,8 @@
   "venvPath": ".",
   "venv": ".venv",
   "pythonVersion": "3.12",
-  "include": ["school", "config", "manage.py"],
+  "typeCheckingMode": "standard",
+  "include": ["school", "config", "manage.py", "tools"],
   "exclude": [".venv", ".runtime", "staticfiles", "**/__pycache__"],
   "reportMissingImports": "error",
   "reportUnknownVariableType": "none",
@@ -10,5 +11,17 @@
   "reportUnknownMemberType": "none",
   "reportUnknownArgumentType": "none",
   "reportMissingParameterType": "none",
-  "reportUnusedCallResult": "none"
+  "reportUnusedCallResult": "none",
+  "reportImplicitStringConcatenation": "none",
+  "reportUntypedFunctionDecorator": "none",
+  "reportPrivateLocalImportUsage": "none",
+  "reportAny": "none",
+  "reportExplicitAny": "none",
+  // reportAttributeAccessIssue / reportCallIssue / reportGeneralTypeIssues 的剩余误报来自
+  // django-stubs：Model.objects、transaction.atomic、get_FOO_display 等类型标注依赖 mypy
+  // 插件，pyright 无法应用，故关闭这三条。真实缺陷由 pytest、ruff、pylint 兜底。
+  "reportAttributeAccessIssue": "none",
+  "reportCallIssue": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportArgumentType": "none"
 }

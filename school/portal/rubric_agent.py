@@ -28,10 +28,11 @@ from school.course_models import Coursework, CourseworkRubric
 from tools.code_quality_agent import curriculum
 from tools.code_quality_agent import models as agent_models
 from tools.code_quality_agent import static_analysis
+from tools.taglib import loader as taglib
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = 'v1'
+PROMPT_VERSION = 'v2'
 
 DIMENSION_POOL: dict[str, str] = {
     'knowledge': '知识点覆盖',
@@ -155,6 +156,17 @@ JSON_SCHEMA_HINT = """{
 }"""
 
 
+def _tag_vocabulary() -> str:
+    """Tag 库词表的紧凑视图（按模块分组），注入 prompt 供大模型选词。"""
+    modules = taglib.tag_modules()
+    if not modules:
+        return ''
+    lines = []
+    for _unit, module, tags in modules:
+        lines.append(f'- {module}：{"、".join(tags)}')
+    return '\n'.join(lines)
+
+
 class LLMNotConfigured(RuntimeError):
     """没有可用的模型端点或密钥。"""
 
@@ -208,15 +220,27 @@ def coursework_context(coursework) -> dict[str, Any]:
 
 def build_messages(context: dict[str, Any]) -> list[dict[str, str]]:
     dimension_lines = '、'.join(f'{key}（{label}）' for key, label in DIMENSION_POOL.items())
+    vocabulary = _tag_vocabulary()
+    vocabulary_block = (
+        f'\n知识点必须从下面的 Tag 库词表中选取（原样使用，不要自造同义词）：\n{vocabulary}\n'
+        if vocabulary
+        else ''
+    )
+    vocabulary_rule = (
+        '1. 分析这道作业考察以及涉及的知识点，逐条写清楚，并标注涉及哪些函数题；'
+        '每道函数题 3~5 个知识点，知识点名必须与词表中的 tag 完全一致；'
+        if vocabulary
+        else '1. 分析这道作业考察以及涉及的知识点，逐条写清楚，并标注涉及哪些函数题；'
+    )
     system = (
         '你是高校 Python 课程的助教，负责把作业题目拆解成可执行、可比较的评分标准。'
         '只输出 JSON，不要输出解释性文字。'
     )
     user = f"""题目信息（来自教师上传的作业，JSON）：
 {json.dumps(context, ensure_ascii=False, indent=2)}
-
+{vocabulary_block}
 任务：
-1. 分析这道作业考察以及涉及的知识点，逐条写清楚，并标注涉及哪些函数题；
+{vocabulary_rule}
 2. 评分维度池（key（中文名））：{dimension_lines}。生成 5 分制评分量表时，维度控制在 6 个，key 必须从该池中选择且不重复；
 3. 从第 1 步的知识点中归纳 6 个主能力，作为雷达图的 6 根轴：每个能力给出名称、说明、涵盖的知识点名称，并从维度池中各选一个 key（6 个能力互不重复），该能力的分数取所绑定维度的分数；
 4. 权重合计必须等于 100；
@@ -322,6 +346,11 @@ def normalize_dimensions(raw: Any) -> list[dict[str, Any]]:
 
 
 def normalize_points(raw: Any) -> list[dict[str, Any]]:
+    """清洗模型输出的知识点，并把名称归一到《Python教学Tag库》标准词表。
+
+    归一顺序：精确匹配 → 包含匹配（取名字中完整包含的最长 tag）。
+    无法归一的名称保留原样并记日志，避免大模型换一种说法就丢失考点。
+    """
     if not isinstance(raw, list):
         return []
     points = []
@@ -331,6 +360,11 @@ def normalize_points(raw: Any) -> list[dict[str, Any]]:
         name = str(item.get('name', '')).strip()
         if not name:
             continue
+        normalized = taglib.normalize_tag(name)
+        if normalized and normalized != name:
+            name = normalized
+        elif not normalized:
+            logger.warning('知识点“%s”不在 Tag 库词表中，保留原始名称', name)
         tasks = item.get('tasks') or []
         points.append(
             {
@@ -407,6 +441,38 @@ def normalize_abilities(
     return abilities
 
 
+def render_axes_section(
+    context: dict[str, Any], points: list[dict]
+) -> str:
+    """渲染“考察重点（雷达图维度）”一节：该作业最主要的六个知识点 Tag。
+
+    重要度 = Σ(覆盖题目的 1 + 分值/10)，覆盖越广、题目分值越重越主要；
+    与报告页雷达图的六根轴严格一致。
+    """
+    tag_tasks: dict[str, list[str]] = {}
+    for point in points:
+        name = str(point.get('name', '')).strip()
+        if not name:
+            continue
+        for task in point.get('tasks') or []:
+            tag_tasks.setdefault(name, []).append(str(task))
+    weights = {item['function']: item['points'] for item in context['items']}
+    top = taglib.top_tags(tag_tasks, weights, limit=6)
+    if not top:
+        return ''
+    lines = [
+        '## 三、考察重点（雷达图维度）',
+        '',
+        '| 考察重点 | 权重 | 涉及题目 |',
+        '| --- | --- | --- |',
+    ]
+    tasks_by_tag = {name: tasks for name, tasks in tag_tasks.items()}
+    for name, share in top:
+        tasks = '、'.join(dict.fromkeys(tasks_by_tag.get(name, []))) or '全部题目'
+        lines.append(f'| {name} | {share * 100:.0f}% | {tasks} |')
+    return '\n'.join(lines)
+
+
 def render_markdown(
     context: dict[str, Any],
     points: list[dict],
@@ -442,28 +508,49 @@ def render_markdown(
             f"{levels['5']} | {levels['4']} | {levels['3']} | "
             f"{levels['2']} | {levels['1']} |"
         )
-    lines.extend(
-        [
-            '',
-            '## 三、主能力（雷达图维度）',
-            '',
-            '| 主能力 | 对应评分维度 | 涵盖知识点 |',
-            '| --- | --- | --- |',
-        ]
-    )
-    for ability in abilities:
-        covered = '、'.join(ability.get('points') or []) or '全部知识点'
-        dimension = ability.get('dimension', '')
-        label = DIMENSION_POOL.get(dimension, dimension)
-        lines.append(f"| {ability.get('label', '')} | {label} | {covered} |")
+    axes = render_axes_section(context, points)
+    if not axes:
+        # 词表缺失等极端情况下退回主能力描述，保证文件完整
+        lines.extend(
+            [
+                '',
+                '## 三、主能力（雷达图维度）',
+                '',
+                '| 主能力 | 对应评分维度 | 涵盖知识点 |',
+                '| --- | --- | --- |',
+            ]
+        )
+        for ability in abilities:
+            covered = '、'.join(ability.get('points') or []) or '全部知识点'
+            dimension = ability.get('dimension', '')
+            label = DIMENSION_POOL.get(dimension, dimension)
+            lines.append(f"| {ability.get('label', '')} | {label} | {covered} |")
+    else:
+        lines.extend(['', axes])
     lines.extend(
         [
             '',
             '> 评分说明：5 分制按维度打分，换算为百分制后按权重加权求和；'
-            '雷达图各轴为“主能力”，分数取所绑定评分维度的得分。',
+            '雷达图各轴为该作业最主要的六个知识点（考察重点）。',
         ]
     )
     return '\n'.join(lines) + '\n'
+
+
+def with_axes_section(markdown: str, context: dict[str, Any], points: list[dict]) -> str:
+    """把模型生成的 markdown 第三节（主能力）替换为统一的考察重点一节。
+
+    大模型自由发挥的“主能力”与报告页雷达图的六根知识点轴不一致，
+    这里在解析阶段统一重写，第三节是 markdown 的最后一节，按标题截断重拼。
+    """
+    axes = render_axes_section(context, points)
+    if not axes:
+        return markdown
+    text = markdown.strip()
+    marker = text.find('## 三、')
+    if marker >= 0:
+        text = text[:marker].rstrip()
+    return text + '\n\n' + axes + '\n'
 
 
 def parse_response(text: str, context: dict[str, Any]) -> dict[str, Any]:
@@ -476,12 +563,10 @@ def parse_response(text: str, context: dict[str, Any]) -> dict[str, Any]:
     dimensions = normalize_dimensions(data.get('dimensions'))
     abilities = normalize_abilities(data.get('abilities'), points)
     markdown = str(data.get('markdown', '')).strip()
-    if (
-        '5 分制量表' not in markdown
-        or '知识点' not in markdown
-        or '主能力' not in markdown
-    ):
+    if '5 分制量表' not in markdown or '知识点' not in markdown:
         markdown = render_markdown(context, points, dimensions, abilities)
+    # 第三节统一重写为“考察重点”，保证评分标准文件与报告页雷达图六轴一致
+    markdown = with_axes_section(markdown, context, points)
     return {
         'points': points,
         'abilities': abilities,
@@ -499,6 +584,7 @@ def _reference_code(coursework) -> str:
     try:
         return storage.read_private(path)
     except Exception:  # noqa: BLE001 -- 兜底路径不应因读取失败中断
+        logger.warning('读取参考答案失败 path=%s', path, exc_info=True)
         return ''
 
 
@@ -509,6 +595,7 @@ def _reference_functions(reference_code: str) -> dict[str, ast.FunctionDef]:
     try:
         tree = ast.parse(reference_code)
     except SyntaxError:
+        logger.warning('参考答案源码无法解析，知识点推断降级为通用描述')
         return {}
     return {
         node.name: node
@@ -551,19 +638,21 @@ def rule_based(context: dict[str, Any], reference_code: str = '') -> dict[str, A
         else:
             points.append({'name': label, 'detail': detail, 'tasks': [function]})
 
+    def point_label(tag: str) -> str:
+        """检测标签 → Tag 库标准名，未映射的沿用课程中文标签。"""
+        return curriculum.POINT_TO_TAG.get(tag) or curriculum.POINT_LABELS.get(tag, tag)
+
     for item in context['items']:
         spec = known.get(item['function'])
         if spec is not None:
             for tag in spec.points:
-                add_point(
-                    curriculum.POINT_LABELS.get(tag, tag), spec.title, item['function']
-                )
+                add_point(point_label(tag), spec.title, item['function'])
             continue
         tags = _reference_point_tags(reference, item['function'])
         if tags:
             for tag in tags:
                 add_point(
-                    curriculum.POINT_LABELS.get(tag, tag),
+                    point_label(tag),
                     f"{item['title']}：依据参考答案自动识别",
                     item['function'],
                 )

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -15,6 +17,8 @@ from school.course_models import CourseworkSubmission, QualityReport
 from . import quality_service
 from .access import allowed, role
 from .common_views import page, private_download
+
+logger = logging.getLogger(__name__)
 
 
 def _entry_for(request, pk):
@@ -45,6 +49,7 @@ def quality_report(request, pk):
         messages.error(request, exc.messages[0] if exc.messages else '无法生成代码质量报告。')
         return redirect('entry', pk=entry.pk)
     except Exception:
+        logger.exception('质量报告生成失败 entry=%s', entry.pk)
         messages.error(request, '代码质量报告生成失败，请稍后重试或联系教师。')
         return redirect('entry', pk=entry.pk)
 

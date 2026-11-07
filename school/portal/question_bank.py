@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 import json
+import logging
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -22,7 +23,11 @@ from typing import Any
 
 from django.conf import settings
 
+from tools.taglib import loader as taglib
+
 from .knowledge_profile import weak_keywords
+
+logger = logging.getLogger(__name__)
 
 BANK_FILENAME = 'Python题库.md'
 
@@ -189,6 +194,7 @@ def load_bank() -> tuple[dict[str, Any], ...]:
     try:
         lines = path.read_text(encoding='utf-8').splitlines()
     except OSError:
+        logger.warning('题库文档读取失败 path=%s，训练选题将退回空题库', path, exc_info=True)
         return ()
     questions: list[dict[str, Any]] = []
     starts = [i for i, line in enumerate(lines) if _HEADER_RE.match(line.strip())]
@@ -224,7 +230,42 @@ def _match_score(question: dict[str, Any], tokens: list[str]) -> int:
     return total
 
 
+def find_questions_by_tag(
+    tag: str, limit: int = 2, exclude: set[str] | None = None
+) -> list[dict[str, Any]]:
+    """按 Tag 标准名从题库打标文件反查题目，难度递增取前 limit 题。
+
+    评分标准的知识点、薄弱项与题库 tag 已统一为同一词表，
+    精确命中优先于关键词模糊匹配。
+    """
+    excluded = exclude or set()
+    matched: list[tuple[int, str, dict[str, Any]]] = []
+    for entry in taglib.questions_for_tag(tag):
+        for question in load_bank():
+            if question['code'] == entry['qid'] and question['code'] not in excluded:
+                matched.append((question['difficulty_rank'], question['code'], question))
+    matched.sort(key=lambda item: (item[0], item[1]))
+    return [question for _rank, _code, question in matched[:limit]]
+
+
 def find_questions(
+    name: str, limit: int = 2, exclude: set[str] | None = None
+) -> list[dict[str, Any]]:
+    """按弱项（Tag 标准名）选题：Tag 精确命中优先，不足时按关键词模糊匹配补齐。"""
+    excluded = exclude or set()
+    if str(name or '').strip() in taglib.tag_names():
+        tagged = find_questions_by_tag(name, limit=limit, exclude=excluded)
+        if len(tagged) >= limit:
+            return tagged
+        excluded |= {question['code'] for question in tagged}
+        fallback = _find_questions_by_keywords(
+            name, limit=limit - len(tagged), exclude=excluded
+        )
+        return tagged + fallback
+    return _find_questions_by_keywords(name, limit=limit, exclude=excluded)
+
+
+def _find_questions_by_keywords(
     name: str, limit: int = 2, exclude: set[str] | None = None
 ) -> list[dict[str, Any]]:
     """按弱项名称的关键词反查题库，返回相关度最高、难度递增的前 limit 题。"""
