@@ -57,6 +57,7 @@ def valid_llm_payload(markdown=None):
     )
 
 
+@override_settings(LLM_BASE_URL='', LLM_API_KEY='', LLM_MODEL='')
 class RubricAgentTestCase(TestCase):
     def setUp(self):
         teacher = User.objects.create_user(

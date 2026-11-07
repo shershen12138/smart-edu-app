@@ -17,6 +17,9 @@ from school.models import Classroom, ClassStaff, Coursework, User, UserRole
     ROOT_URLCONF='config.urls',
     REDIS_URL='',
     CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
+    LLM_BASE_URL='',
+    LLM_API_KEY='',
+    LLM_MODEL='',
 )
 class RubricViewTests(TestCase):
     def setUp(self):
