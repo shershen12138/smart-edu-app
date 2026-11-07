@@ -1,6 +1,5 @@
 import ast
 import json
-from types import SimpleNamespace
 from unittest import mock
 
 from django.test import TestCase, override_settings
@@ -21,9 +20,9 @@ from school.course_models import (
 )
 from school.judge import CaseOutcome
 from school.models import (
+    Classroom,
     ClassStaff,
     ClassStudent,
-    Classroom,
     Problem,
     ProblemVersion,
     User,
@@ -328,59 +327,6 @@ class PracticeAgentTests(TestCase):
             profile_snapshot={},
             source='rule',
         )
-
-    def test_analyze_attempt_quality_caches_payload(self):
-        plan = self.plan_for_function_problem()
-        problem = PracticeProblem.objects.create(
-            plan=plan,
-            knowledge_point='列表切片',
-            title='Q4-02 列表切片四连击',
-            statement='题面',
-            function_name='func0402',
-            function_argc=1,
-            order=1,
-        )
-        attempt = PracticeAttempt.objects.create(
-            problem=problem,
-            student=self.student,
-            code_path=save_private('def func0402(nums):\n    return []\n', suffix='.py'),
-        )
-        analysis = SimpleNamespace(
-            total=88.4,
-            grade='B',
-            scores={'knowledge': 90.0, 'syntax': 85.0},
-            style_notes=[],
-            results=[
-                SimpleNamespace(
-                    spec=SimpleNamespace(task_id='func0402', title='列表切片四连击'),
-                    parsed=True,
-                    covered=['列表/切片'],
-                    missing=['列表/步长切片'],
-                    issues=[],
-                )
-            ],
-        )
-        dimensions = [SimpleNamespace(key='knowledge', label='知识点覆盖')]
-        with mock.patch.object(
-            practice_agent.quality_agent,
-            'analyze',
-            return_value=(analysis, dimensions, '使用内置默认量表'),
-        ):
-            payload = practice_agent.analyze_attempt_quality(attempt)
-        self.assertIsNotNone(payload)
-        self.assertEqual(payload['total'], 88.4)
-        self.assertEqual(payload['grade'], 'B')
-        self.assertEqual(payload['tasks'][0]['function'], 'func0402')
-        self.assertEqual(payload['tasks'][0]['covered'], ['列表/切片'])
-        attempt.refresh_from_db()
-        self.assertEqual(attempt.quality['total'], 88.4)
-        # 二次调用直接读缓存，不再触发分析
-        with mock.patch.object(
-            practice_agent.quality_agent, 'analyze'
-        ) as second_call:
-            again = practice_agent.analyze_attempt_quality(attempt)
-        second_call.assert_not_called()
-        self.assertEqual(again['grade'], 'B')
 
     def test_format_value(self):
         packed = json.dumps(
@@ -730,7 +676,7 @@ class PracticeViewTests(TestCase):
         # 已有批阅记录时编辑器仍然可用（重新练习）
         self.assertIn('提交批阅', body)
 
-    def test_result_page_shows_cases_quality_and_retry(self):
+    def test_result_page_shows_cases_and_retry(self):
         PracticeCase.objects.create(
             problem=self.problem,
             order=1,
@@ -760,38 +706,14 @@ class PracticeViewTests(TestCase):
             verdict='WA',
             elapsed_ms=7,
         )
-        quality = {
-            'total': 88.4,
-            'grade': 'B',
-            'note': '使用内置默认量表',
-            'scores': {'knowledge': 90.0},
-            'dimension_labels': {'knowledge': '知识点覆盖'},
-            'tasks': [
-                {
-                    'function': 'func0402',
-                    'title': '列表切片四连击',
-                    'parsed': True,
-                    'covered': ['列表/切片'],
-                    'missing': [],
-                    'issues': [
-                        {'line': '2', 'message': '缺少实现', 'advice': '补全函数体'}
-                    ],
-                }
-            ],
-            'style_notes': [],
-        }
         self.client.force_login(self.student)
-        with mock.patch.object(
-            practice_agent, 'analyze_attempt_quality', return_value=quality
-        ):
-            response = self.client.get(reverse('practice_result', args=[attempt.pk]))
+        response = self.client.get(reverse('practice_result', args=[attempt.pk]))
         self.assertEqual(response.status_code, 200)
         body = response.content.decode('utf-8')
         self.assertIn('测试用例批阅明细', body)
-        self.assertIn('代码质量分析', body)
         self.assertIn('重新练习', body)
-        self.assertIn('知识点覆盖', body)
-        self.assertIn('补全函数体', body)
+        # 质量分析模块已按要求移除，结果页不再出现
+        self.assertNotIn('代码质量分析', body)
         # 样例用例展示输入/期望/实际
         self.assertIn('[1,2,3]', body)
 

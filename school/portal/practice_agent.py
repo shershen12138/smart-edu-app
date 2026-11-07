@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 from typing import Any
 
 from django.conf import settings
@@ -30,7 +29,6 @@ from school.course_models import (
 from school.judge import CaseOutcome, InfrastructureError, run_case
 from school.models import ProblemVersion, User
 from school.storage import read_private, save_private
-from tools.code_quality_agent import service as quality_agent
 
 from . import grading, knowledge_profile, question_bank
 from .rubric_agent import LLMNotConfigured, chat, llm_configured, llm_status
@@ -398,7 +396,6 @@ def grade_attempt(attempt: PracticeAttempt) -> PracticeAttempt:
     attempt.total_cases = total
     attempt.score = round(passed / total * 100, 1) if total else 0.0
     attempt.verdict = 'AC' if total and passed == total else 'WA'
-    attempt.quality = None  # 新提交后重算代码质量分析
     attempt.finished_at = timezone.now()
     with transaction.atomic():
         attempt.case_results.all().delete()
@@ -466,48 +463,6 @@ def _unpack_value(value: Any) -> Any:
                 for key, item in value.get('items', [])
             }
     return value
-
-
-def analyze_attempt_quality(attempt: PracticeAttempt) -> dict[str, Any] | None:
-    """复用代码质量评测智能体分析本次提交，结果缓存在提交记录上。
-
-    分析与评分在本机静态完成，不执行学生代码；失败时返回 None，不阻塞结果页。
-    """
-    if attempt.quality is not None:
-        return attempt.quality
-    problem = attempt.problem
-    function_name = problem.function_name or ''
-    try:
-        analysis, dimensions, note = quality_agent.analyze(
-            read_private(attempt.code_path),
-            [(function_name, problem.title)],
-            Path(settings.PRIVATE_STORAGE) / 'quality-tmp',
-            name=attempt.student.get_full_name() or attempt.student.username,
-        )
-    except Exception:  # noqa: BLE001 -- 质量分析失败不影响批阅结果展示
-        return None
-    payload = {
-        'total': round(analysis.total, 1),
-        'grade': analysis.grade,
-        'note': note,
-        'scores': {key: round(value, 1) for key, value in analysis.scores.items()},
-        'dimension_labels': {dimension.key: dimension.label for dimension in dimensions},
-        'tasks': [
-            {
-                'function': result.spec.task_id,
-                'title': result.spec.title,
-                'parsed': result.parsed,
-                'covered': list(result.covered),
-                'missing': list(result.missing),
-                'issues': quality_agent.report_issues(result)[0],
-            }
-            for result in analysis.results
-        ],
-        'style_notes': list(analysis.style_notes),
-    }
-    attempt.quality = payload
-    attempt.save(update_fields=['quality'])
-    return payload
 
 
 def latest_plan(student: User) -> PracticePlan | None:

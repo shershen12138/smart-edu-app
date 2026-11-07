@@ -213,23 +213,6 @@ def practice_result(request, pk):
     )
     if attempt.student_id != request.user.pk:
         raise PermissionDenied
-    # 代码质量分析引用既有评测智能体：静态分析、不执行学生代码，失败不阻塞结果页。
-    quality = None
-    quality_rows = []
-    quality_failed = False
-    if attempt.verdict not in ('ERROR', 'PENDING'):
-        try:
-            quality = practice_agent.analyze_attempt_quality(attempt)
-            quality_failed = quality is None
-        except Exception:  # noqa: BLE001 -- 质量分析失败不阻塞结果页
-            quality_failed = True
-        if quality:
-            labels = quality.get('dimension_labels', {})
-            scores = quality.get('scores', {})
-            quality_rows = [
-                (labels.get(key, key), scores.get(key, 0.0))
-                for key, _label in labels.items()
-            ]
     return page(
         request,
         'practice_result',
@@ -238,9 +221,6 @@ def practice_result(request, pk):
         problem=attempt.problem,
         samples=_sample_cases(attempt.problem),
         cases=_result_cases(attempt),
-        quality=quality,
-        quality_rows=quality_rows,
-        quality_failed=quality_failed,
         retry_url=reverse('practice_problem', args=[attempt.problem_id]),
         back_url=reverse('practice_problem', args=[attempt.problem_id]),
         back_label='返回题目',

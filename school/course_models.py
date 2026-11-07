@@ -419,7 +419,6 @@ class PracticeAttempt(models.Model):
     passed_cases = models.PositiveIntegerField(default=0)
     total_cases = models.PositiveIntegerField(default=0)
     verdict = models.CharField(max_length=20, default='PENDING')
-    quality = models.JSONField('代码质量分析（缓存）', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     finished_at = models.DateTimeField(null=True)
 
