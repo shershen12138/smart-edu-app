@@ -1,0 +1,17 @@
+[run]
+source = school,tools/code_quality_agent,config
+omit =
+    */migrations/*
+    */tests/*
+    config/wsgi.py
+    config/asgi.py
+    */management/commands/seed_demo.py
+    */management/commands/run_judge.py
+
+[report]
+show_missing = true
+skip_covered = true
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    raise NotImplementedError
