@@ -17,6 +17,7 @@ from school.course_models import (
     PracticeCaseResult,
     PracticePlan,
     PracticeProblem,
+    QualityReport,
 )
 from school.judge import CaseOutcome
 from school.models import (
@@ -95,7 +96,12 @@ class KnowledgeProfileTests(TestCase):
             source='rule',
         )
 
-    def _submit(self, student, sequence, scores):
+    def _submit(self, student, sequence, tag_results):
+        """创建一次带评测报告的提交。
+
+        tag_results 为 {Tag 名: 是否达成}，映射为逐题明细的
+        points 列表（judged=True 的机器判定 ✓/✗）。
+        """
         entry = CourseworkSubmission.objects.create(
             coursework=self.work,
             student=student,
@@ -104,36 +110,38 @@ class KnowledgeProfileTests(TestCase):
             source_hash='hash',
             status='done',
         )
-        for function_name, score in scores.items():
-            item = self.item_a if function_name == 'func301' else self.item_b
-            CourseworkQuestionResult.objects.create(
-                submission=entry,
-                function_name=function_name,
-                title=item.title,
-                order=item.order,
-                points=item.points,
-                score=score,
-                passed_cases=0,
-                total_cases=4,
-                verdict='WA',
-            )
+        QualityReport.objects.create(
+            submission=entry,
+            source_sha256='hash',
+            payload={
+                'axis_label': '考察重点',
+                'tasks': [
+                    {
+                        'task_id': f'func30{index + 1}',
+                        'points': [{'tag': '', 'label': tag, 'ok': reached, 'judged': True}],
+                    }
+                    for index, (tag, reached) in enumerate(tag_results.items())
+                ],
+            },
+        )
         return entry
 
-    def test_profile_takes_best_score_across_attempts(self):
-        self._submit(self.student, 1, {'func301': 3, 'func303': 9})
-        self._submit(self.student, 2, {'func301': 7, 'func303': 5})
+    def test_profile_takes_first_submission_report(self):
+        """画像取第一次带评测报告提交的逐题明细缺陷，着重反映首次作答暴露的问题。"""
+        self._submit(self.student, 1, {'列表切片': False, '回文判断': True})
+        self._submit(self.student, 2, {'列表切片': True, '回文判断': False})
         profile = knowledge_profile.student_knowledge_profile(self.student)
-        self.assertEqual(profile['列表切片']['earned'], 7)
-        self.assertEqual(profile['列表切片']['total'], 10)
-        self.assertEqual(profile['回文判断']['earned'], 9)
+        self.assertEqual(profile['列表切片']['earned'], 0)
+        self.assertEqual(profile['列表切片']['total'], 100)
+        self.assertEqual(profile['回文判断']['earned'], 100)
 
     def test_weak_points_sorted_and_filtered(self):
-        self._submit(self.student, 1, {'func301': 3, 'func303': 10})
+        self._submit(self.student, 1, {'列表切片': False, '回文判断': True})
         weak = knowledge_profile.weak_points(
             knowledge_profile.student_knowledge_profile(self.student)
         )
         self.assertEqual([item['name'] for item in weak], ['列表切片'])
-        self.assertEqual(weak[0]['percent'], 30.0)
+        self.assertEqual(weak[0]['percent'], 0.0)
 
     def test_students_without_done_entries_have_empty_weak_list(self):
         self._submit(self.student, 1, {'func301': 3, 'func303': 9})
@@ -145,13 +153,71 @@ class KnowledgeProfileTests(TestCase):
     def test_class_summary_counts_weak_students(self):
         other = make_user('other', 'student')
         ClassStudent.objects.create(classroom=self.classroom, student=other)
-        self._submit(self.student, 1, {'func301': 3, 'func303': 10})
-        self._submit(other, 1, {'func301': 9, 'func303': 2})
+        self._submit(self.student, 1, {'列表切片': False, '回文判断': True})
+        self._submit(other, 1, {'列表切片': True, '回文判断': False})
         summary = knowledge_profile.class_knowledge_summary(self.classroom)
         by_name = {item['name']: item for item in summary}
-        self.assertEqual(by_name['列表切片']['avg_percent'], 60.0)
+        self.assertEqual(by_name['列表切片']['avg_percent'], 50.0)
         self.assertEqual(by_name['列表切片']['weak_students'], 1)
-        self.assertEqual(by_name['回文判断']['avg_percent'], 60.0)
+        self.assertEqual(by_name['回文判断']['avg_percent'], 50.0)
+        self.assertEqual(by_name['回文判断']['weak_students'], 1)
+
+    def test_task_profiles_differ_between_works(self):
+        """不同任务的第一次提交犯的错不同，各任务的弱项也各不一样。"""
+        self._submit(self.student, 1, {'列表切片': False, '回文判断': True})
+        loop_work = Coursework.objects.create(
+            classroom=self.classroom,
+            owner=self.teacher,
+            title='循环练习',
+            description='实现循环函数',
+            grading_mode='automatic',
+            opens_at=timezone.now(),
+            deadline=timezone.now() + timezone.timedelta(days=2),
+            status='open',
+        )
+        entry = CourseworkSubmission.objects.create(
+            coursework=loop_work,
+            student=self.student,
+            sequence=1,
+            source_path='objects/y.py',
+            source_hash='hash2',
+            status='done',
+        )
+        QualityReport.objects.create(
+            submission=entry,
+            source_sha256='hash2',
+            payload={
+                'axis_label': '考察重点',
+                'tasks': [
+                    {
+                        'task_id': 'func501',
+                        'points': [{'tag': '', 'label': 'while 循环', 'ok': False, 'judged': True}],
+                    }
+                ],
+            },
+        )
+        sections = knowledge_profile.task_profiles(self.student)
+        by_title = {section['work_title']: section for section in sections}
+        self.assertEqual(len(sections), 2)
+        self.assertEqual(
+            [item['name'] for item in knowledge_profile.weak_points(
+                by_title['列表练习']['profile']
+            )],
+            ['列表切片'],
+        )
+        self.assertEqual(
+            [item['name'] for item in knowledge_profile.weak_points(
+                by_title['循环练习']['profile']
+            )],
+            ['while 循环'],
+        )
+        # 跨任务合并视图里两个弱项都在（同分按名称排序）
+        merged_weak = knowledge_profile.weak_points(
+            knowledge_profile.student_knowledge_profile(self.student)
+        )
+        self.assertEqual(
+            [item['name'] for item in merged_weak], ['while 循环', '列表切片']
+        )
 
 
 @override_settings(**TEST_OVERRIDES)
@@ -209,6 +275,21 @@ class PracticeAgentTests(TestCase):
             total_cases=4,
             verdict='WA',
         )
+        QualityReport.objects.create(
+            submission=entry,
+            source_sha256='hash',
+            payload={
+                'axis_label': '考察重点',
+                'tasks': [
+                    {
+                        'task_id': 'func301',
+                        'points': [
+                            {'tag': '', 'label': '列表切片', 'ok': False, 'judged': True}
+                        ],
+                    }
+                ],
+            },
+        )
 
     def _seed_bank_problem(self):
         problem = Problem.objects.create(
@@ -252,10 +333,31 @@ class PracticeAgentTests(TestCase):
 
     def test_offline_fallback_uses_existing_bank(self):
         self._seed_bank_problem()
-        plan = practice_agent.generate_practice_plan(self.student, offline=True)
+        plan = practice_agent.generate_practice_plan(
+            self.student, offline=True, work=self.work
+        )
         self.assertIsNotNone(plan)
         self.assertEqual(plan.source, 'rule')
         self.assertEqual(plan.model, '')
+        # 计划归属到任务：快照记录 work_id，按任务可查、其他任务查不到
+        self.assertEqual(plan.profile_snapshot['work_id'], self.work.pk)
+        self.assertEqual(plan.profile_snapshot['work_title'], self.work.title)
+        self.assertEqual(
+            practice_agent.latest_plan(self.student, work=self.work).pk, plan.pk
+        )
+        self.assertIsNone(
+            practice_agent.latest_plan(
+                self.student, work=Coursework.objects.create(
+                    classroom=self.classroom,
+                    owner=self.teacher,
+                    title='空任务',
+                    grading_mode='automatic',
+                    opens_at=timezone.now(),
+                    deadline=timezone.now() + timezone.timedelta(days=1),
+                    status='open',
+                )
+            )
+        )
         problems = list(plan.problems.all())
         # 数据库题库表命中 1 题，分层题库文档补足到每弱项 2 题
         self.assertEqual(len(problems), 2)
@@ -628,6 +730,21 @@ class PracticeViewTests(TestCase):
             passed_cases=1,
             total_cases=4,
             verdict='WA',
+        )
+        QualityReport.objects.create(
+            submission=entry,
+            source_sha256='hash',
+            payload={
+                'axis_label': '考察重点',
+                'tasks': [
+                    {
+                        'task_id': 'func301',
+                        'points': [
+                            {'tag': '', 'label': '列表切片', 'ok': False, 'judged': True}
+                        ],
+                    }
+                ],
+            },
         )
 
     def test_home_without_weak_points_blocks_generation(self):
