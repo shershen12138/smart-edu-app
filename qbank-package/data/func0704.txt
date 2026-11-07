@@ -1,0 +1,10 @@
+{"name":"Tom","age":18}
+{"a":1}
+{"x":1,"y":2,"z":3}
+{"city":"Beijing","country":"China"}
+{"k":"v"}
+{"id":100,"name":"Li","score":90}
+{"p":1,"q":1,"r":1,"s":1}
+{"key":"value"}
+{"no":0,"yes":1}
+{"aa":10,"bb":20,"cc":30,"dd":40,"ee":50}
