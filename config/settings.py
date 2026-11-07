@@ -140,8 +140,8 @@ else:
 
 # 日志：项目与智能体模块的告警统一输出到控制台（运行时重定向到 .runtime 下的日志文件）。
 # DEBUG 环境默认 INFO 便于开发排查，生产用环境变量 LOG_LEVEL 调整。
-# ERROR 及以上级别额外写入轮转的异常日志文件 .runtime/logs/exception.log，
-# 便于事后排查判题、批阅与大模型调用中的未预期异常。
+# ERROR 及以上级别（含 Django 未捕获异常的完整堆栈）额外写入轮转的异常日志文件
+# .runtime/logs/exception.log，便于事后排查判题、批阅与大模型调用中的未预期异常。
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO' if DEBUG else 'WARNING')
 LOGGING = {
     'version': 1,
@@ -173,7 +173,12 @@ try:
         'level': 'ERROR',
         'formatter': 'console',
     }
-    for _logger_name in ('school', 'tools'):
+    for _logger_name in ('school', 'tools', 'django'):
+        # django.request 以 ERROR 记录视图里的未捕获异常，同样落盘
+        if _logger_name not in LOGGING['loggers']:
+            LOGGING['loggers'][_logger_name] = {
+                'handlers': [], 'level': 'ERROR', 'propagate': False
+            }
         LOGGING['loggers'][_logger_name]['handlers'].append('exception_file')
 except OSError:
     # 文件系统只读等情况下降级为仅控制台输出。
