@@ -1,6 +1,9 @@
 import json
+from unittest import mock
 
-from django.test import TestCase, override_settings
+from django.contrib.messages import get_messages
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -14,7 +17,7 @@ from school.models import (
     User,
     UserRole,
 )
-from school.portal import rubric_agent
+from school.portal import rubric_agent, teaching_views
 
 
 @override_settings(
@@ -129,3 +132,88 @@ class RubricAgentTests(TestCase):
         rubric_agent.generate_for(self.work, offline=True)
         rubric_agent.generate_for(self.work, offline=True)
         self.assertEqual(CourseworkRubric.objects.filter(coursework=self.work).count(), 1)
+
+    # ---- 作业保存后自动生成评分标准（teaching_views._auto_generate_rubric）----
+
+    def _request_with_messages(self):
+        request = RequestFactory().get('/')
+        setattr(request, 'session', {})
+        setattr(request, '_messages', FallbackStorage(request))
+        return request
+
+    _LLM_PAYLOAD = {
+        'knowledge_points': [{'name': '切片', 'detail': '1 起始换算', 'tasks': ['func301']}],
+        'dimensions': [
+            {'key': 'knowledge', 'weight': 30, 'five': 'A', 'four': 'B', 'three': 'C', 'two': 'D', 'one': 'E'},
+            {'key': 'syntax', 'weight': 20, 'five': 'A', 'four': 'B', 'three': 'C', 'two': 'D', 'one': 'E'},
+            {'key': 'boundary', 'weight': 15, 'five': 'A', 'four': 'B', 'three': 'C', 'two': 'D', 'one': 'E'},
+            {'key': 'logic', 'weight': 15, 'five': 'A', 'four': 'B', 'three': 'C', 'two': 'D', 'one': 'E'},
+            {'key': 'structure', 'weight': 10, 'five': 'A', 'four': 'B', 'three': 'C', 'two': 'D', 'one': 'E'},
+            {'key': 'readability', 'weight': 10, 'five': 'A', 'four': 'B', 'three': 'C', 'two': 'D', 'one': 'E'},
+        ],
+    }
+
+    def test_auto_generate_skipped_without_llm_config(self):
+        request = self._request_with_messages()
+        teaching_views._auto_generate_rubric(request, self.work)
+        self.assertFalse(CourseworkRubric.objects.filter(coursework=self.work).exists())
+        notes = [m.message for m in get_messages(request)]
+        self.assertTrue(any('未配置大模型' in n for n in notes))
+
+    def test_auto_generate_calls_llm_and_saves(self):
+        request = self._request_with_messages()
+        with mock.patch.object(rubric_agent, 'llm_configured', return_value=True), \
+                mock.patch.object(
+                    rubric_agent, 'chat', return_value=json.dumps(self._LLM_PAYLOAD)
+                ):
+            teaching_views._auto_generate_rubric(request, self.work)
+        rubric = CourseworkRubric.objects.get(coursework=self.work)
+        self.assertEqual(rubric.source, 'llm')
+        notes = [m.message for m in get_messages(request)]
+        self.assertTrue(any('已自动调用大模型生成评分标准' in n for n in notes))
+
+    def test_auto_generate_keeps_existing_rubric(self):
+        rubric_agent.generate_for(self.work, offline=True)
+        request = self._request_with_messages()
+        with mock.patch.object(rubric_agent, 'llm_configured', return_value=True), \
+                mock.patch.object(rubric_agent, 'chat') as chat:
+            teaching_views._auto_generate_rubric(request, self.work)
+        chat.assert_not_called()
+        self.assertEqual(CourseworkRubric.objects.filter(coursework=self.work).count(), 1)
+
+    def test_auto_generate_failure_does_not_raise(self):
+        request = self._request_with_messages()
+        with mock.patch.object(rubric_agent, 'llm_configured', return_value=True), \
+                mock.patch.object(rubric_agent, 'chat', side_effect=rubric_agent.LLMError('超时')):
+            teaching_views._auto_generate_rubric(request, self.work)
+        self.assertFalse(CourseworkRubric.objects.filter(coursework=self.work).exists())
+        notes = [m.message for m in get_messages(request)]
+        self.assertTrue(any('自动生成评分标准失败' in n for n in notes))
+
+    # ---- 批阅包更新后后台重建评分标准（rubric_agent.schedule_regeneration）----
+
+    def test_regenerate_job_rule_fallback_without_llm(self):
+        rubric_agent._regenerate_coursework_job(self.work.pk)
+        rubric = CourseworkRubric.objects.get(coursework=self.work)
+        self.assertEqual(rubric.source, 'rule')
+
+    def test_regenerate_job_force_overwrites_existing(self):
+        rubric_agent.generate_for(self.work, offline=True)
+        with mock.patch.object(rubric_agent, 'llm_configured', return_value=True), \
+                mock.patch.object(
+                    rubric_agent, 'chat', return_value=json.dumps(self._LLM_PAYLOAD)
+                ):
+            rubric_agent._regenerate_coursework_job(self.work.pk)
+        rubric = CourseworkRubric.objects.get(coursework=self.work)
+        self.assertEqual(rubric.source, 'llm')
+        self.assertEqual(CourseworkRubric.objects.filter(coursework=self.work).count(), 1)
+
+    def test_regenerate_job_failure_keeps_old_rubric(self):
+        rubric_agent.generate_for(self.work, offline=True)
+        old_markdown = CourseworkRubric.objects.get(coursework=self.work).markdown
+        with mock.patch.object(rubric_agent, 'llm_configured', return_value=True), \
+                mock.patch.object(rubric_agent, 'chat', side_effect=rubric_agent.LLMError('超时')):
+            rubric_agent._regenerate_coursework_job(self.work.pk)
+        rubric = CourseworkRubric.objects.get(coursework=self.work)
+        self.assertEqual(rubric.source, 'rule')
+        self.assertEqual(rubric.markdown, old_markdown)

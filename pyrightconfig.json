@@ -1,0 +1,14 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "include": ["school", "config", "manage.py"],
+  "exclude": [".venv", ".runtime", "staticfiles", "**/__pycache__"],
+  "reportMissingImports": "error",
+  "reportUnknownVariableType": "none",
+  "reportUnknownParameterType": "none",
+  "reportUnknownMemberType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportMissingParameterType": "none",
+  "reportUnusedCallResult": "none"
+}

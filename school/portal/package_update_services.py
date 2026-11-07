@@ -224,6 +224,10 @@ def activate_package_update(update_id):
         str(work.pk),
         {'path': update.changed_path, 'regraded': update.grading_changed},
     )
+    # 新批阅包生效后后台重建评分标准；事务提交后才启动，失败保留旧标准。
+    from .rubric_agent import schedule_regeneration
+
+    schedule_regeneration(work.pk)
     return update
 
 

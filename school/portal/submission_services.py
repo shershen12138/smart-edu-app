@@ -10,6 +10,7 @@ from school.storage import code_digest, save_private
 
 from .access import allowed, classes_for, role
 from .coursework_services import snapshot
+from .quality_service import schedule_generate
 
 
 @transaction.atomic
@@ -75,6 +76,9 @@ def submit(actor, work_id, data):
         ]
     )
     audit(actor, 'portal.submit', str(entry.pk))
+    if work.grading_mode == 'automatic':
+        # 提交后后台预生成质量报告；失败不影响提交，报告页会兜底重算。
+        schedule_generate(entry.pk)
     return entry
 
 

@@ -10,18 +10,23 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+import threading
 import urllib.error
 import urllib.request
 from typing import Any
 
 from django.conf import settings
+from django.db import close_old_connections, transaction
 from django.utils import timezone
 
-from school.course_models import CourseworkRubric
+from school.course_models import Coursework, CourseworkRubric
 
 from tools.code_quality_agent import curriculum
 from tools.code_quality_agent import models as agent_models
+
+logger = logging.getLogger(__name__)
 
 PROMPT_VERSION = 'v1'
 
@@ -639,3 +644,27 @@ def generate_for(coursework, offline: bool = False, force: bool = True) -> Cours
         },
     )
     return rubric
+
+
+def _regenerate_coursework_job(coursework_id) -> None:
+    """在独立连接上重建评分标准；失败保留旧标准，教师可手动重试。"""
+    try:
+        work = Coursework.objects.get(pk=coursework_id, deleted_at__isnull=True)
+        generate_for(work, offline=not llm_configured(), force=True)
+    except Exception:
+        logger.warning('自动重建评分标准失败 coursework=%s', coursework_id, exc_info=True)
+    finally:
+        close_old_connections()
+
+
+def schedule_regeneration(coursework_id) -> None:
+    """批阅包更新生效后后台重建评分标准（新任务内容要重新分析）。
+
+    配置了大模型就用大模型重建，否则用规则兜底，均强制覆盖旧标准；
+    事务提交后才启动线程。
+    """
+    transaction.on_commit(
+        lambda: threading.Thread(
+            target=_regenerate_coursework_job, args=(coursework_id,), daemon=True
+        ).start()
+    )

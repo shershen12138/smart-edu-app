@@ -1,6 +1,8 @@
 import hashlib
 import tempfile
+import uuid
 from pathlib import Path
+from unittest import mock
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -16,6 +18,7 @@ from school.models import (
     User,
     UserRole,
 )
+from school.portal import quality_service, submission_services
 from school.storage import read_private, save_private
 
 SOURCE = (
@@ -403,3 +406,58 @@ class QualityReportTests(TestCase):
             [axis['label'] for axis in radar['axes']],
             [ability['label'] for ability in abilities],
         )
+
+    # ---- 学生提交后后台预生成质量报告 ----
+
+    def test_submit_schedules_quality_analysis_for_automatic(self):
+        with mock.patch.object(submission_services, 'schedule_generate') as scheduled:
+            entry = submission_services.submit(
+                self.student,
+                self.work.pk,
+                {'request_id': str(uuid.uuid4()), 'source': SOURCE},
+            )
+        scheduled.assert_called_once_with(entry.pk)
+
+    def test_submit_skips_quality_analysis_for_manual(self):
+        manual_work = Coursework.objects.create(
+            classroom=self.classroom,
+            owner=self.teacher,
+            title='非机器批阅作业',
+            grading_mode='manual',
+            opens_at=timezone.now(),
+            deadline=timezone.now() + timezone.timedelta(days=1),
+            status='open',
+        )
+        with mock.patch.object(submission_services, 'schedule_generate') as scheduled:
+            entry = submission_services.submit(
+                self.student,
+                manual_work.pk,
+                {'request_id': str(uuid.uuid4()), 'source': {'raw': MANUAL_ARCHIVE}},
+            )
+        scheduled.assert_not_called()
+
+    def test_generate_entry_job_creates_report(self):
+        quality_service._generate_entry_job(self.entry.pk)
+        report = QualityReport.objects.get(submission=self.entry)
+        self.assertEqual(report.source_sha256, self.entry.source_hash)
+
+    def test_generate_entry_job_ignores_unsupported_submission(self):
+        manual_work = Coursework.objects.create(
+            classroom=self.classroom,
+            owner=self.teacher,
+            title='非机器批阅作业',
+            grading_mode='manual',
+            opens_at=timezone.now(),
+            deadline=timezone.now() + timezone.timedelta(days=1),
+            status='open',
+        )
+        manual_entry = CourseworkSubmission.objects.create(
+            coursework=manual_work,
+            student=self.student,
+            sequence=1,
+            source_path=save_private(MANUAL_ARCHIVE, '.zip'),
+            snapshot={'items': [], 'max_score': 10, 'grading_mode': 'manual'},
+            status='review',
+        )
+        quality_service._generate_entry_job(manual_entry.pk)
+        self.assertFalse(QualityReport.objects.filter(submission=manual_entry).exists())

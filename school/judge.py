@@ -132,9 +132,12 @@ def run_case(code, stdin, expected, version):
                 reader.start()
 
             def write_input():
+                stdin_pipe = process.stdin
+                if stdin_pipe is None:
+                    return
                 try:
-                    process.stdin.write(stdin.encode('utf-8'))
-                    process.stdin.close()
+                    stdin_pipe.write(stdin.encode('utf-8'))
+                    stdin_pipe.close()
                 except (BrokenPipeError, OSError):
                     pass
 
@@ -213,6 +216,8 @@ def run_case(code, stdin, expected, version):
                 pass
             if process:
                 for pipe in (process.stdin, process.stdout, process.stderr):
+                    if pipe is None:
+                        continue
                     try:
                         pipe.close()
                     except OSError:

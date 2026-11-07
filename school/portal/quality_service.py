@@ -8,21 +8,26 @@
 
 from __future__ import annotations
 
+import logging
 import math
+import threading
 from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db import close_old_connections, transaction
 
 from school import storage
-from school.course_models import PrivateFileCleanup, QualityReport
+from school.course_models import CourseworkSubmission, PrivateFileCleanup, QualityReport
 
 from tools.code_quality_agent import models as agent_models
 from tools.code_quality_agent import rubric as agent_rubric
 from tools.code_quality_agent import service as agent
 
 from . import rubric_agent
+
+logger = logging.getLogger(__name__)
 
 # 雷达图几何版本：坐标算法调整后，旧报告自动重算，避免页面回退到静态图片。
 RADAR_VERSION = 'radar-v1'
@@ -227,6 +232,29 @@ def supported(entry) -> bool:
     return (
         entry.coursework.grading_mode == 'automatic'
         and entry.source_path.endswith('.py')
+    )
+
+
+def _generate_entry_job(entry_id) -> None:
+    """在独立连接上完成单个提交的质量分析；失败只记日志。"""
+    try:
+        entry = CourseworkSubmission.objects.get(pk=entry_id)
+        if supported(entry):
+            generate(entry)
+    except Exception:
+        logger.warning('后台质量分析失败 entry=%s', entry_id, exc_info=True)
+    finally:
+        close_old_connections()
+
+
+def schedule_generate(entry_id) -> None:
+    """学生提交后后台预生成质量报告，不等学生点开报告页。
+
+    事务提交后才启动线程，避免读到未提交数据；失败只记日志，
+    报告页打开时仍会同步兜底生成，不影响提交流程。
+    """
+    transaction.on_commit(
+        lambda: threading.Thread(target=_generate_entry_job, args=(entry_id,), daemon=True).start()
     )
 
 

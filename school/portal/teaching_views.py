@@ -1,5 +1,6 @@
 import csv
 import io
+from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -15,6 +16,7 @@ from school.services import audit
 from school.storage import read_private_bytes
 
 from . import teaching_forms as forms
+from . import rubric_agent
 from .access import allowed, classes_for, role
 from .common_views import csv_response, form_page, link, page, safe_csv, table, work_for
 from .coursework_services import save_work
@@ -27,18 +29,45 @@ from .parsers import manual_member_choices, package_member_choices
 from .reporting_services import roster_rows, score_distribution
 
 
+def role_required(*roles):
+    """装饰器模式：把各视图重复的角色检查收敛到一个装饰器。"""
+
+    def decorator(view):
+        @wraps(view)
+        def wrapped(request, *args, **kwargs):
+            if role(request.user) not in roles:
+                raise PermissionDenied
+            return view(request, *args, **kwargs)
+
+        return wrapped
+
+    return decorator
+
+
+teacher_required = role_required('teacher')
+
+
+def _filtered_by_classroom(request, queryset):
+    """works 与 results 共用的班级筛选；返回 (过滤后的查询集, 选中班级ID)。"""
+    selected = request.GET.get('classroom', '')
+    if selected.isdigit():
+        queryset = queryset.filter(classroom_id=int(selected))
+    return queryset, selected
+
+
 @login_required
 def works(request):
+    # 学生访问时跳转仪表盘，因此不能用 teacher_required 装饰器
     if role(request.user) == 'student':
         return redirect('dashboard')
     if role(request.user) != 'teacher':
         raise PermissionDenied
-    qs = Coursework.objects.filter(
-        classroom__in=classes_for(request.user), deleted_at__isnull=True
-    ).select_related('classroom')
-    selected = request.GET.get('classroom', '')
-    if selected.isdigit():
-        qs = qs.filter(classroom_id=int(selected))
+    qs, selected = _filtered_by_classroom(
+        request,
+        Coursework.objects.filter(
+            classroom__in=classes_for(request.user), deleted_at__isnull=True
+        ).select_related('classroom'),
+    )
     rows = []
     for work in qs:
         if not (
@@ -72,10 +101,33 @@ def works(request):
     )
 
 
+def _auto_generate_rubric(request, work) -> None:
+    """作业保存后自动调用题目分析智能体；失败只提示，不阻塞上传。"""
+    if getattr(work, 'rubric', None) is not None:
+        return
+    if not rubric_agent.llm_configured():
+        messages.info(
+            request,
+            '未配置大模型（LLM_BASE_URL / LLM_API_KEY / LLM_MODEL），'
+            '已跳过自动生成评分标准。可在作业的“评分标准”页面手动生成或使用规则兜底。',
+        )
+        return
+    try:
+        rubric_agent.generate_for(work, force=False)
+    except rubric_agent.LLMNotConfigured:
+        return
+    except (rubric_agent.LLMError, rubric_agent.RubricParseError) as exc:
+        messages.warning(
+            request,
+            f'自动生成评分标准失败：{exc}。可稍后在作业的“评分标准”页面重试。',
+        )
+    else:
+        messages.success(request, '已自动调用大模型生成评分标准，可在“评分标准”页面查看和调整。')
+
+
 @login_required
+@teacher_required
 def work_edit(request, pk=None):
-    if role(request.user) != 'teacher':
-        raise PermissionDenied
     work = work_for(request.user, pk, 'edit') if pk else None
     form = forms.WorkForm(
         request.POST or None, request.FILES or None, instance=work, user=request.user
@@ -87,6 +139,7 @@ def work_edit(request, pk=None):
             form.add_error(None, exc)
         else:
             messages.success(request, '题目文件和提交时限已保存，学生现在可以查看。')
+            _auto_generate_rubric(request, saved)
             return redirect('work', pk=saved.pk)
     return form_page(
         request,
@@ -106,20 +159,66 @@ def work_edit(request, pk=None):
     )
 
 
+class AutomaticPackageStrategy:
+    """策略模式：机器批阅作业的单文件更新差异点。"""
+
+    def archive_path(self, work):
+        if not work.package or not work.package.archive_path:
+            raise PermissionDenied
+        return work.package.archive_path
+
+    def member_choices(self, archive):
+        return package_member_choices(archive)
+
+    def description(self):
+        return '只有修改Word说明文档不重评；修改sample.py或其他批阅文件时，验证通过后重新批阅已有提交。'
+
+    def success_message(self, update):
+        if update.status == 'activated':
+            return (
+                '单个文件已更新；仅说明文档变化，无需重新批阅。'
+                if not update.grading_changed
+                else '新版本已生效，已有学生提交已重新加入批阅队列。'
+            )
+        return '新文件已暂存，正在等待 Docker 验证；旧版本和旧成绩保持不变。'
+
+
+class ManualPackageStrategy:
+    """策略模式：非机器批阅作业的单文件更新差异点。"""
+
+    def archive_path(self, work):
+        if not work.materials_path:
+            raise PermissionDenied
+        return work.materials_path
+
+    def member_choices(self, archive):
+        return manual_member_choices(archive)
+
+    def description(self):
+        return '非机器批阅材料更新后直接生效，不调用Docker，也不改动已有人工成绩。'
+
+    def success_message(self, update):
+        if update.status == 'activated' and not update.grading_changed:
+            return '单个文件已更新；无需调用 Docker 重新批阅。'
+        if update.status == 'activated':
+            return '新版本已生效，已有学生提交已重新加入批阅队列。'
+        return '新文件已暂存，正在等待 Docker 验证；旧版本和旧成绩保持不变。'
+
+
+def package_strategy(work):
+    """按批阅方式选择对应的单文件更新策略。"""
+    return AutomaticPackageStrategy() if work.grading_mode == 'automatic' else ManualPackageStrategy()
+
+
 @login_required
+@teacher_required
 def work_package_file(request, pk):
-    if role(request.user) != 'teacher':
-        raise PermissionDenied
     work = work_for(request.user, pk, 'edit')
-    automatic = work.grading_mode == 'automatic'
-    if automatic and (not work.package or not work.package.archive_path):
-        raise PermissionDenied
-    if not automatic and not work.materials_path:
-        raise PermissionDenied
+    strategy = package_strategy(work)
+    archive_path = strategy.archive_path(work)
     try:
-        archive_path = work.package.archive_path if automatic else work.materials_path
         archive = read_private_bytes(archive_path)
-        choices = package_member_choices(archive) if automatic else manual_member_choices(archive)
+        choices = strategy.member_choices(archive)
     except (OSError, ValidationError) as exc:
         messages.error(request, f'原批阅包无法读取：{exc}')
         return redirect('work', pk=pk)
@@ -137,42 +236,29 @@ def work_package_file(request, pk):
         except (OSError, ValidationError) as exc:
             form.add_error(None, exc)
         else:
-            if update.status == 'activated' and not update.grading_changed:
-                messages.success(
-                    request,
-                    '单个文件已更新；无需调用 Docker 重新批阅。'
-                    if work.grading_mode == 'manual'
-                    else '单个文件已更新；仅说明文档变化，无需重新批阅。',
-                )
-            elif update.status == 'activated':
-                messages.success(request, '新版本已生效，已有学生提交已重新加入批阅队列。')
-            else:
-                messages.success(
-                    request,
-                    '新文件已暂存，正在等待 Docker 验证；旧版本和旧成绩保持不变。',
-                )
+            messages.success(request, strategy.success_message(update))
+            if work.grading_mode == 'manual':
+                # 非机器批阅材料直接生效，立即后台重建评分标准；
+                # 机器批阅由 activate_package_update 在验证生效后触发。
+                rubric_agent.schedule_regeneration(work.pk)
+                messages.info(request, '材料已更新，正在后台重新生成评分标准。')
+            elif update.status != 'activated':
+                messages.info(request, '新批阅包验证生效后将自动重建评分标准。')
             return redirect('work', pk=pk)
     return form_page(
         request,
         '更新批阅包中的单个文件',
         form,
         reverse('work', args=[pk]),
-        description=(
-            '选择原ZIP中的文件并上传替代文件。系统会生成新版本，不会直接修改原ZIP。'
-            + (
-                '只有修改Word说明文档不重评；修改sample.py或其他批阅文件时，验证通过后重新批阅已有提交。'
-                if automatic
-                else '非机器批阅材料更新后直接生效，不调用Docker，也不改动已有人工成绩。'
-            )
-        ),
+        description='选择原ZIP中的文件并上传替代文件。系统会生成新版本，不会直接修改原ZIP。'
+        + strategy.description(),
     )
 
 
 @login_required
 @require_POST
+@teacher_required
 def work_package_retry(request, pk):
-    if role(request.user) != 'teacher':
-        raise PermissionDenied
     work = work_for(request.user, pk, 'edit')
     update = CourseworkPackageUpdate.objects.filter(
         coursework=work, previous_package=work.package, status='error'
@@ -189,9 +275,8 @@ def work_package_retry(request, pk):
 
 
 @login_required
+@teacher_required
 def work_delete(request, pk):
-    if role(request.user) != 'teacher':
-        raise PermissionDenied
     work = work_for(request.user, pk, 'edit')
     if request.method == 'POST':
         with transaction.atomic():
@@ -210,15 +295,14 @@ def work_delete(request, pk):
 
 
 @login_required
+@role_required('teacher', 'admin')
 def results(request):
-    if role(request.user) not in ('teacher', 'admin'):
-        raise PermissionDenied
-    works = Coursework.objects.filter(
-        classroom__in=classes_for(request.user, 'view_grades'), deleted_at__isnull=True
-    ).select_related('classroom')
-    selected = request.GET.get('classroom', '')
-    if selected.isdigit():
-        works = works.filter(classroom_id=int(selected))
+    works, selected = _filtered_by_classroom(
+        request,
+        Coursework.objects.filter(
+            classroom__in=classes_for(request.user, 'view_grades'), deleted_at__isnull=True
+        ).select_related('classroom'),
+    )
     rows = []
     for work in works:
         _, stats = roster_rows(work)
@@ -251,40 +335,44 @@ def results(request):
     )
 
 
+EXPORT_HEADERS = ['教学班', '作业', '学号', '姓名', '提交状态', '得分', '提交时题目总分', '提交时间']
+
+
+def _export_row(work, row):
+    """把一行名册数据转成 CSV 单元格；未提交学生的字段用占位值。"""
+    user, entry = row['student'], row['entry']
+    return [
+        work.classroom.name,
+        work.title,
+        user.student_no,
+        user.full_name,
+        entry.get_status_display() if entry else '未提交',
+        f'{entry.total:.1f}' if entry and entry.total is not None else '',
+        entry.snapshot['max_score'] if entry else work.max_score,
+        timezone.localtime(entry.submitted_at).strftime('%Y-%m-%d %H:%M:%S') if entry else '',
+    ]
+
+
+def _results_csv(request, work, rows):
+    """单一职责：班级结果导出只在这里组装 CSV，其他视图不关心格式。"""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(EXPORT_HEADERS)
+    for row in rows:
+        writer.writerow(safe_csv(v) for v in _export_row(work, row))
+    audit(request.user, 'portal.results.export', str(work.pk))
+    return csv_response(output.getvalue(), f'coursework-{work.pk}-results.csv')
+
+
 @login_required
 def work_results(request, pk, export=False):
     work = work_for(request.user, pk, 'view_grades')
     rows, stats = roster_rows(work)
-    distribution, graded_count = score_distribution(work, rows)
     if export:
         if not allowed(request.user, work.classroom, 'export'):
             raise PermissionDenied
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(
-            ['教学班', '作业', '学号', '姓名', '提交状态', '得分', '提交时题目总分', '提交时间']
-        )
-        for row in rows:
-            user, entry = row['student'], row['entry']
-            writer.writerow(
-                [
-                    safe_csv(v)
-                    for v in [
-                        work.classroom.name,
-                        work.title,
-                        user.student_no,
-                        user.full_name,
-                        entry.get_status_display() if entry else '未提交',
-                        f'{entry.total:.1f}' if entry and entry.total is not None else '',
-                        entry.snapshot['max_score'] if entry else work.max_score,
-                        timezone.localtime(entry.submitted_at).strftime('%Y-%m-%d %H:%M:%S')
-                        if entry
-                        else '',
-                    ]
-                ]
-            )
-        audit(request.user, 'portal.results.export', str(pk))
-        return csv_response(output.getvalue(), f'coursework-{pk}-results.csv')
+        return _results_csv(request, work, rows)
+    distribution, graded_count = score_distribution(work, rows)
     package_update_alert, _ = package_update_display(work)
     return page(
         request,
