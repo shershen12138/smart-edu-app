@@ -1,5 +1,6 @@
 """Only Docker executes student code. There is deliberately no host-execution fallback."""
 
+import logging
 import math
 import subprocess
 import tempfile
@@ -13,6 +14,8 @@ from django.db import transaction
 from django.utils import timezone
 from .models import JudgeRun, JudgeCaseResult, ProblemVersion
 from .storage import read_private
+
+logger = logging.getLogger(__name__)
 
 
 class InfrastructureError(Exception):
@@ -267,7 +270,8 @@ def verify_reference(version_id):
         version.verification_error = ''
         version.save(update_fields=['reference_verified', 'verification_error'])
         return True
-    except (InfrastructureError, OSError) as exc:
+    except (InfrastructureError, OSError):
+        logger.warning('参考答案验证运行环境异常 version=%s', version_id, exc_info=True)
         version.verification_error = '运行环境异常，请检查评测服务。'
         version.save(update_fields=['verification_error'])
         return False
@@ -321,6 +325,7 @@ def evaluate(run_id):
             finished_at=timezone.now(),
         )
     except Exception:
+        logger.exception('评测进程未知异常 run=%s', run_id)
         JudgeRun.objects.filter(pk=run.pk, status='running').update(
             status='error', base_score=None, error_code='WORKER_ERROR', finished_at=timezone.now()
         )

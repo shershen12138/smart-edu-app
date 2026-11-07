@@ -276,10 +276,15 @@ class EvaluateTests(DjangoTestCase):
         self.assertIsNone(run.base_score)
 
     def test_unexpected_error_marks_run_and_reraises(self):
+        from school import judge as judge_module
+
         run = self.run_for()
-        with mock.patch('school.judge.run_case', side_effect=KeyError('boom')):
+        with mock.patch('school.judge.run_case', side_effect=KeyError('boom')), mock.patch.object(
+            judge_module.logger, 'exception'
+        ) as log_exception:
             with self.assertRaises(KeyError):
                 evaluate(run.pk)
+        log_exception.assert_called_once()
         run.refresh_from_db()
         self.assertEqual(run.status, 'error')
         self.assertEqual(run.error_code, 'WORKER_ERROR')

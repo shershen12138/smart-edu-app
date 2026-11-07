@@ -140,6 +140,8 @@ else:
 
 # 日志：项目与智能体模块的告警统一输出到控制台（运行时重定向到 .runtime 下的日志文件）。
 # DEBUG 环境默认 INFO 便于开发排查，生产用环境变量 LOG_LEVEL 调整。
+# ERROR 及以上级别额外写入轮转的异常日志文件 .runtime/logs/exception.log，
+# 便于事后排查判题、批阅与大模型调用中的未预期异常。
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO' if DEBUG else 'WARNING')
 LOGGING = {
     'version': 1,
@@ -158,3 +160,21 @@ LOGGING = {
         'tools': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
     },
 }
+
+try:
+    _LOG_DIR = RUNTIME / 'logs'
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    LOGGING['handlers']['exception_file'] = {
+        'class': 'logging.handlers.RotatingFileHandler',
+        'filename': str(_LOG_DIR / 'exception.log'),
+        'maxBytes': 10 * 1024 * 1024,
+        'backupCount': 5,
+        'encoding': 'utf-8',
+        'level': 'ERROR',
+        'formatter': 'console',
+    }
+    for _logger_name in ('school', 'tools'):
+        LOGGING['loggers'][_logger_name]['handlers'].append('exception_file')
+except OSError:
+    # 文件系统只读等情况下降级为仅控制台输出。
+    pass

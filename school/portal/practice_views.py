@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -72,7 +74,8 @@ def _sample_cases(problem):
 def _case_text(key):
     try:
         return read_private(key)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 展示层兜底：读不到用例文件时留空
+        logging.getLogger(__name__).warning('读取训练题用例文件失败 key=%s', key, exc_info=True)
         return ''
 
 
