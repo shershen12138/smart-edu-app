@@ -10,9 +10,11 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
+from django.db.models import Q
+
 from school.course_models import PracticeAttempt, PracticeProblem
 from school.judge import InfrastructureError
-from school.models import Classroom
+from school.models import Classroom, ProblemVersion
 from school.storage import read_private, save_private
 
 from . import knowledge_profile, practice_agent
@@ -44,6 +46,17 @@ def _sample_cases(problem):
         }
         for case in problem.cases.filter(is_sample=True).order_by('order')
     ]
+
+
+def _bank_has_matches(weak) -> bool:
+    """题库中是否存在带用例、知识点标签能匹配任一弱项的现成题。"""
+    names = [item['name'] for item in weak]
+    if not names:
+        return True
+    query = Q()
+    for name in names:
+        query |= Q(knowledge__icontains=name)
+    return ProblemVersion.objects.filter(query, cases__isnull=False).exists()
 
 
 def _case_text(key):
@@ -92,6 +105,7 @@ def practice_home(request):
         grouped=grouped,
         llm_ready=practice_agent.llm_configured(),
         llm_status=practice_agent.status_text(),
+        bank_ready=_bank_has_matches(weak),
         back_url=reverse('dashboard'),
     )
 

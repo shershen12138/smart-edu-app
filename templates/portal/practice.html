@@ -28,7 +28,11 @@
         </table>
       </div>
     {% else %}
-      <p class="tip space-top">当前没有得分率偏低的弱项知识点。完成新的机器批阅作业后画像会自动更新。</p>
+      <p class="tip space-top">
+        当前没有得分率偏低的弱项知识点。画像只统计<strong>已生成评分标准且包含知识点</strong>的
+        作业里<strong>状态为“已批阅完成”</strong>的机器批阅结果；满足条件的批阅记录出现后，
+        画像会自动更新。
+      </p>
     {% endif %}
     {% if mastered %}
       <p class="subtle space-top">已掌握：{% for item in mastered %}{{ item.name }}（{{ item.percent }}%）{% if not forloop.last %}、{% endif %}{% endfor %}</p>
@@ -48,18 +52,44 @@
     <div class="actions space-top">
       <form method="post" data-loading="正在调用大模型生成训练题，可能需要几十秒…">
         {% csrf_token %}
-        <button class="button" {% if not llm_ready or not weak %}disabled{% endif %}>调用大模型生成训练题</button>
+        <button
+          class="button"
+          {% if not llm_ready or not weak %}
+            disabled
+            {% if not llm_ready %}
+              title="不可用：尚未配置大模型端点（.env 中 LLM_BASE_URL、LLM_API_KEY、LLM_MODEL）"
+            {% else %}
+              title="不可用：当前没有得分率偏低的弱项知识点"
+            {% endif %}
+          {% endif %}
+        >调用大模型生成训练题</button>
       </form>
       <form method="post" data-loading="正在按规则生成训练题…">
         {% csrf_token %}
         <input type="hidden" name="mode" value="offline">
-        <button class="button secondary" {% if not weak %}disabled{% endif %}>规则兜底生成（离线演示）</button>
+        <button
+          class="button secondary"
+          {% if not weak %}
+            disabled
+            title="不可用：当前没有得分率偏低的弱项知识点"
+          {% endif %}
+        >规则兜底生成（离线演示）</button>
       </form>
     </div>
-    {% if not llm_ready %}
+    {% if weak and not llm_ready %}
       <p class="tip space-top">
-        未配置大模型端点，主按钮不可用。规则兜底只从题库挑选现成题目，
-        结果会标注“规则兜底”，不当作大模型结论。
+        <strong>主按钮为什么禁用：</strong>未配置大模型端点。需要在部署目录的 <code>.env</code>
+        中填写 <code>LLM_BASE_URL</code>（OpenAI 兼容接口地址）、
+        <code>LLM_API_KEY</code>（密钥）和 <code>LLM_MODEL</code>（模型名），
+        然后重启服务。系统不会在缺配置时伪装调用。
+      </p>
+    {% endif %}
+    {% if weak and not bank_ready %}
+      <p class="tip space-top">
+        <strong>“规则兜底生成”为什么会失败：</strong>兜底只从题库挑选带测试用例、知识点标签
+        能匹配你弱项的现成题目，不会自己编题。当前题库中没有这类题目，因此点击后
+        会提示“题库中没有匹配弱项知识点的现成题”。要么配置大模型由它按弱项出题，
+        要么由教师向题库录入与弱项知识点名称一致的题目。
       </p>
     {% endif %}
   </section>

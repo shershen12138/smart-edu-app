@@ -498,3 +498,14 @@ class PracticeViewTests(TestCase):
         response = self.client.get(reverse('practice'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '当前没有得分率偏低的弱项知识点')
+        self.assertNotContains(response, '主按钮为什么禁用')
+
+    def test_home_explains_disabled_reasons(self):
+        self._seed_weak_record()
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('practice'))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode('utf-8')
+        self.assertIn('主按钮为什么禁用', body)
+        self.assertIn('“规则兜底生成”为什么会失败', body)
+        self.assertIn('LLM_BASE_URL', body)
