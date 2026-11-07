@@ -64,7 +64,7 @@
           {% endif %}
         >调用大模型生成训练题</button>
       </form>
-      <form method="post" data-loading="正在按规则生成训练题…">
+      <form method="post" data-loading="正在从现有题库挑选训练题…">
         {% csrf_token %}
         <input type="hidden" name="mode" value="offline">
         <button
@@ -73,7 +73,7 @@
             disabled
             title="不可用：当前没有得分率偏低的弱项知识点"
           {% endif %}
-        >规则兜底生成（离线演示）</button>
+        >根据现有题库生成训练题</button>
       </form>
     </div>
     {% if weak and not llm_ready %}
@@ -81,13 +81,14 @@
         <strong>主按钮为什么禁用：</strong>未配置大模型端点。需要在部署目录的 <code>.env</code>
         中填写 <code>LLM_BASE_URL</code>（OpenAI 兼容接口地址）、
         <code>LLM_API_KEY</code>（密钥）和 <code>LLM_MODEL</code>（模型名），
-        然后重启服务。系统不会在缺配置时伪装调用。
+        然后重启服务。系统不会在缺配置时伪装调用；不配置也可以用下面的按钮
+        直接从现有题库中挑选训练题。
       </p>
     {% endif %}
     {% if weak and not bank_ready %}
       <p class="tip space-top">
-        <strong>“规则兜底生成”为什么会失败：</strong>兜底根据现有题库挑选带测试用例、
-        且知识点标签或题名能对应你弱项关键词的现成题目，不会自己编题。
+        <strong>“根据现有题库生成训练题”为什么会失败：</strong>该按钮只从题库挑选
+        带测试用例、且知识点标签或题名能对应你弱项关键词的现成题目，不会自己编题。
         当前题库中没有这类题目，因此点击后会提示“题库中没有匹配弱项知识点的现成题”。
         要么配置大模型由它按弱项出题，要么由教师向题库录入覆盖这些知识点的题目。
       </p>

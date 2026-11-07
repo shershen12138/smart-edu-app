@@ -570,5 +570,5 @@ class PracticeViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.content.decode('utf-8')
         self.assertIn('主按钮为什么禁用', body)
-        self.assertIn('“规则兜底生成”为什么会失败', body)
+        self.assertIn('“根据现有题库生成训练题”为什么会失败', body)
         self.assertIn('LLM_BASE_URL', body)
