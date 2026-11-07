@@ -1,10 +1,12 @@
-"""知识点画像：把机器批阅结果按知识点聚合，算出学生的强弱分布。
+"""知识点画像：依据评测报告逐题明细的知识点缺陷，按 Tag 库聚合出强弱分布。
 
-数据链路：
-    CourseworkSubmission(学生, status='done')
-      → CourseworkQuestionResult(function_name, score, points)
-      → CourseworkItem(function_name, points)
-      → CourseworkRubric.knowledge_points(tasks=[function_name])
+数据链路（弱项练习的依据是每份作业的评测报告，教师上传不同任务 →
+评分标准不同 → 逐题明细考察的知识点与机器判定结果也不同）：
+    CourseworkSubmission(学生, status='done', quality_report 存在)
+      → QualityReport.payload['tasks'] 逐题明细
+      → 每题的 points 列表：机器可判定（judged）知识点的 ✓/✗
+      → ✗ 的项即该题暴露的缺陷，label 已是《Python教学Tag库》标准名
+      → 按 Tag 聚合各任务的达成 / 缺陷比例
 
 只做纯数据统计，不调用大模型；弱项判定用固定阈值，便于教师端复用。
 """
@@ -15,7 +17,7 @@ import re
 
 from django.conf import settings
 
-from school.course_models import Coursework
+from school.course_models import Coursework, QualityReport
 from school.models import User
 
 from .access import classes_for
@@ -49,48 +51,103 @@ def weak_threshold() -> float:
     return min(max(threshold, 0.0), 1.0)
 
 
-def student_knowledge_profile(student: User) -> dict[str, dict]:
-    """按知识点聚合该学生在已批阅作业上的表现。
+def _first_reported_entry(work, student_id):
+    """该学生在本作业第一次带评测报告的提交（着重首次作答暴露的问题）。"""
+    return (
+        work.entries.filter(
+            student_id=student_id, status='done', quality_report__isnull=False
+        )
+        .order_by('sequence', 'pk')
+        .first()
+    )
 
-    返回 {知识点名: {'earned': 得分合计, 'total': 满分合计, 'attempts': 覆盖题数}}。
-    每道函数题取历次提交的最高分，避免重试次数拉低画像。
+
+def _report_tag_points(report: QualityReport) -> dict[str, tuple[int, int]]:
+    """从评测报告逐题明细取各 Tag 的达成情况：{Tag 名: (✓ 数, 判定数)}。
+
+    逐题明细的 points 列表里，judged=True 的知识点是机器判定过的考察点：
+    ✓ 代表学生代码正确用到了该 Tag，✗ 代表该题暴露的缺陷（未达成）。
+    label 在生成报告时已归一为《Python教学Tag库》标准名；无法机检（judged=False）
+    的知识点既不是缺陷也不是达成，不计入画像。
+    """
+    payload = report.payload or {}
+    tags: dict[str, tuple[int, int]] = {}
+    for task in payload.get('tasks') or []:
+        for point in task.get('points') or []:
+            if not point.get('judged'):
+                continue
+            tag = str(point.get('label') or '').strip()
+            if not tag:
+                continue
+            ok_count, judged_count = tags.get(tag, (0, 0))
+            tags[tag] = (ok_count + (1 if point.get('ok') else 0), judged_count + 1)
+    return tags
+
+
+def _aggregate_tag_points(tag_points: dict[str, tuple[int, int]]) -> dict[str, dict]:
+    """把 {Tag: (✓ 数, 判定数)} 聚合成画像结构，弱项/掌握判定都基于它。"""
+    profile: dict[str, dict] = {}
+    for tag, (ok_count, judged_count) in tag_points.items():
+        aggregate = profile.setdefault(tag, {'earned': 0.0, 'total': 0, 'attempts': 0})
+        aggregate['earned'] += ok_count * 100
+        aggregate['total'] += judged_count * 100
+        aggregate['attempts'] += 1
+    return profile
+
+
+def task_profiles(student: User) -> list[dict]:
+    """每个任务一份独立画像（学生端弱项练习按任务区分的依据）。
+
+    返回 [{'work': 作业, 'work_title': 标题, 'profile': {Tag: 聚合}}]。
+    学生在不同任务里首次提交犯的错不同，各任务报告逐题明细的缺陷
+    对应的 Tag 也不同，因此每个任务的弱项练习互不一样。
     """
     works = Coursework.objects.filter(
         classroom__in=classes_for(student),
         deleted_at__isnull=True,
         status='open',
-    ).select_related('rubric').prefetch_related('items')
-    profile: dict[str, dict] = {}
+    ).order_by('-pk')
+    sections: list[dict] = []
     for work in works:
-        rubric = getattr(work, 'rubric', None)
-        if rubric is None or not rubric.knowledge_points:
+        entry = _first_reported_entry(work, student.pk)
+        if entry is None:
             continue
-        best: dict[str, float] = {}
-        points_by_task: dict[str, int] = {}
-        for item in work.items.all():
-            points_by_task[item.function_name] = item.points
-        for entry in work.entries.filter(student=student, status='done'):
-            for question in entry.questions.all():
-                if question.score is None:
-                    continue
-                earned = float(question.score)
-                if earned > best.get(question.function_name, -1):
-                    best[question.function_name] = earned
-        if not best:
-            continue
-        for point in rubric.knowledge_points:
-            name = str(point.get('name', '')).strip()
-            if not name:
-                continue
-            aggregate = profile.setdefault(name, {'earned': 0.0, 'total': 0, 'attempts': 0})
-            for task in point.get('tasks') or []:
-                total = points_by_task.get(task)
-                if total is None:
-                    continue
-                aggregate['total'] += total
-                if task in best:
-                    aggregate['earned'] += best[task]
-                    aggregate['attempts'] += 1
+        sections.append(
+            {
+                'work': work,
+                'work_title': work.title,
+                'profile': _aggregate_tag_points(
+                    _report_tag_points(entry.quality_report)
+                ),
+            }
+        )
+    return sections
+
+
+def task_profile(student: User, work) -> dict[str, dict]:
+    """单份任务的画像；该任务还没有带评测报告的提交时返回空。"""
+    entry = _first_reported_entry(work, student.pk)
+    if entry is None:
+        return {}
+    return _aggregate_tag_points(_report_tag_points(entry.quality_report))
+
+
+def student_knowledge_profile(student: User) -> dict[str, dict]:
+    """按 Tag 合并所有任务的画像（跨任务汇总视图）。
+
+    返回 {Tag 名: {'earned': 达成判定数×100, 'total': 判定数×100, 'attempts': 出现任务数}}。
+    每份作业取第一次有评测报告的提交——画像着重反映学生首次作答就暴露出的问题；
+    教师上传的不同任务评分标准不同，逐题明细考察的知识点与缺陷也不同，逐任务计入。
+    """
+    profile: dict[str, dict] = {}
+    for section in task_profiles(student):
+        for tag, aggregate in section['profile'].items():
+            merged = profile.setdefault(
+                tag, {'earned': 0.0, 'total': 0, 'attempts': 0}
+            )
+            merged['earned'] += aggregate['earned']
+            merged['total'] += aggregate['total']
+            merged['attempts'] += aggregate['attempts']
     return profile
 
 
@@ -177,33 +234,16 @@ def class_knowledge_summary(classroom) -> list[dict]:
 
 
 def _profile_for_work(work, student_id) -> dict[str, dict]:
-    """单份作业的单个学生画像，供 class_knowledge_summary 复用。"""
-    rubric = getattr(work, 'rubric', None)
-    if rubric is None or not rubric.knowledge_points:
-        return {}
-    best: dict[str, float] = {}
-    points_by_task = {item.function_name: item.points for item in work.items.all()}
-    for entry in work.entries.filter(student_id=student_id, status='done'):
-        for question in entry.questions.all():
-            if question.score is None:
-                continue
-            earned = float(question.score)
-            if earned > best.get(question.function_name, -1):
-                best[question.function_name] = earned
-    if not best:
+    """单份作业的单个学生画像（来自该作业评测报告的逐题明细），供 class_knowledge_summary 复用。"""
+    entry = _first_reported_entry(work, student_id)
+    if entry is None:
         return {}
     profile: dict[str, dict] = {}
-    for point in rubric.knowledge_points:
-        name = str(point.get('name', '')).strip()
-        if not name:
-            continue
-        aggregate = profile.setdefault(name, {'earned': 0.0, 'total': 0, 'attempts': 0})
-        for task in point.get('tasks') or []:
-            total = points_by_task.get(task)
-            if total is None:
-                continue
-            aggregate['total'] += total
-            if task in best:
-                aggregate['earned'] += best[task]
-                aggregate['attempts'] += 1
+    for tag, (ok_count, judged_count) in _report_tag_points(
+        entry.quality_report
+    ).items():
+        aggregate = profile.setdefault(tag, {'earned': 0.0, 'total': 0, 'attempts': 0})
+        aggregate['earned'] += ok_count * 100
+        aggregate['total'] += judged_count * 100
+        aggregate['attempts'] += 1
     return profile

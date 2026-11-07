@@ -63,11 +63,27 @@ class NoWeakPoint(RuntimeError):
     """学生当前没有可训练的弱项知识点。"""
 
 
-def practice_context(student: User) -> dict[str, Any]:
-    profile = knowledge_profile.student_knowledge_profile(student)
+def practice_context(student: User, work=None) -> dict[str, Any]:
+    """弱项练习的画像上下文；指定任务时只看该任务第一次提交报告的缺陷。
+
+    学生完成不同任务的过程中首次提交犯的错不同，各任务报告逐题明细的
+    缺陷归到的 Tag 也不同，因此每个任务的弱项与训练计划互不一样。
+    """
+    if work is not None:
+        profile = knowledge_profile.task_profile(student, work)
+    else:
+        profile = knowledge_profile.student_knowledge_profile(student)
     weak = knowledge_profile.weak_points(profile)
     mastered = knowledge_profile.mastered_points(profile)
-    return {'profile': profile, 'weak': weak, 'mastered': mastered}
+    context: dict[str, Any] = {
+        'profile': profile,
+        'weak': weak,
+        'mastered': mastered,
+    }
+    if work is not None:
+        context['work'] = work
+        context['work_title'] = work.title
+    return context
 
 
 def existing_titles(student: User) -> list[str]:
@@ -291,11 +307,19 @@ def _read_case(key: str) -> str:
 
 @transaction.atomic
 def _store_plan(student: User, weak: list[dict], profile: dict, questions: list[dict],
-                source: str, model: str) -> PracticePlan:
+                source: str, model: str, work=None) -> PracticePlan:
+    snapshot: dict[str, Any] = {
+        'weak': weak,
+        'mastered': knowledge_profile.mastered_points(profile),
+    }
+    if work is not None:
+        # 记录计划对应的任务，弱项练习页据此把计划和它的任务放在一起展示
+        snapshot['work_id'] = work.pk
+        snapshot['work_title'] = work.title
     plan = PracticePlan.objects.create(
         student=student,
         classroom=None,
-        profile_snapshot={'weak': weak, 'mastered': knowledge_profile.mastered_points(profile)},
+        profile_snapshot=snapshot,
         status='ready',
         source=source,
         model=model,
@@ -328,9 +352,15 @@ def _store_plan(student: User, weak: list[dict], profile: dict, questions: list[
     return plan
 
 
-def generate_practice_plan(student: User, offline: bool = False) -> PracticePlan | None:
-    """计算画像并生成训练计划；没有弱项时返回 None。"""
-    context = practice_context(student)
+def generate_practice_plan(
+    student: User, offline: bool = False, work=None
+) -> PracticePlan | None:
+    """计算画像并生成训练计划；没有弱项时返回 None。
+
+    指定 work 时只依据该任务第一次提交报告的逐题缺陷出题，
+    计划也归属到该任务下；不指定则按所有任务的合并画像生成。
+    """
+    context = practice_context(student, work=work)
     weak = context['weak']
     if not weak:
         return None
@@ -355,7 +385,9 @@ def generate_practice_plan(student: User, offline: bool = False) -> PracticePlan
         if source == 'rule':
             raise PracticeParseError('题库中没有匹配弱项知识点的现成题，规则兜底无法出题。')
         raise PracticeParseError('模型返回的题目均不可用。')
-    return _store_plan(student, weak, context['profile'], questions, source, model)
+    return _store_plan(
+        student, weak, context['profile'], questions, source, model, work=work
+    )
 
 
 def grade_attempt(attempt: PracticeAttempt) -> PracticeAttempt:
@@ -465,8 +497,12 @@ def _unpack_value(value: Any) -> Any:
     return value
 
 
-def latest_plan(student: User) -> PracticePlan | None:
-    return PracticePlan.objects.filter(student=student, status='ready').first()
+def latest_plan(student: User, work=None) -> PracticePlan | None:
+    """最近一次就绪的训练计划；指定任务时只取该任务名下的计划。"""
+    plans = PracticePlan.objects.filter(student=student, status='ready')
+    if work is not None:
+        plans = plans.filter(profile_snapshot__work_id=work.pk)
+    return plans.first()
 
 
 def status_text() -> str:

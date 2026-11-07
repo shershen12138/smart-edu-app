@@ -13,13 +13,13 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
-from school.course_models import PracticeAttempt, PracticeProblem
+from school.course_models import Coursework, PracticeAttempt, PracticeProblem
 from school.judge import InfrastructureError
 from school.models import Classroom
 from school.storage import read_private, save_private
 
 from . import knowledge_profile, practice_agent
-from .access import allowed, require_role, role
+from .access import allowed, classes_for, require_role, role
 from .common_views import page
 from .practice_agent import LLMNotConfigured, PracticeParseError
 from .rubric_agent import LLMError
@@ -79,46 +79,78 @@ def _case_text(key):
         return ''
 
 
+def _grouped_problems(plan):
+    problems = list(plan.problems.all()) if plan else []
+    grouped: dict[str, list] = {}
+    for problem in problems:
+        grouped.setdefault(problem.knowledge_point, []).append(problem)
+    return grouped
+
+
 @login_required
 @require_http_methods(['GET', 'POST'])
 def practice_home(request):
     require_role(request.user, 'student')
     if request.method == 'POST':
         offline = request.POST.get('mode') == 'offline'
+        work = None
+        work_id = request.POST.get('work')
+        if work_id:
+            work = get_object_or_404(
+                Coursework,
+                pk=work_id,
+                deleted_at__isnull=True,
+                status='open',
+                classroom__in=classes_for(request.user),
+            )
         try:
-            plan = practice_agent.generate_practice_plan(request.user, offline=offline)
+            plan = practice_agent.generate_practice_plan(
+                request.user, offline=offline, work=work
+            )
         except LLMNotConfigured as exc:
             messages.error(request, str(exc))
         except (LLMError, PracticeParseError) as exc:
             messages.error(request, f'生成失败：{exc}')
         else:
+            target = f'“{work.title}”' if work else ''
             if plan is None:
                 messages.info(request, '当前没有得分率偏低的弱项知识点，暂不需要生成训练题。')
             elif offline:
-                messages.warning(request, '已按规则兜底生成训练题，结果标注为“规则兜底”，不是大模型结论。')
+                messages.warning(
+                    request, f'已按规则兜底生成{target}训练题，结果标注为“规则兜底”，不是大模型结论。'
+                )
             else:
-                messages.success(request, '已调用大模型生成本次个性化训练题。')
+                messages.success(request, f'已调用大模型生成{target}本次个性化训练题。')
         return redirect('practice')
 
-    profile = knowledge_profile.student_knowledge_profile(request.user)
-    weak = knowledge_profile.weak_points(profile)
-    mastered = knowledge_profile.mastered_points(profile)
-    plan = practice_agent.latest_plan(request.user)
-    problems = list(plan.problems.all()) if plan else []
-    grouped: dict[str, list] = {}
-    for problem in problems:
-        grouped.setdefault(problem.knowledge_point, []).append(problem)
+    # 弱项练习按任务区分：每个任务取学生第一次提交评测报告的逐题缺陷，
+    # 归到 Tag 库对应知识点，得到该任务自己的弱项与训练计划。
+    sections = []
+    merged_weak: list[dict] = []
+    for section in knowledge_profile.task_profiles(request.user):
+        weak = knowledge_profile.weak_points(section['profile'])
+        merged_weak.extend(weak)
+        plan = practice_agent.latest_plan(request.user, work=section['work'])
+        sections.append(
+            {
+                'work': section['work'],
+                'work_title': section['work_title'],
+                'weak': weak,
+                'mastered': knowledge_profile.mastered_points(section['profile']),
+                'plan': plan,
+                'grouped': _grouped_problems(plan),
+                'bank_ready': practice_agent.bank_matches_exist(weak),
+            }
+        )
     return page(
         request,
         'practice',
         '个性化训练',
-        weak=weak,
-        mastered=mastered,
-        plan=plan,
-        grouped=grouped,
+        tasks=sections,
+        any_weak=bool(merged_weak),
         llm_ready=practice_agent.llm_configured(),
         llm_status=practice_agent.status_text(),
-        bank_ready=practice_agent.bank_matches_exist(weak),
+        bank_ready=practice_agent.bank_matches_exist(merged_weak),
         back_url=reverse('dashboard'),
     )
 

@@ -3,121 +3,124 @@
   <div class="page-heading split">
     <div>
       <h1>个性化训练</h1>
-      <p class="subtle">按知识点统计你在已批阅作业上的表现，针对弱项生成训练题；训练题不计入正式成绩。</p>
+      <p class="subtle">按任务分析你第一次提交的评测报告逐题缺陷，定位弱项知识点并生成对应训练题；训练题不计入正式成绩。</p>
     </div>
   </div>
 
-  <section class="card space-bottom">
-    <h2>知识点画像</h2>
-    {% if weak %}
-      <div class="table-card">
-        <table>
-          <thead>
-            <tr><th>弱项知识点</th><th>得分率</th><th>得分 / 满分</th><th>覆盖题数</th></tr>
-          </thead>
-          <tbody>
-            {% for item in weak %}
-              <tr>
-                <td>{{ item.name }}</td>
-                <td>{{ item.percent }}%</td>
-                <td>{{ item.earned }} / {{ item.total }}</td>
-                <td>{{ item.attempts }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <p class="tip space-top">
-        当前没有得分率偏低的弱项知识点。画像只统计<strong>已生成评分标准且包含知识点</strong>的
-        作业里<strong>状态为“已批阅完成”</strong>的机器批阅结果；满足条件的批阅记录出现后，
-        画像会自动更新。
-      </p>
-    {% endif %}
-    {% if mastered %}
-      <p class="subtle space-top">已掌握：{% for item in mastered %}{{ item.name }}（{{ item.percent }}%）{% if not forloop.last %}、{% endif %}{% endfor %}</p>
-    {% endif %}
-  </section>
+  {% if tasks %}
+    <section class="card space-bottom">
+      <h2>训练题智能体</h2>
+      <p class="subtle">{{ llm_status }}</p>
+      {% if any_weak and not llm_ready %}
+        <p class="tip space-top">
+          <strong>主按钮为什么禁用：</strong>未配置大模型端点。需要在部署目录的 <code>.env</code>
+          中填写 <code>LLM_BASE_URL</code>（OpenAI 兼容接口地址）、
+          <code>LLM_API_KEY</code>（密钥）和 <code>LLM_MODEL</code>（模型名），
+          然后重启服务。系统不会在缺配置时伪装调用；不配置也可以用各任务下的
+          “根据现有题库生成训练题”按钮直接挑选现成题目。
+        </p>
+      {% endif %}
+      {% if any_weak and not bank_ready %}
+        <p class="tip space-top">
+          <strong>“根据现有题库生成训练题”为什么会失败：</strong>该按钮只从题库挑选
+          带测试用例、且知识点标签或题名能对应你弱项关键词的现成题目，不会自己编题。
+          若某个任务的题库没有覆盖它的弱项知识点，点击后会提示“题库中没有匹配弱项知识点的现成题”。
+        </p>
+      {% endif %}
+    </section>
 
-  <section class="card space-bottom">
-    <h2>训练题智能体</h2>
-    <p class="subtle">{{ llm_status }}</p>
-    {% if plan %}
-      <p>
-        <span class="tag">{% if plan.source == "llm" %}大模型生成{% else %}规则兜底{% endif %}</span>
-        {% if plan.model %}<span class="subtle">模型：{{ plan.model }}</span>{% endif %}
-        <span class="subtle">生成时间：{{ plan.created_at|date:'Y-m-d H:i' }}</span>
-      </p>
-    {% endif %}
-    <div class="actions space-top">
-      <form method="post" data-loading="正在调用大模型生成训练题，可能需要几十秒…">
-        {% csrf_token %}
-        <button
-          class="button"
-          {% if not llm_ready or not weak %}
-            disabled
-            {% if not llm_ready %}
-              title="不可用：尚未配置大模型端点（.env 中 LLM_BASE_URL、LLM_API_KEY、LLM_MODEL）"
-            {% else %}
-              title="不可用：当前没有得分率偏低的弱项知识点"
-            {% endif %}
-          {% endif %}
-        >调用大模型生成训练题</button>
-      </form>
-      <form method="post" data-loading="正在从现有题库挑选训练题…">
-        {% csrf_token %}
-        <input type="hidden" name="mode" value="offline">
-        <button
-          class="button secondary"
-          {% if not weak %}
-            disabled
-            title="不可用：当前没有得分率偏低的弱项知识点"
-          {% endif %}
-        >根据现有题库生成训练题</button>
-      </form>
-    </div>
-    {% if weak and not llm_ready %}
-      <p class="tip space-top">
-        <strong>主按钮为什么禁用：</strong>未配置大模型端点。需要在部署目录的 <code>.env</code>
-        中填写 <code>LLM_BASE_URL</code>（OpenAI 兼容接口地址）、
-        <code>LLM_API_KEY</code>（密钥）和 <code>LLM_MODEL</code>（模型名），
-        然后重启服务。系统不会在缺配置时伪装调用；不配置也可以用下面的按钮
-        直接从现有题库中挑选训练题。
-      </p>
-    {% endif %}
-    {% if weak and not bank_ready %}
-      <p class="tip space-top">
-        <strong>“根据现有题库生成训练题”为什么会失败：</strong>该按钮只从题库挑选
-        带测试用例、且知识点标签或题名能对应你弱项关键词的现成题目，不会自己编题。
-        当前题库中没有这类题目，因此点击后会提示“题库中没有匹配弱项知识点的现成题”。
-        要么配置大模型由它按弱项出题，要么由教师向题库录入覆盖这些知识点的题目。
-      </p>
-    {% endif %}
-  </section>
-
-  {% if plan %}
-    <h2>本次训练计划</h2>
-    <p class="subtle">训练题独立于正式作业，提交后同样在受限容器中按用例通过比例计分。</p>
-    {% for point, problems in grouped.items %}
+    {% for section in tasks %}
       <section class="card space-bottom">
-        <h3><span class="tag">{{ point }}</span></h3>
-        <table>
-          <thead>
-            <tr><th>题目</th><th>难度</th><th>操作</th></tr>
-          </thead>
-          <tbody>
-            {% for problem in problems %}
-              <tr>
-                <td>{{ problem.title }}</td>
-                <td>{{ problem.difficulty }}</td>
-                <td><a href="{% url 'practice_problem' problem.pk %}">开始练习</a></td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <h2>{{ section.work_title }} · 知识点画像</h2>
+        {% if section.weak %}
+          <div class="table-card">
+            <table>
+              <thead>
+                <tr><th>弱项知识点</th><th>达成率</th><th>达成 / 判定</th><th>出现题数</th></tr>
+              </thead>
+              <tbody>
+                {% for item in section.weak %}
+                  <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.percent }}%</td>
+                    <td>{{ item.earned }} / {{ item.total }}</td>
+                    <td>{{ item.attempts }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="tip space-top">该任务第一次提交的评测报告里没有得分率偏低的弱项知识点。</p>
+        {% endif %}
+        {% if section.mastered %}
+          <p class="subtle space-top">已掌握：{% for item in section.mastered %}{{ item.name }}（{{ item.percent }}%）{% if not forloop.last %}、{% endif %}{% endfor %}</p>
+        {% endif %}
+
+        <div class="actions space-top">
+          <form method="post" data-loading="正在调用大模型生成训练题，可能需要几十秒…">
+            {% csrf_token %}
+            <input type="hidden" name="work" value="{{ section.work.pk }}">
+            <button
+              class="button"
+              {% if not llm_ready or not section.weak %}
+                disabled
+                {% if not llm_ready %}
+                  title="不可用：尚未配置大模型端点（.env 中 LLM_BASE_URL、LLM_API_KEY、LLM_MODEL）"
+                {% else %}
+                  title="不可用：该任务没有得分率偏低的弱项知识点"
+                {% endif %}
+              {% endif %}
+            >为该任务调用大模型生成训练题</button>
+          </form>
+          <form method="post" data-loading="正在从现有题库挑选训练题…">
+            {% csrf_token %}
+            <input type="hidden" name="mode" value="offline">
+            <input type="hidden" name="work" value="{{ section.work.pk }}">
+            <button
+              class="button secondary"
+              {% if not section.weak %}
+                disabled
+                title="不可用：该任务没有得分率偏低的弱项知识点"
+              {% endif %}
+            >根据现有题库为该任务生成训练题</button>
+          </form>
+        </div>
+
+        {% if section.plan %}
+          <h3 class="space-top">该任务本次训练计划
+            <span class="tag">{% if section.plan.source == "llm" %}大模型生成{% else %}规则兜底{% endif %}</span>
+            <span class="subtle">生成时间：{{ section.plan.created_at|date:'Y-m-d H:i' }}</span>
+          </h3>
+          {% for point, problems in section.grouped.items %}
+            <table>
+              <thead>
+                <tr><th>{{ point }}</th><th>难度</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                {% for problem in problems %}
+                  <tr>
+                    <td>{{ problem.title }}</td>
+                    <td>{{ problem.difficulty }}</td>
+                    <td><a href="{% url 'practice_problem' problem.pk %}">开始练习</a></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% empty %}
+            <p class="tip">该任务本次计划没有可用题目。</p>
+          {% endfor %}
+        {% endif %}
       </section>
-    {% empty %}
-      <p class="tip">本次计划没有可用题目。</p>
     {% endfor %}
+  {% else %}
+    <section class="card space-bottom">
+      <h2>知识点画像</h2>
+      <p class="tip space-top">
+        当前没有得分率偏低的弱项知识点。画像依据各任务<strong>第一次提交的评测报告逐题明细</strong>：
+        报告里机器判定的知识点缺陷会归到《Python教学Tag库》对应的知识点，每个任务的弱项各不一样。
+        完成作业并生成评测报告后，画像会自动更新。
+      </p>
+    </section>
   {% endif %}
 {% endblock %}
