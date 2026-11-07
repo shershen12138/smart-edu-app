@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import math
 from decimal import Decimal
 from pathlib import Path
 
@@ -22,6 +23,9 @@ from tools.code_quality_agent import rubric as agent_rubric
 from tools.code_quality_agent import service as agent
 
 from . import rubric_agent
+
+# 雷达图几何版本：坐标算法调整后，旧报告自动重算，避免页面回退到静态图片。
+RADAR_VERSION = 'radar-v1'
 
 def ensure_rubric(coursework):
     """确保该作业有一份自己的评分标准，返回它（可能为 None）。
@@ -168,6 +172,56 @@ def display_dimensions(dimensions, abilities) -> list[agent_models.Dimension]:
     return shown
 
 
+def radar_geometry(scores, width: int = 480, height: int = 360, radius: float = 104) -> dict:
+    """把主能力得分换算成 SVG 极坐标，供前端绘制可交互的雷达图。
+
+    Django 模板做不了三角函数，这里一次算好网格、轴线、数据多边形与标签位置，
+    页面只负责画；悬停提示由 portal.js 根据 data-label / data-score 填充。
+    """
+    center_x = width / 2
+    center_y = height / 2
+    count = len(scores) or 1
+    axes = []
+    for index, item in enumerate(scores):
+        angle = -math.pi / 2 + 2 * math.pi * index / count
+        score = min(100.0, max(0.0, float(item.get('score') or 0)))
+        distance = radius * score / 100
+        cos_v, sin_v = math.cos(angle), math.sin(angle)
+        axes.append(
+            {
+                'label': str(item.get('label', '')),
+                'score': round(score, 1),
+                'weight': item.get('weight', 0),
+                'x': round(center_x + distance * cos_v, 1),
+                'y': round(center_y + distance * sin_v, 1),
+                'label_x': round(center_x + (radius + 24) * cos_v, 1),
+                'label_y': round(center_y + (radius + 24) * sin_v, 1),
+                'value_y': round(center_y + (radius + 24) * sin_v + 15, 1),
+                'anchor': 'start' if cos_v > 0.3 else ('end' if cos_v < -0.3 else 'middle'),
+            }
+        )
+    rings = []
+    for ratio in (0.25, 0.5, 0.75, 1.0):
+        points = []
+        for index in range(count):
+            angle = -math.pi / 2 + 2 * math.pi * index / count
+            points.append(
+                f"{center_x + radius * ratio * math.cos(angle):.1f},"
+                f"{center_y + radius * ratio * math.sin(angle):.1f}"
+            )
+        rings.append(' '.join(points))
+    return {
+        'width': width,
+        'height': height,
+        'center_x': round(center_x, 1),
+        'center_y': round(center_y, 1),
+        'radius': radius,
+        'rings': rings,
+        'axes': axes,
+        'polygon': ' '.join(f"{axis['x']},{axis['y']}" for axis in axes),
+    }
+
+
 def supported(entry) -> bool:
     """该提交是否可以生成代码质量报告。"""
     return (
@@ -225,6 +279,8 @@ def generate(entry, force: bool = False) -> QualityReport:
         + _knowledge_signature(knowledge_points)
         + '#'
         + _abilities_signature(abilities)
+        + '#'
+        + RADAR_VERSION
     )
 
     existing = QualityReport.objects.filter(submission=entry).first()
@@ -252,6 +308,7 @@ def generate(entry, force: bool = False) -> QualityReport:
     markdown = agent.markdown(analysis, shown, rubric_note, knowledge_points)
     payload = agent.payload(analysis, shown, rubric_note, bool(radar), knowledge_points)
     payload['axis_label'] = '主能力' if uses_abilities else '评分维度'
+    payload['radar'] = radar_geometry(payload['scores'])
     payload['rubric_signature'] = signature
 
     markdown_key = storage.save_private(markdown, '.md')
