@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import re
+
 from django.conf import settings
 
 from school.course_models import Coursework
@@ -20,6 +22,22 @@ from .access import classes_for
 
 DEFAULT_WEAK_THRESHOLD = 0.6
 DEFAULT_MIN_ATTEMPTS = 1
+
+# 把"切片与 1 起始计数换算"这类弱项名拆成关键词，供题库反查复用。
+_TOKEN_SPLIT_RE = re.compile(r'[\s/、，,（）()\[\]【】·。.:：;；]+')
+_TOKEN_STRIP = '与和的或及·、'
+_TOKEN_STOPWORDS = {'相关', '及其', '应用', '使用', '练习'}
+
+
+def weak_keywords(name: str) -> list[str]:
+    """把弱项知识点名称拆成关键词列表，如 'for 遍历' → ['for', '遍历']。"""
+    tokens: list[str] = []
+    for raw in _TOKEN_SPLIT_RE.split(name):
+        token = raw.strip(_TOKEN_STRIP).strip().lower()
+        if not token or token in _TOKEN_STOPWORDS or len(token) == 1:
+            continue
+        tokens.append(token)
+    return tokens
 
 
 def weak_threshold() -> float:

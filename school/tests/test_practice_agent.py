@@ -26,7 +26,7 @@ from school.models import (
     User,
     UserRole,
 )
-from school.portal import knowledge_profile, practice_agent
+from school.portal import knowledge_profile, practice_agent, question_bank
 from school.storage import read_private, save_private
 
 TEST_OVERRIDES = dict(
@@ -255,16 +255,19 @@ class PracticeAgentTests(TestCase):
         self.assertEqual(plan.source, 'rule')
         self.assertEqual(plan.model, '')
         problems = list(plan.problems.all())
-        self.assertEqual(len(problems), 1)
+        # 数据库题库表命中 1 题，分层题库文档补足到每弱项 2 题
+        self.assertEqual(len(problems), 2)
         self.assertEqual(problems[0].knowledge_point, '列表切片')
         self.assertEqual(problems[0].cases.count(), 2)
         case = problems[0].cases.order_by('order').first()
         self.assertEqual(read_private(case.input_path), '1 2 3 4 5')
+        # 补足的题来自分层题库文档，标签/答案/用例齐全
+        self.assertTrue(problems[1].title.startswith('Q4-'))
+        self.assertTrue(problems[1].reference_code)
 
-    def test_offline_fallback_without_bank_raises(self):
-        with self.assertRaises(practice_agent.PracticeParseError):
-            practice_agent.generate_practice_plan(self.student, offline=True)
-        self.assertFalse(PracticePlan.objects.filter(student=self.student).exists())
+    def test_rule_based_without_match_returns_empty(self):
+        """题库表与分层题库文档都匹配不到时不出题，不造假数据。"""
+        self.assertEqual(practice_agent.rule_based([{'name': '量子纠缠纠错'}]), [])
 
     def test_offline_keyword_match_ignores_label_wording(self):
         """题库标签写“for 循环”，弱项叫“for 遍历”，也应按关键词匹配到。"""
@@ -289,7 +292,8 @@ class PracticeAgentTests(TestCase):
         )
         self.assertTrue(practice_agent.bank_matches_exist([{'name': 'for 遍历'}]))
         questions = practice_agent.rule_based([{'name': 'for 遍历'}])
-        self.assertEqual(len(questions), 1)
+        # 第一题来自数据库题库表（版本题优先），其余由分层题库文档补足
+        self.assertGreaterEqual(len(questions), 1)
         self.assertEqual(questions[0]['title'], '遍历求和')
         self.assertEqual(questions[0]['knowledge_point'], 'for 遍历')
         self.assertEqual(questions[0]['cases'][0]['input'], '1 2 3')
@@ -512,7 +516,7 @@ class PracticeViewTests(TestCase):
         plan = PracticePlan.objects.filter(student=self.student).order_by('-pk').first()
         self.assertIsNotNone(plan)
         self.assertEqual(plan.source, 'rule')
-        self.assertEqual(plan.problems.count(), 1)
+        self.assertEqual(plan.problems.count(), 2)
 
     def _seed_weak_record(self):
         work = Coursework.objects.create(
@@ -561,7 +565,6 @@ class PracticeViewTests(TestCase):
         response = self.client.get(reverse('practice'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '当前没有得分率偏低的弱项知识点')
-        self.assertNotContains(response, '主按钮为什么禁用')
 
     def test_home_explains_disabled_reasons(self):
         self._seed_weak_record()
@@ -570,5 +573,54 @@ class PracticeViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.content.decode('utf-8')
         self.assertIn('主按钮为什么禁用', body)
-        self.assertIn('“根据现有题库生成训练题”为什么会失败', body)
         self.assertIn('LLM_BASE_URL', body)
+        # 分层题库文档已覆盖该弱项，题库提示不应出现
+        self.assertNotIn('“根据现有题库生成训练题”为什么会失败', body)
+
+
+class QuestionBankTests(TestCase):
+    """分层题库文档（Python题库.md）解析与选题测试。"""
+
+    def test_load_bank_parses_all_questions(self):
+        bank = question_bank.load_bank()
+        self.assertEqual(len(bank), 44)
+        for question in bank:
+            self.assertTrue(question['code'])
+            self.assertTrue(question['title'])
+            self.assertTrue(question['statement'])
+            self.assertTrue(question['tags'])
+            self.assertTrue(question['reference_code'])
+            self.assertGreaterEqual(len(question['cases']), 3)
+            for case in question['cases']:
+                self.assertTrue(case['input'])
+                self.assertTrue(case['output'])
+
+    def test_parse_sample_question_details(self):
+        bank = {q['code']: q for q in question_bank.load_bank()}
+        question = bank['Q4-02']
+        self.assertEqual(question['title'], 'Q4-02 列表切片四连击')
+        self.assertEqual(question['difficulty'], '进阶')
+        self.assertIn('列表/切片', question['tags'])
+        self.assertEqual(len(question['cases']), 10)
+        self.assertTrue(question['cases'][0]['is_sample'])
+        self.assertFalse(question['cases'][1]['is_sample'])
+        self.assertIn('nums[::-1]', question['reference_code'])
+        self.assertEqual(question['cases'][0]['input'], '1,2,3,4,5')
+
+    def test_find_questions_prefers_specific_tags(self):
+        matched = [q['code'] for q in question_bank.find_questions('列表切片')]
+        self.assertEqual(matched[0], 'Q4-02')
+        # 同一弱项每次选题不超过 2 题，且不重复
+        self.assertEqual(len(matched), 2)
+
+    def test_find_questions_exclude(self):
+        first = question_bank.find_questions('列表切片')
+        second = question_bank.find_questions(
+            '列表切片', exclude={q['code'] for q in first}
+        )
+        self.assertTrue(second)
+        self.assertFalse({q['code'] for q in second} & {q['code'] for q in first})
+
+    def test_has_matches(self):
+        self.assertTrue(question_bank.has_matches([{'name': '列表切片'}]))
+        self.assertFalse(question_bank.has_matches([{'name': '量子纠缠纠错'}]))

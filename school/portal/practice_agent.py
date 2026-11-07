@@ -5,7 +5,8 @@
   演示或离线运行必须显式 `offline=True`，结果标注来源，不把兜底当成模型结论；
 - 生成的训练题必须带 stdin/stdout 测试用例，落库后经 school.judge.run_case
   在受限 Docker 中批阅，按用例通过比例计分，不计入正式作业成绩；
-- 规则兜底根据现有题库按知识点关键词匹配现成题，不凭空编题。
+- 规则兜底根据现有题库（数据库题库表 + 分层题库文档 Python题库.md）
+  按知识点关键词匹配现成题，不凭空编题。
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from school.judge import InfrastructureError, run_case
 from school.models import ProblemVersion, User
 from school.storage import read_private, save_private
 
-from . import knowledge_profile
+from . import knowledge_profile, question_bank
 from .rubric_agent import LLMNotConfigured, chat, llm_configured, llm_status
 
 PROMPT_VERSION = 'v1'
@@ -176,20 +177,7 @@ def parse_practice(text: str, weak_names: list[str]) -> list[dict[str, Any]]:
     return questions
 
 
-_TOKEN_SPLIT_RE = re.compile(r'[\s/、，,（）()\[\]【】·。.:：;；]+')
-_TOKEN_STRIP = '与和的或及·、'
-_STOPWORDS = {'相关', '及其', '应用', '使用', '练习'}
-
-
-def weak_keywords(name: str) -> list[str]:
-    """把“切片与 1 起始计数换算”这类弱项名拆成 ['切片', '起始计数换算'] 等关键词。"""
-    tokens: list[str] = []
-    for raw in _TOKEN_SPLIT_RE.split(name):
-        token = raw.strip(_TOKEN_STRIP).strip().lower()
-        if not token or token in _STOPWORDS or len(token) == 1:
-            continue
-        tokens.append(token)
-    return tokens
+from .knowledge_profile import weak_keywords
 
 
 def _match_versions(name: str) -> list[tuple[int, ProblemVersion]]:
@@ -213,9 +201,11 @@ def _match_versions(name: str) -> list[tuple[int, ProblemVersion]]:
 
 
 def bank_matches_exist(weak: list[dict]) -> bool:
-    """题库中是否存在至少一个能按关键词匹配任一弱项、且带用例的题目。"""
+    """题库（数据库题库表 + 分层题库文档）中是否存在可匹配任一弱项的题目。"""
     for item in weak:
-        if _match_versions(item['name']):
+        if _match_versions(item['name']) or question_bank.find_questions(
+            item['name'], limit=1
+        ):
             return True
     return False
 
@@ -223,21 +213,25 @@ def bank_matches_exist(weak: list[dict]) -> bool:
 def rule_based(weak: list[dict]) -> list[dict[str, Any]]:
     """离线兜底：根据现有题库按知识点关键词匹配现成题，不凭空编题。
 
-    匹配到的题目按关键词得分排序（命中 knowledge 标签优先于命中题名），
-    每个弱项最多取 MAX_QUESTIONS_PER_POINT 题。完全匹配不到时不出题，
-    弱项本身已记录在画像快照中，避免造假数据。
+    两个来源按顺序补足，每个弱项最多 MAX_QUESTIONS_PER_POINT 题：
+    1. 数据库题库表 ProblemVersion（教师录入的正式题库，命中 knowledge 标签优先）；
+    2. 分层训练题库文档 Python题库.md（团队维护、答案与用例实测通过），
+       按题目考点标签与弱项关键词反查。
+    完全匹配不到时不出题，弱项本身已记录在画像快照中，避免造假数据。
     """
     questions: list[dict[str, Any]] = []
+    used_bank_codes: set[str] = set()
     for item in weak:
-        matched = _match_versions(item['name'])
         taken: list[dict[str, Any]] = []
         seen_problems: set[int] = set()
-        for _score, version in matched:
+        for _score, version in _match_versions(item['name']):
             if version.problem_id in seen_problems:
                 continue
             seen_problems.add(version.problem_id)
             if not version.cases.exists():
                 continue
+            if len(taken) >= MAX_QUESTIONS_PER_POINT:
+                break
             taken.append(
                 {
                     'knowledge_point': item['name'],
@@ -257,8 +251,24 @@ def rule_based(weak: list[dict]) -> list[dict[str, Any]]:
                     ],
                 }
             )
-            if len(taken) >= MAX_QUESTIONS_PER_POINT:
-                break
+        remaining = MAX_QUESTIONS_PER_POINT - len(taken)
+        if remaining > 0:
+            for bank_question in question_bank.find_questions(
+                item['name'], limit=remaining, exclude=used_bank_codes
+            ):
+                used_bank_codes.add(bank_question['code'])
+                taken.append(
+                    {
+                        'knowledge_point': item['name'],
+                        'title': bank_question['title'],
+                        'statement': bank_question['statement'],
+                        'template_code': '',
+                        'reference_code': bank_question['reference_code'],
+                        'explanation': bank_question['explanation'],
+                        'difficulty': bank_question['difficulty'],
+                        'cases': bank_question['cases'],
+                    }
+                )
         questions.extend(taken)
     return questions
 
