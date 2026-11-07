@@ -1,7 +1,7 @@
-"""编排入口：发现学生文件 → 执行评测图 → 组装学生报告数据。
+"""编排入口：执行评测图 → 组装学生报告数据。
 
 各阶段实现在 `stages.py`，执行顺序与条件分支由 `agent_graph` 的 LangGraph
-状态图决定；本模块只负责文件发现、临时落盘与最终数据结构组装。
+状态图决定；本模块只负责临时落盘与最终数据结构组装。
 """
 
 from __future__ import annotations
@@ -10,8 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
-from . import agent_graph, curriculum, lint, models, rubric
-from .config import CourseContext, build_context
+from . import agent_graph, models
 
 
 @dataclass
@@ -37,15 +36,6 @@ class StudentAnalysis:
         if total >= 60:
             return "D"
         return "E"
-
-
-@dataclass
-class Evaluation:
-    context: CourseContext
-    dimensions: list[models.Dimension]
-    rubric_note: str
-    students: list[StudentAnalysis]
-    lint_note: str | None = None
 
 
 def _analyze_source(
@@ -91,15 +81,6 @@ def _analyze_source(
     )
 
 
-def _analyze_student(
-    path: Path,
-    specs: tuple[models.TaskSpec, ...],
-    dimensions: list[models.Dimension],
-) -> StudentAnalysis:
-    source = path.read_text(encoding="utf-8", errors="replace")
-    return _analyze_source(source, path, specs, dimensions, path.stem, path.name)
-
-
 def analyze_text(
     source: str,
     specs: tuple[models.TaskSpec, ...],
@@ -136,23 +117,4 @@ def analyze_text(
             pass
 
 
-def run(course: str, rubric_path: Path | None = None) -> Evaluation:
-    context = build_context(course, rubric_path)
-    specs = curriculum.specs_for(course)
-    dimensions, rubric_note = rubric.load_rubric(context.rubric_file)
 
-    files = sorted(p for p in context.student_dir.glob("*.py") if p.is_file())
-    students = [_analyze_student(path, specs, dimensions) for path in files]
-    students.sort(key=lambda item: item.name)
-
-    lint_note = None
-    if not lint.pylint_available():
-        lint_note = "pylint 不可用，本次报告仅包含语法与 AST 语义分析结果"
-
-    return Evaluation(
-        context=context,
-        dimensions=dimensions,
-        rubric_note=rubric_note,
-        students=students,
-        lint_note=lint_note,
-    )

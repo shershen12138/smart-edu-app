@@ -48,17 +48,17 @@ def build_specs(
 def analyze(
     source: str,
     items: Iterable[tuple[str, str]],
-    rubric_path: Path,
     workdir: Path,
     name: str = "student",
     dimensions: Sequence[models.Dimension] | None = None,
     rubric_note: str | None = None,
+    rubric_path: Path | None = None,
     problem_text: str = "",
     reference_source: str = "",
     points_by_function: dict[str, list[str]] | None = None,
     specs: Sequence[models.TaskSpec] | None = None,
 ) -> tuple[pipeline.StudentAnalysis, list[models.Dimension], str]:
-    """dimensions 为空时读取 Markdown 量表，否则使用数据库中的作业评分标准。
+    """dimensions 非空时使用数据库中的作业评分标准，否则读取给定量表文件。
 
     specs 非空时直接使用调用方给出的已解析规格，跳过图中的考点解析；
     problem_text / reference_source / points_by_function 用于自动确定考点，
@@ -69,8 +69,11 @@ def analyze(
     if dimensions:
         active = list(dimensions)
         note = rubric_note or "使用作业评分标准"
+    elif rubric_path is not None and Path(rubric_path).is_file():
+        active, note = rubric.load_rubric(Path(rubric_path))
     else:
-        active, note = rubric.load_rubric(rubric_path)
+        active = list(rubric.DEFAULT_RUBRIC)
+        note = rubric_note or "使用内置默认量表"
     # specs 为空时由评测图的 specs 节点解析：题库规格 → 数据库确认 → 参考答案 → 题面 → 兜底。
     analysis = pipeline.analyze_text(
         source,

@@ -201,10 +201,9 @@ class QualityReportTests(TestCase):
         )
         self.assertEqual([item['weight'] for item in scores], [50, 20, 20, 10])
         self.assertIn('取自评分标准 Markdown', report.payload['rubric_note'])
-        self.assertContains(
-            self.client.get(reverse('quality_report', args=[self.entry.pk])),
-            '评分维度得分与雷达图',
-        )
+        page = self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        # 只有 4 个维度、无法对应 6 个主能力时，仍按评分维度展示
+        self.assertContains(page, '评分维度得分与雷达图')
 
     def test_rubric_change_regenerates_report(self):
         rubric = self._rubric(RUBRIC_MARKDOWN)
@@ -290,22 +289,36 @@ class QualityReportTests(TestCase):
         self.assertContains(response, 'if / else 分支')
         self.assertNotContains(response, '未配置知识点模板')
 
+    def test_missing_rubric_is_generated_and_saved(self):
+        """作业还没有评分标准时，首次出报告会按该任务题目自动生成并存库。"""
+        self.assertFalse(CourseworkRubric.objects.filter(coursework=self.work).exists())
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        self.assertEqual(response.status_code, 200)
+        rubric = CourseworkRubric.objects.get(coursework=self.work)
+        self.assertEqual(len(rubric.dimensions), 6)
+        self.assertEqual(len(rubric.abilities), 6)
+        self.assertTrue(rubric.knowledge_points)
+        self.assertEqual(rubric.source, 'rule')
+
     def test_report_uses_coursework_rubric_knowledge_points(self):
         """逐题明细的知识点列取作业评分标准，而不是评测器按题库规格推断的标签。"""
         self.client.force_login(self.student)
         self.client.get(reverse('quality_report', args=[self.entry.pk]))
-        CourseworkRubric.objects.create(
+        CourseworkRubric.objects.update_or_create(
             coursework=self.work,
-            markdown='## 一、作业考察的知识点\n\n## 二、5 分制量表\n',
-            knowledge_points=[
-                {
-                    'name': '列表切片边界换算',
-                    'detail': '1 起始计数换算为 0 起始下标',
-                    'tasks': ['func301'],
-                }
-            ],
-            dimensions=[],
-            source='rule',
+            defaults={
+                'markdown': '## 一、作业考察的知识点\n\n## 二、5 分制量表\n',
+                'knowledge_points': [
+                    {
+                        'name': '列表切片边界换算',
+                        'detail': '1 起始计数换算为 0 起始下标',
+                        'tasks': ['func301'],
+                    }
+                ],
+                'dimensions': [],
+                'source': 'rule',
+            },
         )
         response = self.client.get(reverse('quality_report', args=[self.entry.pk]))
         self.assertEqual(response.status_code, 200)
@@ -338,3 +351,46 @@ class QualityReportTests(TestCase):
         self.assertEqual(point['label'], '列表合并（+ / extend）')
         self.assertTrue(point['judged'])
         self.assertTrue(point['ok'])
+
+    def test_radar_axes_are_six_abilities(self):
+        """评分标准有 6 个主能力时，雷达图与得分表按能力名展示。"""
+        abilities = [
+            {'label': '数据组织与容器操作', 'dimension': 'knowledge', 'points': []},
+            {'label': '流程控制与分支循环', 'dimension': 'logic', 'points': []},
+            {'label': '字符串与内置方法', 'dimension': 'syntax', 'points': []},
+            {'label': '函数设计与结构', 'dimension': 'structure', 'points': []},
+            {'label': '边界与异常处理', 'dimension': 'boundary', 'points': []},
+            {'label': '规范与可读性', 'dimension': 'readability', 'points': []},
+        ]
+        CourseworkRubric.objects.create(
+            coursework=self.work,
+            markdown='## 一、作业考察的知识点\n',
+            knowledge_points=[],
+            dimensions=[
+                {'key': 'knowledge', 'label': '知识点覆盖', 'weight': 25},
+                {'key': 'syntax', 'label': '语法与规范', 'weight': 20},
+                {'key': 'boundary', 'label': '边界与健壮性', 'weight': 15},
+                {'key': 'logic', 'label': '题意正确性', 'weight': 25},
+                {'key': 'structure', 'label': '代码结构', 'weight': 5},
+                {'key': 'readability', 'label': '可读性', 'weight': 10},
+            ],
+            abilities=abilities,
+            source='llm',
+        )
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('quality_report', args=[self.entry.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '主能力得分与雷达图')
+        self.assertContains(response, '数据组织与容器操作')
+
+        report = QualityReport.objects.get(submission=self.entry)
+        scores = report.payload['scores']
+        self.assertEqual(
+            [item['label'] for item in scores],
+            [ability['label'] for ability in abilities],
+        )
+        self.assertEqual(
+            [item['key'] for item in scores],
+            [ability['dimension'] for ability in abilities],
+        )
+        self.assertEqual(report.payload['axis_label'], '主能力')

@@ -90,6 +90,10 @@ class RubricAgentTests(TestCase):
         self.assertIn('## 二、5 分制量表', rubric.markdown)
         self.assertTrue(rubric.knowledge_points)
         self.assertEqual(CourseworkRubric.objects.filter(coursework=self.work).count(), 1)
+        # 雷达图的 6 根轴：规则兜底也必须是 6 个主能力，且各绑定一个不同维度
+        self.assertEqual(len(rubric.abilities), 6)
+        self.assertEqual(len({item['dimension'] for item in rubric.abilities}), 6)
+        self.assertIn('## 三、主能力（雷达图维度）', rubric.markdown)
 
     def test_parse_filters_unknown_dimensions_and_normalizes_weight(self):
         context = rubric_agent.coursework_context(self.work)

@@ -303,6 +303,7 @@ class CourseworkRubric(models.Model):
     markdown = models.TextField('评分标准 Markdown')
     knowledge_points = models.JSONField('考察知识点', default=list)
     dimensions = models.JSONField('评分维度', default=list)
+    abilities = models.JSONField('主能力维度', default=list)
     source = models.CharField('来源', max_length=8, choices=SOURCES, default='llm')
     model = models.CharField('模型', max_length=80, blank=True)
     prompt_version = models.CharField('提示词版本', max_length=20, default='v1')

@@ -21,11 +21,30 @@ from tools.code_quality_agent import models as agent_models
 from tools.code_quality_agent import rubric as agent_rubric
 from tools.code_quality_agent import service as agent
 
-RUBRIC_FILENAME = '03评分量表.md'
+from . import rubric_agent
 
+def ensure_rubric(coursework):
+    """确保该作业有一份自己的评分标准，返回它（可能为 None）。
 
-def rubric_path() -> Path:
-    return Path(settings.BASE_DIR) / 'data' / RUBRIC_FILENAME
+    评分标准按任务存库，学生报告不再共用仓库里的通用量表：
+    - 已有结构化维度时直接使用（可能是教师用大模型生成的）；
+    - 没有时按该作业的题目自动生成一份规则版并存库，每个任务的
+      知识点、量表与六主能力都只属于自己。
+    这里只做规则兜底，不调用大模型，避免学生打开报告时等待网络请求。
+    """
+    stored = getattr(coursework, 'rubric', None)
+    if stored:
+        # 结构化维度、知识点或可解析的量表 Markdown，任一存在就算已有评分标准，
+        # 不能因为维度暂时为空就覆盖教师已生成的内容。
+        parsed = agent_rubric.dimensions_from_text(
+            stored.markdown or '', '作业评分标准'
+        )
+        if stored.dimensions or stored.knowledge_points or parsed:
+            return stored
+    try:
+        return rubric_agent.generate_for(coursework, offline=True, force=True)
+    except Exception:
+        return stored
 
 
 def _stored_dimensions(stored) -> list[agent_models.Dimension]:
@@ -50,12 +69,13 @@ def _stored_dimensions(stored) -> list[agent_models.Dimension]:
     ]
 
 
-def dimensions_for(coursework) -> tuple[list[agent_models.Dimension], str]:
-    """取该题目的评分标准：结构化维度优先，其次解析数据库中的量表 Markdown。
+def dimensions_for(coursework, stored=None) -> tuple[list[agent_models.Dimension], str]:
+    """取该任务的评分标准：结构化维度优先，其次解析数据库中的量表 Markdown。
 
-    两者都不可用时才回退 `data/` 下的通用量表文件或内置默认量表。
+    两者都不可用时用智能体的内置 6 维量表，不再读取仓库里的通用量表文件。
     """
-    stored = getattr(coursework, 'rubric', None)
+    if stored is None:
+        stored = getattr(coursework, 'rubric', None)
     if stored:
         dimensions = _stored_dimensions(stored)
         if dimensions:
@@ -73,17 +93,19 @@ def dimensions_for(coursework) -> tuple[list[agent_models.Dimension], str]:
                 f'使用作业评分标准（{stored.get_source_display()}，'
                 f'{len(dimensions)} 维，取自评分标准 Markdown）',
             )
-    return agent_rubric.load_rubric(rubric_path())
+    dimensions = rubric_agent.default_dimensions()
+    return dimensions, f'使用内置 6 维量表（{len(dimensions)} 维，该任务尚未生成评分标准）'
 
 
-def knowledge_points_for(coursework, items) -> dict[str, tuple[str, ...]]:
+def knowledge_points_for(coursework, items, stored=None) -> dict[str, tuple[str, ...]]:
     """评分标准（CourseworkRubric）里的“作业考察的知识点”，按函数名分组。
 
     报告逐题明细的知识点列直接使用这份清单，而不是评测器按题库规格推断的标签；
     作业还没有评分标准时返回空，由评测器回退到题库规格。
     `tasks` 为空的知识点视为覆盖该作业的全部题目。
     """
-    stored = getattr(coursework, 'rubric', None)
+    if stored is None:
+        stored = getattr(coursework, 'rubric', None)
     if not stored:
         return {}
     functions = [name for name, _ in items]
@@ -105,6 +127,45 @@ def knowledge_points_for(coursework, items) -> dict[str, tuple[str, ...]]:
             if name not in names:
                 names.append(name)
     return {function: tuple(names) for function, names in grouped.items()}
+
+
+def abilities_for(coursework, stored=None) -> list[dict]:
+    """评分标准里的 6 个主能力，作为雷达图的 6 根轴。
+
+    新数据由题目分析智能体与大模型一起产出并存库；旧评分标准没有该字段时，
+    用规则把知识点归类补算，不调用模型，保证旧作业也能出图。
+    """
+    if stored is None:
+        stored = getattr(coursework, 'rubric', None)
+    if not stored:
+        return []
+    abilities = [
+        item
+        for item in (stored.abilities or [])
+        if isinstance(item, dict) and item.get('label') and item.get('dimension')
+    ]
+    if len(abilities) == 6:
+        return abilities
+    return rubric_agent.rule_abilities(stored.knowledge_points or [])
+
+
+def display_dimensions(dimensions, abilities) -> list[agent_models.Dimension]:
+    """把评分维度换成主能力名称，分数仍取所绑定维度的分数。
+
+    维度数量与主能力对不上时（例如只用内置 5 维量表）保持原样，避免少轴或错配。
+    """
+    if len(abilities) != 6:
+        return list(dimensions)
+    by_key = {dimension.key: dimension for dimension in dimensions}
+    shown: list[agent_models.Dimension] = []
+    for ability in abilities:
+        base = by_key.get(str(ability.get('dimension', '')))
+        if base is None:
+            return list(dimensions)
+        shown.append(agent_models.Dimension(base.key, str(ability['label']), base.weight))
+    if len(shown) != len(dimensions):
+        return list(dimensions)
+    return shown
 
 
 def supported(entry) -> bool:
@@ -130,6 +191,14 @@ def _knowledge_signature(points: dict[str, tuple[str, ...]]) -> str:
     )
 
 
+def _abilities_signature(abilities: list[dict]) -> str:
+    """主能力的指纹：重新生成评分标准后，旧报告要自动重算。"""
+    return '|'.join(
+        f"{ability.get('dimension', '')}:{ability.get('label', '')}"
+        for ability in abilities
+    )
+
+
 def generate(entry, force: bool = False) -> QualityReport:
     if not supported(entry):
         raise ValidationError('非机器批阅作业不生成代码质量报告。')
@@ -139,9 +208,12 @@ def generate(entry, force: bool = False) -> QualityReport:
     items = [
         (item.function_name, item.title) for item in entry.coursework.items.all()
     ]
-    dimensions, rubric_note = dimensions_for(entry.coursework)
-    knowledge_points = knowledge_points_for(entry.coursework, items)
-    # 量表维度、题库考点或评分标准知识点变了都要重算，不能只比源码摘要。
+    # 每个任务使用自己的评分标准：缺失时按该任务的题目自动生成并存库。
+    stored = ensure_rubric(entry.coursework)
+    dimensions, rubric_note = dimensions_for(entry.coursework, stored)
+    abilities = abilities_for(entry.coursework, stored)
+    knowledge_points = knowledge_points_for(entry.coursework, items, stored)
+    # 量表维度、题库考点、知识点或主能力变了都要重算，不能只比源码摘要。
     signature = (
         '|'.join(
             f'{dimension.key}:{dimension.label}:{dimension.weight}'
@@ -151,6 +223,8 @@ def generate(entry, force: bool = False) -> QualityReport:
         + _specs_signature(items)
         + '#'
         + _knowledge_signature(knowledge_points)
+        + '#'
+        + _abilities_signature(abilities)
     )
 
     existing = QualityReport.objects.filter(submission=entry).first()
@@ -166,17 +240,18 @@ def generate(entry, force: bool = False) -> QualityReport:
     analysis, dimensions, rubric_note = agent.analyze(
         source,
         items,
-        rubric_path(),
         workdir,
         name=display_name,
         dimensions=dimensions,
         rubric_note=rubric_note,
     )
-    radar = agent.radar_png(analysis, dimensions)
-    markdown = agent.markdown(analysis, dimensions, rubric_note, knowledge_points)
-    payload = agent.payload(
-        analysis, dimensions, rubric_note, bool(radar), knowledge_points
-    )
+    # 雷达图与得分表换成 6 个主能力，分数仍是所绑定评分维度的分数。
+    shown = display_dimensions(dimensions, abilities)
+    uses_abilities = [item.label for item in shown] != [item.label for item in dimensions]
+    radar = agent.radar_png(analysis, shown)
+    markdown = agent.markdown(analysis, shown, rubric_note, knowledge_points)
+    payload = agent.payload(analysis, shown, rubric_note, bool(radar), knowledge_points)
+    payload['axis_label'] = '主能力' if uses_abilities else '评分维度'
     payload['rubric_signature'] = signature
 
     markdown_key = storage.save_private(markdown, '.md')
