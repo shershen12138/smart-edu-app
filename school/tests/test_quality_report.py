@@ -355,6 +355,51 @@ class QualityReportTests(TestCase):
         self.assertTrue(point['judged'])
         self.assertTrue(point['ok'])
 
+    # ---- 逐题明细知识点以评分标准 Markdown 的知识点表格为准 ----
+
+    def test_knowledge_points_table_parser(self):
+        from tools.code_quality_agent import rubric as agent_rubric
+
+        markdown = (
+            '# 测试作业 · 评分标准\n\n'
+            '## 一、作业考察的知识点\n\n'
+            '| 序号 | 知识点 | 说明 | 涉及题目 |\n'
+            '| --- | --- | --- | --- |\n'
+            '| 1 | 切片起始换算 | 下标从 1 起需减一 | func301 |\n'
+            '| 2 | 列表合并 | 拼接两个列表 | func301、func302 |\n'
+            '| 3 | 通用程序设计 | 函数定义与返回值 | 全部题目 |\n'
+        )
+        self.assertEqual(
+            agent_rubric.knowledge_points_from_text(markdown),
+            [
+                ('切片起始换算', ['func301']),
+                ('列表合并', ['func301', 'func302']),
+                ('通用程序设计', []),
+            ],
+        )
+        # 没有知识点表格时返回 None，由调用方回退到结构化字段
+        self.assertIsNone(agent_rubric.knowledge_points_from_text('## 一、作业考察的知识点\n'))
+
+    def test_detail_points_follow_rubric_markdown_table(self):
+        """知识点表格优先于 JSON 字段，涉及题目支持题目名称与“全部题目”。"""
+        CourseworkRubric.objects.create(
+            coursework=self.work,
+            markdown=(
+                '## 一、作业考察的知识点\n\n'
+                '| 序号 | 知识点 | 说明 | 涉及题目 |\n'
+                '| --- | --- | --- | --- |\n'
+                '| 1 | 切片起始换算 | 下标换算 | 合并两列表并取第 8~15 个 |\n'
+                '| 2 | 通用程序设计 | 函数定义 | 全部题目 |\n'
+            ),
+            knowledge_points=[{'name': '过期字段里的知识点', 'tasks': ['func301']}],
+            dimensions=[],
+            source='rule',
+        )
+        mapping = quality_service.knowledge_points_for(
+            self.work, [('func301', '合并两列表并取第 8~15 个')]
+        )
+        self.assertEqual(mapping, {'func301': ('切片起始换算', '通用程序设计')})
+
     def test_radar_axes_are_six_abilities(self):
         """评分标准有 6 个主能力时，雷达图与得分表按能力名展示。"""
         abilities = [

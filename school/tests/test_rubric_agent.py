@@ -98,6 +98,47 @@ class RubricAgentTests(TestCase):
         self.assertEqual(len({item['dimension'] for item in rubric.abilities}), 6)
         self.assertIn('## 三、主能力（雷达图维度）', rubric.markdown)
 
+    # ---- 规则兜底：课程表未收录的题目从参考答案推断知识点 ----
+
+    REFERENCE_CODE = (
+        'def func501(n):\n'
+        '    total = 0\n'
+        '    i = 1\n'
+        '    while i <= n:\n'
+        '        total = total + i\n'
+        '        i = i + 1\n'
+        '    return total\n'
+    )
+
+    def test_rule_based_infers_points_from_reference_code(self):
+        """课程规格表没有的函数，依据参考答案 AST 检测出具体知识点。"""
+        context = {
+            'title': '循环练习',
+            'grading_mode': '机器批阅',
+            'items': [{'function': 'func501', 'title': '1~n 累加', 'points': 10}],
+        }
+        result = rubric_agent.rule_based(context, reference_code=self.REFERENCE_CODE)
+        names = {point['name'] for point in result['points']}
+        self.assertIn('while 循环', names)
+        self.assertIn('函数定义与返回值', names)
+        self.assertNotIn('通用程序设计', names)
+        point = next(p for p in result['points'] if p['name'] == 'while 循环')
+        self.assertEqual(point['tasks'], ['func501'])
+        self.assertIn('依据参考答案自动识别', point['detail'])
+        self.assertEqual(len(result['abilities']), 6)
+
+    def test_rule_based_falls_back_without_reference(self):
+        """没有参考答案可分析时（如非机器批阅），退回通用描述。"""
+        context = {
+            'title': '循环练习',
+            'grading_mode': '机器批阅',
+            'items': [{'function': 'func501', 'title': '1~n 累加', 'points': 10}],
+        }
+        result = rubric_agent.rule_based(context)
+        self.assertEqual(
+            [point['name'] for point in result['points']], ['通用程序设计']
+        )
+
     def test_parse_filters_unknown_dimensions_and_normalizes_weight(self):
         context = rubric_agent.coursework_context(self.work)
         payload = {

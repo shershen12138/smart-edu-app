@@ -179,6 +179,43 @@ def dimensions_from_text(
     return dims, f"已按 {source_label} 解析出 {len(dims)} 个维度并按比例归一化"
 
 
+def knowledge_points_from_text(text: str) -> list[tuple[str, list[str]]] | None:
+    """解析“知识点”一节的表格：| 序号 | 知识点 | 说明 | 涉及题目 |。
+
+    返回 (知识点名, 涉及题目列表) 的有序清单，作为学生报告逐题明细
+    “作业考察的知识点”一列的数据来源；涉及题目按 、 , ; / 分隔，
+    空“涉及题目”或写“全部题目”表示覆盖整份作业（返回空列表）。
+    解析不到表格行时返回 None，由调用方决定回退策略。
+    """
+    section = _section_lines(text, "知识点") or text.splitlines()
+    points: list[tuple[str, list[str]]] = []
+    seen: set[str] = set()
+    for line in section:
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if len(cells) < 3:
+            continue
+        if all(_SEPARATOR.match(cell) for cell in cells if cell):
+            continue  # 分隔行
+        if any("知识点" in cell for cell in cells):
+            continue  # 表头行
+        # 4 列（序号 | 知识点 | 说明 | 涉及题目）知识点取第 2 列；
+        # 3 列（知识点 | 说明 | 涉及题目）知识点取第 1 列。
+        name = cells[1] if len(cells) >= 4 else cells[0]
+        tasks_cell = cells[-1] if len(cells) >= 3 else ""
+        if not name or _SEPARATOR.match(name) or name in seen:
+            continue
+        if "全部题目" in tasks_cell or not tasks_cell:
+            tasks: list[str] = []
+        else:
+            tasks = [t.strip() for t in re.split(r"[、,，;；/]", tasks_cell) if t.strip()]
+        seen.add(name)
+        points.append((name, tasks))
+    return points or None
+
+
 def load_rubric(path: Path) -> tuple[list[models.Dimension], str]:
     if not path.is_file():
         return list(DEFAULT_RUBRIC), f"未找到量表文件 {path.name}，使用内置默认量表"

@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import logging
 import re
@@ -21,10 +22,12 @@ from django.conf import settings
 from django.db import close_old_connections, transaction
 from django.utils import timezone
 
+from school import storage
 from school.course_models import Coursework, CourseworkRubric
 
 from tools.code_quality_agent import curriculum
 from tools.code_quality_agent import models as agent_models
+from tools.code_quality_agent import static_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -487,17 +490,85 @@ def parse_response(text: str, context: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def rule_based(context: dict[str, Any]) -> dict[str, Any]:
-    """离线兜底：基于题库规格与函数名推断知识点，不声称是模型结果。"""
+def _reference_code(coursework) -> str:
+    """读取作业批阅包的参考答案（gold.py）源码；非机器批阅或读取失败返回空。"""
+    package = getattr(coursework, 'package', None)
+    path = getattr(package, 'reference_path', '') if package else ''
+    if not path:
+        return ''
+    try:
+        return storage.read_private(path)
+    except Exception:  # noqa: BLE001 -- 兜底路径不应因读取失败中断
+        return ''
+
+
+def _reference_functions(reference_code: str) -> dict[str, ast.FunctionDef]:
+    """解析参考答案源码，返回 函数名 -> AST 节点；解析失败返回空。"""
+    if not reference_code.strip():
+        return {}
+    try:
+        tree = ast.parse(reference_code)
+    except SyntaxError:
+        return {}
+    return {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef)
+    }
+
+
+def _reference_point_tags(
+    functions: dict[str, ast.FunctionDef], function: str
+) -> list[str]:
+    """用知识点检测器分析参考函数，返回考察的知识点标签。"""
+    node = functions.get(function)
+    if node is None:
+        return []
+    helper_names = set(functions) - {function}
+    return static_analysis.detect_points(node, helper_names)
+
+
+def rule_based(context: dict[str, Any], reference_code: str = '') -> dict[str, Any]:
+    """离线兜底：内置课程规格优先，未收录的题目从参考答案自动推断知识点。
+
+    这样后续上传 06、07 或教师自命题的机器批阅任务时，即使课程规格表
+    尚未人工标注，也能依据 gold.py 参考函数的 AST 检测出考察的知识点，
+    不再一律退化为“通用程序设计”。不声称是模型结果。
+    """
     known = {}
     for specs in curriculum.COURSE_SPECS.values():
         for spec in specs:
             known[spec.task_id] = spec
+    reference = _reference_functions(reference_code)
 
     points: list[dict[str, Any]] = []
+
+    def add_point(label: str, detail: str, function: str) -> None:
+        existing = next((point for point in points if point['name'] == label), None)
+        if existing:
+            if function not in existing['tasks']:
+                existing['tasks'].append(function)
+        else:
+            points.append({'name': label, 'detail': detail, 'tasks': [function]})
+
     for item in context['items']:
         spec = known.get(item['function'])
-        if spec is None:
+        if spec is not None:
+            for tag in spec.points:
+                add_point(
+                    curriculum.POINT_LABELS.get(tag, tag), spec.title, item['function']
+                )
+            continue
+        tags = _reference_point_tags(reference, item['function'])
+        if tags:
+            for tag in tags:
+                add_point(
+                    curriculum.POINT_LABELS.get(tag, tag),
+                    f"{item['title']}：依据参考答案自动识别",
+                    item['function'],
+                )
+        else:
+            # 没有参考答案可分析（如非机器批阅），退回通用描述
             points.append(
                 {
                     'name': '通用程序设计',
@@ -505,20 +576,6 @@ def rule_based(context: dict[str, Any]) -> dict[str, Any]:
                     'tasks': [item['function']],
                 }
             )
-            continue
-        for tag in spec.points:
-            label = curriculum.POINT_LABELS.get(tag, tag)
-            existing = next((point for point in points if point['name'] == label), None)
-            if existing:
-                existing['tasks'].append(item['function'])
-            else:
-                points.append(
-                    {
-                        'name': label,
-                        'detail': spec.title,
-                        'tasks': [item['function']],
-                    }
-                )
 
     dimensions = []
     for key, label in DIMENSION_POOL.items():
@@ -624,7 +681,7 @@ def generate_for(coursework, offline: bool = False, force: bool = True) -> Cours
                 '未配置大模型端点。请设置 LLM_BASE_URL / LLM_API_KEY / LLM_MODEL，'
                 '或显式使用规则兜底。'
             )
-        result = rule_based(context)
+        result = rule_based(context, reference_code=_reference_code(coursework))
         source, model = 'rule', ''
     else:
         text = chat(build_messages(context))

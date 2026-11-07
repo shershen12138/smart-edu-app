@@ -103,4 +103,43 @@ docker pull python:3.12-slim
 | config/legacy_urls.py | 仅供旧回归测试，不挂到网站 |
 | school/tests/test_portal.py | 本轮账号、权限、提交、评分、导出测试 |
 
+### teaching_views.py 的修改方法与设计模式
+
+教学端视图曾存在三类重复：每个视图手写角色检查、`work_package_file` 按批阅方式的 if/else 分支散落在权限、归档路径、解析器、成功提示、页面说明 5 处、`works` 与 `results` 重复的班级筛选逻辑。重构时**行为保持不变**（提示文案、重定向、403 条件逐字一致），用以下模式收敛：
+
+**1. 装饰器模式 —— 角色检查收敛**
+
+新增 `role_required(*roles)` 装饰器工厂和 `teacher_required = role_required('teacher')`，替代各视图重复的 `if role(...) != 'teacher': raise PermissionDenied`：
+
+```python
+@login_required
+@teacher_required          # 或 @role_required('teacher', 'admin')
+def work_edit(request, pk=None): ...
+```
+
+视图只需叠加强调顺序：`@login_required` 在前、角色装饰器在后。`works` 是例外——学生访问要跳转仪表盘而非 403，因此保留内联判断。
+
+**2. 策略模式 —— 按批阅方式分流**
+
+机器批阅与非机器批阅在“更新单个文件”流程中的差异封装为同接口的两个策略类，由 `package_strategy(work)` 按 `grading_mode` 选择：
+
+| 策略类 | archive_path | member_choices | description | success_message |
+| --- | --- | --- | --- | --- |
+| `AutomaticPackageStrategy` | 批阅包路径（缺失即 403） | `package_member_choices` | Docker 重评说明 | 含验证中/已生效分支 |
+| `ManualPackageStrategy` | 材料路径（缺失即 403） | `manual_member_choices` | 直接生效说明 | 无需 Docker 分支 |
+
+主视图 `work_package_file` 不再出现任何批阅方式判断；新增批阅方式时只需增加一个策略类。
+
+**3. 公共辅助函数抽取**
+
+- `_filtered_by_classroom(request, queryset)`：`works` 与 `results` 共用的“GET classroom 参数 → 过滤查询集”
+- `_export_row(work, row)` / `_results_csv(request, work, rows)` / `EXPORT_HEADERS`：班级结果 CSV 导出的行组装与完整导出职责，`work_results` 主函数只保留流程控制，且导出分支提前返回、不再白算页面才需要的分数分布
+
+**4. 同文件新增的异步触发点**
+
+- `_auto_generate_rubric(request, work)`：`work_edit` 保存成功后自动调用题目分析智能体；已有评分标准跳过，未配置大模型提示后跳过，失败只警告不阻塞上传
+- 非机器批阅材料更新成功后调用 `rubric_agent.schedule_regeneration(work.pk)`，机器批阅由 `activate_package_update` 在验证生效后触发（后台线程，失败保留旧标准）
+
+以上行为均有测试覆盖：`school/tests/test_rubric_agent.py`（自动生成与重建）、`school/tests/test_quality_report.py`（提交后后台分析）、`school/tests/test_portal.py` / `test_review_changes.py`（视图回归）。
+
 本轮方案与交接见 [需求说明](docs/REQUIREMENTS.md)、[A 开发交接](docs/A_HANDOFF.md)、[验证记录](docs/VALIDATION.md)。私有仓库：[Gitee](https://gitee.com/arongmiao/python-course-judge)。

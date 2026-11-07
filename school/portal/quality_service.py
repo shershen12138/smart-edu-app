@@ -107,11 +107,12 @@ def dimensions_for(coursework, stored=None) -> tuple[list[agent_models.Dimension
 
 
 def knowledge_points_for(coursework, items, stored=None) -> dict[str, tuple[str, ...]]:
-    """评分标准（CourseworkRubric）里的“作业考察的知识点”，按函数名分组。
+    """评分标准里的“作业考察的知识点”，按函数名分组。
 
-    报告逐题明细的知识点列直接使用这份清单，而不是评测器按题库规格推断的标签；
-    作业还没有评分标准时返回空，由评测器回退到题库规格。
-    `tasks` 为空的知识点视为覆盖该作业的全部题目。
+    数据来源优先级：评分标准 Markdown 的知识点表格（教师看到的那份文件，
+    含“涉及题目”列）→ CourseworkRubric.knowledge_points 结构化字段；
+    两者都拿不到时返回空，由评测器回退到题库规格。
+    “涉及题目”支持函数名或题目名称；为空或写“全部题目”视为覆盖整份作业。
     """
     if stored is None:
         stored = getattr(coursework, 'rubric', None)
@@ -119,22 +120,42 @@ def knowledge_points_for(coursework, items, stored=None) -> dict[str, tuple[str,
         return {}
     functions = [name for name, _ in items]
     known = set(functions)
+    titles = {title: function for function, title in items if title and title != function}
     grouped: dict[str, list[str]] = {}
-    for point in stored.knowledge_points or []:
-        if not isinstance(point, dict):
-            continue
-        name = str(point.get('name', '')).strip()
+
+    def register(name: str, raw_tasks) -> None:
         if not name:
-            continue
-        raw_tasks = point.get('tasks') or []
+            return
         if isinstance(raw_tasks, str):
             raw_tasks = [raw_tasks]
         tasks = [str(task).strip() for task in raw_tasks if str(task).strip()]
-        targets = [task for task in tasks if task in known] if tasks else functions
+        targets = []
+        for task in tasks:
+            if task in known:
+                targets.append(task)
+            elif task in titles:
+                # 涉及题目写的是题目名称（如大模型没用函数名）时也能对应
+                targets.append(titles[task])
+        if not targets:
+            targets = functions
         for function in targets:
             names = grouped.setdefault(function, [])
             if name not in names:
                 names.append(name)
+
+    markdown_points = (
+        agent_rubric.knowledge_points_from_text(stored.markdown or '')
+        if stored.markdown
+        else None
+    )
+    if markdown_points:
+        for name, tasks in markdown_points:
+            register(name, tasks)
+        return {function: tuple(names) for function, names in grouped.items()}
+    for point in stored.knowledge_points or []:
+        if not isinstance(point, dict):
+            continue
+        register(str(point.get('name', '')).strip(), point.get('tasks') or [])
     return {function: tuple(names) for function, names in grouped.items()}
 
 
