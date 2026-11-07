@@ -6,6 +6,7 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -141,7 +142,12 @@ def practice_problem(request, pk):
 @login_required
 @require_http_methods(['POST'])
 def practice_submit(request, pk):
-    problem = _problem_for_student(request, pk)
+    try:
+        problem = _problem_for_student(request, pk)
+    except Http404:
+        # 训练计划重新生成后旧题目的链接会失效，别让学生停在 404 页面。
+        messages.error(request, '这道训练题已随计划更新而失效，请回到训练页重新进入题目后再提交。')
+        return redirect('practice')
     form = PracticeSubmitForm(request.POST)
     if not form.is_valid():
         messages.error(request, '提交内容为空或格式不正确。')

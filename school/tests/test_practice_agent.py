@@ -702,6 +702,15 @@ class PracticeViewTests(TestCase):
         # 分层题库文档已覆盖该弱项，题库提示不应出现
         self.assertNotIn('“根据现有题库生成训练题”为什么会失败', body)
 
+    def test_submit_stale_problem_redirects_with_hint(self):
+        """训练计划重新生成后，旧题目链接提交应给出明确提示而不是 404。"""
+        self.client.force_login(self.student)
+        response = self.client.post(
+            reverse('practice_submit', args=[99999]), {'code': 'print(1)'}
+        )
+        self.assertRedirects(response, reverse('practice'))
+        self.assertFalse(PracticeAttempt.objects.exists())
+
     def test_problem_page_shows_editor_and_framework(self):
         self.problem.function_name = 'func0402'
         self.problem.function_argc = 1
