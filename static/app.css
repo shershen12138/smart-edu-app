@@ -674,6 +674,140 @@ td small {
   padding: 6px 12px
 }
 
+/* 提交记录里的次级操作：浅绿底、深绿字，两个入口保持同一样式 */
+.button.soft {
+  background: var(--green-light);
+  color: var(--green);
+  border-color: #cfe7dc
+}
+
+.button.soft:hover {
+  background: #d7ece1;
+  color: #066151
+}
+
+.actions.report-actions {
+  gap: 8px
+}
+
+/* 主能力表 + 雷达图：表格固定一列，雷达图吃满剩余宽度 */
+.summary-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin-top: 6px
+}
+
+.summary-grid table {
+  width: 100%;
+  margin: 0
+}
+
+/* 可交互雷达图：SVG 绘制，悬停/聚焦显示维度与得分 */
+.radar-figure {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0
+}
+
+.radar-figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 520px
+}
+
+@media (max-width: 860px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+    gap: 10px
+  }
+
+  .radar-figure {
+    max-width: 100%
+  }
+}
+
+.radar-ring {
+  fill: none;
+  stroke: #e3ece6;
+  stroke-width: 1
+}
+
+.radar-spoke {
+  stroke: #edf2ee;
+  stroke-width: 1
+}
+
+.radar-area {
+  fill: rgba(8, 123, 102, .16);
+  stroke: var(--green);
+  stroke-width: 2;
+  stroke-linejoin: round
+}
+
+.radar-axis {
+  cursor: pointer;
+  outline: none
+}
+
+.radar-point {
+  fill: var(--green);
+  stroke: #fff;
+  stroke-width: 2;
+  transition: r .15s ease, fill .15s ease
+}
+
+.radar-label {
+  fill: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  transition: fill .15s ease
+}
+
+.radar-value {
+  fill: var(--muted);
+  font-size: 10px
+}
+
+.radar-axis:hover .radar-point,
+.radar-axis:focus-visible .radar-point {
+  r: 6.5;
+  fill: #0a9479
+}
+
+.radar-axis:hover .radar-label,
+.radar-axis:focus-visible .radar-label {
+  fill: var(--green)
+}
+
+.radar-tooltip {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  max-width: 220px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  background: #0f2f2a;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 8px 20px rgba(15, 47, 42, .24);
+  transform: translate(-50%, -100%)
+}
+
+.radar-tooltip[hidden] {
+  display: none
+}
+
+.radar-tooltip strong {
+  color: #9fe3cd;
+  font-weight: 700
+}
+
 .button.full {
   width: 100%
 }

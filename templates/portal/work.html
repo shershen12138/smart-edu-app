@@ -123,10 +123,10 @@
               <td>{% if e.total != None %}{{ e.total|floatformat:1 }}{% else %}—{% endif %} / {{ e.snapshot.max_score|default:work.max_score }}</td>
               <td>{% if e.snapshot.grading_mode == 'manual' %}非机器批阅{% else %}机器批阅{% endif %}</td>
               <td>
-                <div class="actions">
-                  <a href="{% url 'entry' e.pk %}">{% if work.grading_mode == 'manual' %}查看提交 / 批阅结果{% else %}查看题目 / 用例结果{% endif %}</a>
+                <div class="actions report-actions">
+                  <a class="button soft small" href="{% url 'entry' e.pk %}">{% if work.grading_mode == 'manual' %}查看提交 / 批阅结果{% else %}查看题目 / 用例结果{% endif %}</a>
                   {% if e.can_report %}
-                    <a class="button secondary small" data-loading="正在生成评测报告…"
+                    <a class="button soft small" data-loading="正在生成评测报告…"
                        href="{% url 'quality_report' e.pk %}">查看评测报告</a>
                   {% endif %}
                 </div>

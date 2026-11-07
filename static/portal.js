@@ -79,3 +79,38 @@ document.addEventListener('click', (event) => {
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) hideLoading();
 });
+
+// 雷达图：悬停或键盘聚焦某个维度时，在数据点上方显示名称与得分
+const initRadar = () => {
+  document.querySelectorAll('[data-radar]').forEach((wrap) => {
+    const tip = wrap.querySelector('.radar-tooltip');
+    if (!tip) return;
+    const place = (axis) => {
+      const point = axis.querySelector('.radar-point');
+      if (!point) return;
+      const wrapRect = wrap.getBoundingClientRect();
+      const pointRect = point.getBoundingClientRect();
+      const x = pointRect.left + pointRect.width / 2 - wrapRect.left;
+      tip.style.left = `${Math.min(Math.max(x, 70), wrapRect.width - 70)}px`;
+      tip.style.top = `${pointRect.top - wrapRect.top - 10}px`;
+      tip.textContent = '';
+      const name = document.createElement('strong');
+      name.textContent = axis.dataset.label || '';
+      tip.append(name, ` ${axis.dataset.score || '0'} 分 · 权重 ${axis.dataset.weight || '0'}%`);
+      tip.hidden = false;
+    };
+    wrap.querySelectorAll('.radar-axis').forEach((axis) => {
+      axis.addEventListener('mouseenter', () => place(axis));
+      axis.addEventListener('mousemove', () => place(axis));
+      axis.addEventListener('focus', () => place(axis));
+      axis.addEventListener('mouseleave', () => {
+        tip.hidden = true;
+      });
+      axis.addEventListener('blur', () => {
+        tip.hidden = true;
+      });
+    });
+  });
+};
+
+initRadar();

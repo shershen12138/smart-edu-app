@@ -394,3 +394,12 @@ class QualityReportTests(TestCase):
             [ability['dimension'] for ability in abilities],
         )
         self.assertEqual(report.payload['axis_label'], '主能力')
+        self.assertContains(response, 'data-radar')
+        self.assertContains(response, 'radar-tooltip')
+        radar = report.payload['radar']
+        self.assertEqual(len(radar['axes']), 6)
+        self.assertEqual(len(radar['rings']), 4)
+        self.assertEqual(
+            [axis['label'] for axis in radar['axes']],
+            [ability['label'] for ability in abilities],
+        )
