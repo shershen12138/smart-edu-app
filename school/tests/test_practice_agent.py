@@ -723,6 +723,10 @@ class PracticeViewTests(TestCase):
         self.assertIn('code-editor', body)
         self.assertIn('data-code-input', body)
         self.assertIn('def func0402(nums):', body)
+        # 表单必须提交到批阅接口而不是当前页面，否则提交后只会原地刷新
+        self.assertIn(
+            f'action="{reverse("practice_submit", args=[self.problem.pk])}"', body
+        )
         # 已有批阅记录时编辑器仍然可用（重新练习）
         self.assertIn('提交批阅', body)
 
