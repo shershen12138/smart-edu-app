@@ -1,13 +1,20 @@
 """分层训练题库（Python题库.md）解析与按弱项关键词选题。
 
-Python题库.md 是团队维护的结构化题库文档（44 题、12 知识域、每题 10 组
-实测用例），字段顺序固定，便于机器解析。本模块把它当作"现有题库"的
-数据源之一：规则兜底出题时按弱项关键词反查题目标签，挑选现成题，
-不凭空编题；解析失败或文件缺失时返回空题库，不阻塞其他出题路径。
+Python题库.md 是团队维护的结构化题库文档，v2 起改为"函数式批阅包"：
+每题给出函数框架（学生起始代码）、标准答案与 10 组字面量用例，
+判题只认函数返回值（类型 + 值严格比对，浮点容差 1e-6）。
+
+本模块把它当作"现有题库"的数据源之一：
+- 解析出题目、函数签名、框架代码、参考答案与用例；
+- 用例的期望返回值统一转成判题器的打包 JSON（与 school.portal.grading
+  的 PACKER 约定一致），学生返回值经同一打包流程后逐值比对；
+- 按弱项关键词反查考点标签选题；文件缺失或解析异常时返回空题库。
 """
 
 from __future__ import annotations
 
+import ast
+import json
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -23,7 +30,9 @@ _HEADER_RE = re.compile(
     r'^###\s*1、题目标题：(Q\d+-\d+)\s*(.+?)（(★[☆★]*)｜(\d+)\s*分）\s*$'
 )
 _SECTION_RE = re.compile(r'^\*\*([234])、')
+_SUBSECTION_RE = re.compile(r'^\*\*4\.\d')
 _CASE_ROW_RE = re.compile(r'^\|\s*(\d+)\s*\|(.+)\|(.+)\|\s*$')
+_DEF_RE = re.compile(r'^def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*:', re.MULTILINE)
 
 # 星级 → 难度（与 PracticeProblem.DIFFICULTIES 对齐）与排序权重
 _DIFFICULTY_BY_STARS = {'★☆☆': ('基础', 0), '★★☆': ('进阶', 1), '★★★': ('进阶', 2)}
@@ -34,22 +43,80 @@ def bank_path() -> Path:
 
 
 def _clean_cell(raw: str) -> str:
-    """用例单元格 → 判题器实际文本：反引号去除，<br> 还原为换行。"""
-    text = raw.strip().strip('`').strip().replace('<br>', '\n').replace('`', '')
-    return '\n'.join(part.strip() for part in text.split('\n'))
+    """用例单元格 → 字面量文本：反引号去除、行内换行还原。"""
+    return raw.strip().strip('`').strip().replace('<br>', '\n').replace('`', '')
 
 
-def _parse_case_table(lines: list[str]) -> list[dict[str, Any]]:
+def _code_block(text: str) -> str:
+    match = re.search(r'```python\s*\n(.*?)```', text, re.DOTALL)
+    return match.group(1).strip() if match else ''
+
+
+def _parse_signature(framework: str) -> tuple[str, int]:
+    """从函数框架解析函数名与位置参数个数（带默认值的参数也计入）。"""
+    match = _DEF_RE.search(framework)
+    if not match:
+        return '', 1
+    name, params = match.group(1), match.group(2).strip()
+    if not params:
+        return name, 0
+    argc = 0
+    for part in params.split(','):
+        part = part.strip()
+        if not part or part.startswith('*'):
+            continue
+        argc += 1
+    return name, max(argc, 1)
+
+
+def pack_value(value: Any) -> dict[str, Any]:
+    """把 Python 返回值打包成判题器的类型化 JSON（与 grading.PACKER_SOURCE 一致）。"""
+    kind = type(value)
+    if value is None:
+        return {'type': 'none'}
+    if kind is bool:
+        return {'type': 'bool', 'value': value}
+    if kind is int:
+        return {'type': 'int', 'value': value}
+    if kind is float:
+        return {'type': 'float', 'value': value}
+    if kind is complex:
+        return {'type': 'complex', 'real': value.real, 'imag': value.imag}
+    if kind is str:
+        return {'type': 'str', 'value': value}
+    if kind is list:
+        return {'type': 'list', 'items': [pack_value(item) for item in value]}
+    if kind is tuple:
+        return {'type': 'tuple', 'items': [pack_value(item) for item in value]}
+    if kind is set:
+        items = [pack_value(item) for item in value]
+        return {'type': 'set', 'items': sorted(items, key=lambda x: json.dumps(x, sort_keys=True))}
+    if kind is dict:
+        items = [[pack_value(key), pack_value(item)] for key, item in value.items()]
+        items.sort(key=lambda pair: json.dumps(pair[0], sort_keys=True))
+        return {'type': 'dict', 'items': items}
+    raise TypeError('unsupported return type: ' + kind.__name__)
+
+
+def _expected_packed(repr_text: str) -> str:
+    """文档里的期望返回值是 repr 字面量，转成判题器的打包 JSON。"""
+    value = ast.literal_eval(repr_text)
+    return json.dumps(pack_value(value), ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+
+
+def _parse_cases(lines: list[str]) -> list[dict[str, Any]]:
     cases: list[dict[str, Any]] = []
     for line in lines:
         match = _CASE_ROW_RE.match(line)
         if not match:
             continue
-        stdin = _clean_cell(match.group(2))
-        expected = _clean_cell(match.group(3))
-        if stdin and expected:
-            cases.append({'input': stdin, 'output': expected})
-    # 题库文档约定第一组为示例；全部用例均经过答案实测。
+        args_text = _clean_cell(match.group(2))
+        try:
+            expected = _expected_packed(_clean_cell(match.group(3)))
+        except (ValueError, SyntaxError, MemoryError, RecursionError):
+            continue
+        if args_text and expected:
+            cases.append({'input': args_text, 'output': expected})
     for index, case in enumerate(cases):
         case['is_sample'] = index == 0
     return cases
@@ -76,12 +143,24 @@ def _parse_question(lines: list[str]) -> dict[str, Any] | None:
     if not statement or not tags:
         return None
 
-    code_block = re.search(
-        r'```python\s*\n(.*?)```', '\n'.join(sections['4']), re.DOTALL
-    )
-    reference_code = code_block.group(1).strip() if code_block else ''
-    cases = _parse_case_table(sections['4'])
-    if not cases:
+    # 4.x 小节：4.1 函数框架、4.2 标准答案、4.3 测试用例
+    framework_lines: list[str] = []
+    answer_lines: list[str] = []
+    case_lines: list[str] = []
+    target = framework_lines
+    for line in sections['4']:
+        if _SUBSECTION_RE.match(line):
+            if line.startswith('**4.2'):
+                target = answer_lines
+            elif line.startswith('**4.3'):
+                target = case_lines
+            continue
+        target.append(line)
+    framework = _code_block('\n'.join(framework_lines))
+    reference_code = _code_block('\n'.join(answer_lines))
+    function_name, function_argc = _parse_signature(framework)
+    cases = _parse_cases(case_lines)
+    if not framework or not reference_code or not cases or not function_name:
         return None
 
     return {
@@ -89,6 +168,9 @@ def _parse_question(lines: list[str]) -> dict[str, Any] | None:
         'title': f'{code} {title.strip()}',
         'statement': statement,
         'tags': tags,
+        'function_name': function_name,
+        'function_argc': function_argc,
+        'template_code': framework,
         'reference_code': reference_code,
         'explanation': '',
         'difficulty': difficulty,

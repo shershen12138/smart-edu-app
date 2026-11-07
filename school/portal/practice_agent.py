@@ -13,18 +13,26 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from school.course_models import PracticeAttempt, PracticeCase, PracticePlan, PracticeProblem
-from school.judge import InfrastructureError, run_case
+from school.course_models import (
+    PracticeAttempt,
+    PracticeCase,
+    PracticeCaseResult,
+    PracticePlan,
+    PracticeProblem,
+)
+from school.judge import CaseOutcome, InfrastructureError, run_case
 from school.models import ProblemVersion, User
 from school.storage import read_private, save_private
+from tools.code_quality_agent import service as quality_agent
 
-from . import knowledge_profile, question_bank
+from . import grading, knowledge_profile, question_bank
 from .rubric_agent import LLMNotConfigured, chat, llm_configured, llm_status
 
 PROMPT_VERSION = 'v1'
@@ -262,10 +270,13 @@ def rule_based(weak: list[dict]) -> list[dict[str, Any]]:
                         'knowledge_point': item['name'],
                         'title': bank_question['title'],
                         'statement': bank_question['statement'],
-                        'template_code': '',
+                        # 函数式题：编辑器预填题库的函数框架，批阅只认函数返回值。
+                        'template_code': bank_question['template_code'],
                         'reference_code': bank_question['reference_code'],
                         'explanation': bank_question['explanation'],
                         'difficulty': bank_question['difficulty'],
+                        'function_name': bank_question['function_name'],
+                        'function_argc': bank_question['function_argc'],
                         'cases': bank_question['cases'],
                     }
                 )
@@ -303,6 +314,8 @@ def _store_plan(student: User, weak: list[dict], profile: dict, questions: list[
             reference_code=question.get('reference_code', ''),
             explanation=question.get('explanation', ''),
             difficulty=question.get('difficulty', '基础'),
+            function_name=question.get('function_name', ''),
+            function_argc=question.get('function_argc'),
             order=order,
             time_ms=int(getattr(settings, 'COURSEWORK_CASE_TIME_MS', 2000)),
         )
@@ -350,36 +363,151 @@ def generate_practice_plan(student: User, offline: bool = False) -> PracticePlan
 def grade_attempt(attempt: PracticeAttempt) -> PracticeAttempt:
     """在受限 Docker 中批阅一次训练题提交，按用例通过比例计分。
 
-    与正式批阅一致：只经 school.judge.run_case，绝不在宿主机直接执行学生代码。
+    两种判定模式，都绝不在宿主机直接执行学生代码：
+    - 函数式题（分层题库文档）：经 grading.grade_submission 在一个受限容器内
+      逐用例调用题库约定的函数，按"类型 + 值"严格比对返回值；
+    - stdin/stdout 题（大模型生成/旧题库）：逐用例经 school.judge.run_case。
+    每条用例的结果写入 PracticeCaseResult，供结果页展示批阅明细。
     """
     problem = attempt.problem
     code = read_private(attempt.code_path)
     cases = list(problem.cases.order_by('order'))
-    passed = 0
     try:
-        for case in cases:
-            outcome = run_case(
+        if problem.function_name:
+            outcomes = _grade_function_cases(problem, code, cases)
+        else:
+            outcomes = _grade_io_cases(problem, code, cases)
+    except InfrastructureError:
+        attempt.verdict = 'ERROR'
+        attempt.finished_at = timezone.now()
+        attempt.save(update_fields=['verdict', 'finished_at'])
+        raise
+    rows = [
+        PracticeCaseResult(
+            attempt=attempt,
+            order=index,
+            verdict=outcome.verdict,
+            elapsed_ms=outcome.elapsed_ms,
+            actual_output=(outcome.stdout or '')[:65536],
+        )
+        for index, outcome in enumerate(outcomes, start=1)
+    ]
+    passed = sum(1 for outcome in outcomes if outcome.verdict == 'AC')
+    total = len(cases)
+    attempt.passed_cases = passed
+    attempt.total_cases = total
+    attempt.score = round(passed / total * 100, 1) if total else 0.0
+    attempt.verdict = 'AC' if total and passed == total else 'WA'
+    attempt.quality = None  # 新提交后重算代码质量分析
+    attempt.finished_at = timezone.now()
+    with transaction.atomic():
+        attempt.case_results.all().delete()
+        PracticeCaseResult.objects.bulk_create(rows)
+        attempt.save()
+    return attempt
+
+
+def _grade_function_cases(problem: PracticeProblem, code: str, cases) -> list[CaseOutcome]:
+    """函数式题：一次容器内批量调用判定函数并比对打包后的返回值。"""
+    item = {
+        'function': problem.function_name,
+        'argc': problem.function_argc or 1,
+        'inputs': [read_private(case.input_path) for case in cases],
+        'expected': [read_private(case.output_path) for case in cases],
+    }
+    return grading.grade_submission(code, [item])[0]
+
+
+def _grade_io_cases(problem: PracticeProblem, code: str, cases) -> list[CaseOutcome]:
+    """stdin/stdout 题：逐用例送入 school.judge.run_case。"""
+    outcomes = []
+    for case in cases:
+        outcomes.append(
+            run_case(
                 code,
                 read_private(case.input_path),
                 read_private(case.output_path),
                 problem,
             )
-            if outcome.verdict == 'AC':
-                passed += 1
-    except InfrastructureError as exc:
-        attempt.verdict = 'ERROR'
-        attempt.finished_at = timezone.now()
-        attempt.save(update_fields=['verdict', 'finished_at'])
-        raise
-    total = len(cases)
-    score = round(passed / total * 100, 1) if total else 0.0
-    attempt.passed_cases = passed
-    attempt.total_cases = total
-    attempt.score = score
-    attempt.verdict = 'AC' if total and passed == total else 'WA'
-    attempt.finished_at = timezone.now()
-    attempt.save()
-    return attempt
+        )
+    return outcomes
+
+
+def format_value(text: str) -> str:
+    """把打包 JSON 的返回值还原成可读的 repr 文本；非打包内容原样返回。"""
+    if not text:
+        return ''
+    try:
+        value = json.loads(text)
+    except (ValueError, TypeError):
+        return text
+    if isinstance(value, dict) and 'type' in value:
+        return repr(_unpack_value(value))
+    return text
+
+
+def _unpack_value(value: Any) -> Any:
+    if isinstance(value, dict) and 'type' in value:
+        kind = value['type']
+        if kind == 'none':
+            return None
+        if kind in ('bool', 'int', 'float', 'str'):
+            return value.get('value')
+        if kind == 'complex':
+            return complex(value.get('real', 0), value.get('imag', 0))
+        if kind in ('list', 'tuple'):
+            items = [_unpack_value(item) for item in value.get('items', [])]
+            return tuple(items) if kind == 'tuple' else items
+        if kind == 'set':
+            return {_unpack_value(item) for item in value.get('items', [])}
+        if kind == 'dict':
+            return {
+                _unpack_value(key): _unpack_value(item)
+                for key, item in value.get('items', [])
+            }
+    return value
+
+
+def analyze_attempt_quality(attempt: PracticeAttempt) -> dict[str, Any] | None:
+    """复用代码质量评测智能体分析本次提交，结果缓存在提交记录上。
+
+    分析与评分在本机静态完成，不执行学生代码；失败时返回 None，不阻塞结果页。
+    """
+    if attempt.quality is not None:
+        return attempt.quality
+    problem = attempt.problem
+    function_name = problem.function_name or ''
+    try:
+        analysis, dimensions, note = quality_agent.analyze(
+            read_private(attempt.code_path),
+            [(function_name, problem.title)],
+            Path(settings.PRIVATE_STORAGE) / 'quality-tmp',
+            name=attempt.student.get_full_name() or attempt.student.username,
+        )
+    except Exception:  # noqa: BLE001 -- 质量分析失败不影响批阅结果展示
+        return None
+    payload = {
+        'total': round(analysis.total, 1),
+        'grade': analysis.grade,
+        'note': note,
+        'scores': {key: round(value, 1) for key, value in analysis.scores.items()},
+        'dimension_labels': {dimension.key: dimension.label for dimension in dimensions},
+        'tasks': [
+            {
+                'function': result.spec.task_id,
+                'title': result.spec.title,
+                'parsed': result.parsed,
+                'covered': list(result.covered),
+                'missing': list(result.missing),
+                'issues': quality_agent.report_issues(result)[0],
+            }
+            for result in analysis.results
+        ],
+        'style_notes': list(analysis.style_notes),
+    }
+    attempt.quality = payload
+    attempt.save(update_fields=['quality'])
+    return payload
 
 
 def latest_plan(student: User) -> PracticePlan | None:

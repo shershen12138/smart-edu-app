@@ -21,6 +21,89 @@
     </div>
   </section>
 
+  <div class="actions space-bottom">
+    <a class="button" href="{{ retry_url }}">重新练习</a>
+    <span class="subtle">点击后返回题目页，编辑器会重新预填函数框架，可再次提交。</span>
+  </div>
+
+  {% if cases %}
+    <section class="card space-bottom">
+      <h2>测试用例批阅明细</h2>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>#</th><th>类型</th><th>结果</th><th>耗时</th><th>输入</th><th>期望输出</th><th>实际输出</th></tr>
+          </thead>
+          <tbody>
+            {% for row in cases %}
+              <tr>
+                <td>{{ row.order }}</td>
+                <td>{% if row.is_sample %}样例{% else %}隐藏{% endif %}</td>
+                <td>{{ row.verdict_label }}</td>
+                <td>{% if row.elapsed_ms != None %}{{ row.elapsed_ms }} ms{% else %}—{% endif %}</td>
+                <td>{% if row.is_sample %}<pre style="white-space:pre-wrap">{{ row.input }}</pre>{% else %}—{% endif %}</td>
+                <td>{% if row.is_sample %}<pre style="white-space:pre-wrap">{{ row.expected }}</pre>{% else %}—{% endif %}</td>
+                <td>{% if row.is_sample %}<pre style="white-space:pre-wrap">{{ row.actual }}</pre>{% else %}—{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if quality %}
+    <section class="card space-bottom">
+      <h2>代码质量分析 <span class="subtle">{{ quality.note }}</span></h2>
+      <p>
+        综合得分 <strong>{{ quality.total }}</strong>（等级 {{ quality.grade }}）
+        · 由代码质量评测智能体静态分析生成，不执行你的代码。
+      </p>
+      <div class="table-card">
+        <table>
+          <thead><tr><th>评分维度</th><th>得分</th></tr></thead>
+          <tbody>
+            {% for row in quality_rows %}
+              <tr>
+                <td>{{ row.0 }}</td>
+                <td>{{ row.1 }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% for task in quality.tasks %}
+        <h3>{{ task.title }} <span class="subtle">{{ task.function }}</span></h3>
+        {% if task.covered %}
+          <p><span class="tag">已覆盖考点</span> {% for point in task.covered %}{{ point }}{% if not forloop.last %}、{% endif %}{% endfor %}</p>
+        {% endif %}
+        {% if task.missing %}
+          <p><span class="tag">建议补强</span> {% for point in task.missing %}{{ point }}{% if not forloop.last %}、{% endif %}{% endfor %}</p>
+        {% endif %}
+        {% if task.issues %}
+          <div class="table-card">
+            <table>
+              <thead><tr><th>位置</th><th>问题</th><th>建议</th></tr></thead>
+              <tbody>
+                {% for issue in task.issues %}
+                  <tr>
+                    <td>第 {{ issue.line }} 行</td>
+                    <td>{{ issue.message }}</td>
+                    <td>{{ issue.advice|default:'—' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="subtle">未发现明显缺陷。</p>
+        {% endif %}
+      {% endfor %}
+    </section>
+  {% elif quality_failed %}
+    <p class="tip space-top">代码质量分析暂时不可用，批阅结果不受影响。</p>
+  {% endif %}
+
   {% if problem.explanation %}
     <section class="card space-bottom">
       <h2>解题思路</h2>

@@ -1,4 +1,9 @@
 {% extends "portal/base.html" %}
+{% load static %}
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'practice_editor.css' %}?v=20261107-1">
+  <script src="{% static 'practice_editor.js' %}?v=20261107-1" defer></script>
+{% endblock %}
 {% block content %}
   <div class="page-heading split">
     <div>
@@ -36,17 +41,23 @@
 
   <section class="card space-bottom">
     <h2>提交代码</h2>
-    {% if form %}
-      <form method="post" data-loading="正在保存并批阅代码…">
-        {% csrf_token %}
-        {{ form.code }}
-        <div class="actions space-top">
-          <button class="button">提交批阅</button>
-        </div>
-      </form>
-    {% else %}
-      <p class="tip">已经有批阅记录。如需重做，请从训练计划重新开始练习。</p>
+    {% if problem.function_name %}
+      <p class="subtle">本题按函数返回值判定：实现 <code>{{ problem.function_name }}()</code> 并 <code>return</code> 结果，函数内的 <code>print</code> 不参与判定。</p>
     {% endif %}
+    <form method="post" data-loading="正在保存并批阅代码…">
+      {% csrf_token %}
+      <div class="code-editor" data-editor>
+        <div class="code-gutter" data-gutter aria-hidden="true">1</div>
+        <div class="code-area">
+          <pre class="code-highlight" data-highlight aria-hidden="true"><code></code></pre>
+          {{ form.code }}
+        </div>
+      </div>
+      <p class="subtle space-top">编辑器已预填本题的函数框架，直接在 TODO 处实现即可；支持 Tab 缩进与自动换行缩进。</p>
+      <div class="actions space-top">
+        <button class="button">提交批阅</button>
+      </div>
+    </form>
   </section>
 
   {% if attempts %}

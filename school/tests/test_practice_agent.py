@@ -1,4 +1,6 @@
+import ast
 import json
+from types import SimpleNamespace
 from unittest import mock
 
 from django.test import TestCase, override_settings
@@ -13,6 +15,7 @@ from school.course_models import (
     CourseworkSubmission,
     PracticeAttempt,
     PracticeCase,
+    PracticeCaseResult,
     PracticePlan,
     PracticeProblem,
 )
@@ -261,9 +264,131 @@ class PracticeAgentTests(TestCase):
         self.assertEqual(problems[0].cases.count(), 2)
         case = problems[0].cases.order_by('order').first()
         self.assertEqual(read_private(case.input_path), '1 2 3 4 5')
-        # 补足的题来自分层题库文档，标签/答案/用例齐全
+        # 补足的题来自分层题库文档：函数式题，框架/答案/函数签名齐全
         self.assertTrue(problems[1].title.startswith('Q4-'))
         self.assertTrue(problems[1].reference_code)
+        self.assertTrue(problems[1].function_name)
+        self.assertGreaterEqual(problems[1].function_argc, 1)
+        self.assertIn('def ', problems[1].template_code)
+
+    def test_grade_attempt_function_mode(self):
+        """函数式题：调用 grading 批量判题，返回值按类型比对并记录逐用例明细。"""
+        problem = PracticeProblem.objects.create(
+            plan=self.plan_for_function_problem(),
+            knowledge_point='列表切片',
+            title='Q4-02 列表切片四连击',
+            statement='题面',
+            template_code='def func0402(nums):\n    # TODO: 在此实现\n    pass\n',
+            difficulty='进阶',
+            function_name='func0402',
+            function_argc=1,
+            order=1,
+        )
+        packed = json.dumps({'type': 'list', 'items': []}, ensure_ascii=False)
+        for index, args_line in enumerate(['[1,2,3,4,5]', '[10,20,30]'], start=1):
+            PracticeCase.objects.create(
+                problem=problem,
+                order=index,
+                input_path=save_private(args_line),
+                output_path=save_private(packed),
+                is_sample=index == 1,
+            )
+        attempt = PracticeAttempt.objects.create(
+            problem=problem,
+            student=self.student,
+            code_path=save_private('def func0402(nums):\n    return []\n', suffix='.py'),
+        )
+        outcomes = [
+            CaseOutcome('AC', 12, '{"type":"list"}'),
+            CaseOutcome('WA', 8, '{"type":"none"}'),
+        ]
+        with mock.patch.object(
+            practice_agent.grading, 'grade_submission', return_value=[outcomes]
+        ) as grader:
+            practice_agent.grade_attempt(attempt)
+        grader.assert_called_once()
+        item = grader.call_args.args[1][0]
+        self.assertEqual(item['function'], 'func0402')
+        self.assertEqual(item['argc'], 1)
+        self.assertEqual(item['inputs'], ['[1,2,3,4,5]', '[10,20,30]'])
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.passed_cases, 1)
+        self.assertEqual(attempt.total_cases, 2)
+        self.assertEqual(float(attempt.score), 50.0)
+        self.assertEqual(attempt.verdict, 'WA')
+        rows = list(attempt.case_results.order_by('order'))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0].verdict, 'AC')
+        self.assertEqual(rows[0].actual_output, '{"type":"list"}')
+        self.assertEqual(rows[1].verdict, 'WA')
+
+    def plan_for_function_problem(self):
+        return PracticePlan.objects.create(
+            student=self.student,
+            profile_snapshot={},
+            source='rule',
+        )
+
+    def test_analyze_attempt_quality_caches_payload(self):
+        plan = self.plan_for_function_problem()
+        problem = PracticeProblem.objects.create(
+            plan=plan,
+            knowledge_point='列表切片',
+            title='Q4-02 列表切片四连击',
+            statement='题面',
+            function_name='func0402',
+            function_argc=1,
+            order=1,
+        )
+        attempt = PracticeAttempt.objects.create(
+            problem=problem,
+            student=self.student,
+            code_path=save_private('def func0402(nums):\n    return []\n', suffix='.py'),
+        )
+        analysis = SimpleNamespace(
+            total=88.4,
+            grade='B',
+            scores={'knowledge': 90.0, 'syntax': 85.0},
+            style_notes=[],
+            results=[
+                SimpleNamespace(
+                    spec=SimpleNamespace(task_id='func0402', title='列表切片四连击'),
+                    parsed=True,
+                    covered=['列表/切片'],
+                    missing=['列表/步长切片'],
+                    issues=[],
+                )
+            ],
+        )
+        dimensions = [SimpleNamespace(key='knowledge', label='知识点覆盖')]
+        with mock.patch.object(
+            practice_agent.quality_agent,
+            'analyze',
+            return_value=(analysis, dimensions, '使用内置默认量表'),
+        ):
+            payload = practice_agent.analyze_attempt_quality(attempt)
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload['total'], 88.4)
+        self.assertEqual(payload['grade'], 'B')
+        self.assertEqual(payload['tasks'][0]['function'], 'func0402')
+        self.assertEqual(payload['tasks'][0]['covered'], ['列表/切片'])
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.quality['total'], 88.4)
+        # 二次调用直接读缓存，不再触发分析
+        with mock.patch.object(
+            practice_agent.quality_agent, 'analyze'
+        ) as second_call:
+            again = practice_agent.analyze_attempt_quality(attempt)
+        second_call.assert_not_called()
+        self.assertEqual(again['grade'], 'B')
+
+    def test_format_value(self):
+        packed = json.dumps(
+            {'type': 'list', 'items': [{'type': 'int', 'value': 1}]}, ensure_ascii=False
+        )
+        self.assertEqual(practice_agent.format_value(packed), '[1]')
+        self.assertEqual(practice_agent.format_value('plain output'), 'plain output')
+        self.assertEqual(practice_agent.format_value(''), '')
 
     def test_rule_based_without_match_returns_empty(self):
         """题库表与分层题库文档都匹配不到时不出题，不造假数据。"""
@@ -577,9 +702,89 @@ class PracticeViewTests(TestCase):
         # 分层题库文档已覆盖该弱项，题库提示不应出现
         self.assertNotIn('“根据现有题库生成训练题”为什么会失败', body)
 
+    def test_problem_page_shows_editor_and_framework(self):
+        self.problem.function_name = 'func0402'
+        self.problem.function_argc = 1
+        self.problem.template_code = 'def func0402(nums):\n    # TODO: 在此实现\n    pass\n'
+        self.problem.save()
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('practice_problem', args=[self.problem.pk]))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode('utf-8')
+        self.assertIn('code-editor', body)
+        self.assertIn('data-code-input', body)
+        self.assertIn('def func0402(nums):', body)
+        # 已有批阅记录时编辑器仍然可用（重新练习）
+        self.assertIn('提交批阅', body)
+
+    def test_result_page_shows_cases_quality_and_retry(self):
+        PracticeCase.objects.create(
+            problem=self.problem,
+            order=1,
+            input_path=save_private('[1,2,3]'),
+            output_path=save_private('{"type":"list","items":[]}'),
+            is_sample=True,
+        )
+        attempt = PracticeAttempt.objects.create(
+            problem=self.problem,
+            student=self.student,
+            code_path=save_private('def f():\n    return []\n', suffix='.py'),
+            score=50.0,
+            passed_cases=1,
+            total_cases=2,
+            verdict='WA',
+        )
+        PracticeCaseResult.objects.create(
+            attempt=attempt,
+            order=1,
+            verdict='AC',
+            elapsed_ms=9,
+            actual_output='{"type":"list","items":[]}',
+        )
+        PracticeCaseResult.objects.create(
+            attempt=attempt,
+            order=2,
+            verdict='WA',
+            elapsed_ms=7,
+        )
+        quality = {
+            'total': 88.4,
+            'grade': 'B',
+            'note': '使用内置默认量表',
+            'scores': {'knowledge': 90.0},
+            'dimension_labels': {'knowledge': '知识点覆盖'},
+            'tasks': [
+                {
+                    'function': 'func0402',
+                    'title': '列表切片四连击',
+                    'parsed': True,
+                    'covered': ['列表/切片'],
+                    'missing': [],
+                    'issues': [
+                        {'line': '2', 'message': '缺少实现', 'advice': '补全函数体'}
+                    ],
+                }
+            ],
+            'style_notes': [],
+        }
+        self.client.force_login(self.student)
+        with mock.patch.object(
+            practice_agent, 'analyze_attempt_quality', return_value=quality
+        ):
+            response = self.client.get(reverse('practice_result', args=[attempt.pk]))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode('utf-8')
+        self.assertIn('测试用例批阅明细', body)
+        self.assertIn('代码质量分析', body)
+        self.assertIn('重新练习', body)
+        self.assertIn('知识点覆盖', body)
+        self.assertIn('补全函数体', body)
+        # 样例用例展示输入/期望/实际
+        self.assertIn('[1,2,3]', body)
+
 
 class QuestionBankTests(TestCase):
-    """分层题库文档（Python题库.md）解析与选题测试。"""
+    """分层题库文档（Python题库.md，函数式批阅包）解析与选题测试。"""
 
     def test_load_bank_parses_all_questions(self):
         bank = question_bank.load_bank()
@@ -589,23 +794,55 @@ class QuestionBankTests(TestCase):
             self.assertTrue(question['title'])
             self.assertTrue(question['statement'])
             self.assertTrue(question['tags'])
-            self.assertTrue(question['reference_code'])
+            self.assertTrue(question['function_name'])
+            self.assertGreaterEqual(question['function_argc'], 1)
+            # 函数框架与标准答案都是合法 Python 函数定义
+            ast.parse(question['template_code'])
+            ast.parse(question['reference_code'])
             self.assertGreaterEqual(len(question['cases']), 3)
             for case in question['cases']:
                 self.assertTrue(case['input'])
-                self.assertTrue(case['output'])
+                packed = json.loads(case['output'])
+                self.assertIn('type', packed)
 
     def test_parse_sample_question_details(self):
         bank = {q['code']: q for q in question_bank.load_bank()}
         question = bank['Q4-02']
         self.assertEqual(question['title'], 'Q4-02 列表切片四连击')
         self.assertEqual(question['difficulty'], '进阶')
+        self.assertEqual(question['function_name'], 'func0402')
+        self.assertEqual(question['function_argc'], 1)
+        self.assertIn('def func0402(nums):', question['template_code'])
+        self.assertIn('TODO', question['template_code'])
+        self.assertIn('nums[::-1]', question['reference_code'])
         self.assertIn('列表/切片', question['tags'])
         self.assertEqual(len(question['cases']), 10)
         self.assertTrue(question['cases'][0]['is_sample'])
         self.assertFalse(question['cases'][1]['is_sample'])
-        self.assertIn('nums[::-1]', question['reference_code'])
-        self.assertEqual(question['cases'][0]['input'], '1,2,3,4,5')
+        self.assertEqual(question['cases'][0]['input'], '[1,2,3,4,5]')
+        expected = json.loads(question['cases'][0]['output'])
+        self.assertEqual(expected['type'], 'list')
+        # 期望值 [整体反转, 偶数下标, 前三个, 最后两个] 的第一项首元素是 5
+        first_reversed = expected['items'][0]['items']
+        self.assertEqual(first_reversed[0]['value'], 5)
+
+    def test_parse_multi_argument_function(self):
+        bank = {q['code']: q for q in question_bank.load_bank()}
+        question = bank['Q1-04']
+        self.assertEqual(question['function_argc'], 2)
+
+    def test_pack_value_matches_judge_convention(self):
+        self.assertEqual(question_bank.pack_value(None), {'type': 'none'})
+        self.assertEqual(question_bank.pack_value(True), {'type': 'bool', 'value': True})
+        self.assertEqual(question_bank.pack_value((1, 2.5)), {
+            'type': 'tuple',
+            'items': [{'type': 'int', 'value': 1}, {'type': 'float', 'value': 2.5}],
+        })
+        packed_set = question_bank.pack_value({3, 1})
+        self.assertEqual(packed_set['type'], 'set')
+        self.assertEqual(
+            [item['value'] for item in packed_set['items']], [1, 3]
+        )
 
     def test_find_questions_prefers_specific_tags(self):
         matched = [q['code'] for q in question_bank.find_questions('列表切片')]

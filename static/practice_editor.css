@@ -1,0 +1,87 @@
+/* 训练题代码编辑器：行号、语法高亮、Tab 缩进。无外部依赖，离线可用。 */
+.code-editor {
+  display: flex;
+  border: 1px solid #2a323d;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #12161d;
+  font-family: Consolas, "JetBrains Mono", "Courier New", monospace;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.code-gutter {
+  flex: 0 0 auto;
+  padding: 12px 10px 12px 14px;
+  text-align: right;
+  color: #56606e;
+  background: #0d1117;
+  white-space: pre;
+  user-select: none;
+  min-width: 3.2em;
+}
+
+.code-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.code-highlight,
+textarea.code-input {
+  margin: 0;
+  border: 0;
+  padding: 12px;
+  font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 4;
+}
+
+.code-highlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #cdd7e4;
+  background: transparent;
+}
+
+.code-highlight code {
+  font: inherit;
+  display: block;
+}
+
+textarea.code-input {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 340px;
+  resize: vertical;
+  background: transparent;
+  color: transparent;
+  caret-color: #eef3fa;
+  outline: none;
+  border-radius: 0;
+}
+
+textarea.code-input:focus {
+  outline: none;
+}
+
+.code-editor:focus-within {
+  border-color: #3d5a80;
+}
+
+/* 语法高亮配色 */
+.tok-com  { color: #5f7280; font-style: italic; }
+.tok-str  { color: #9ece6a; }
+.tok-kw   { color: #bb9af7; }
+.tok-def  { color: #7aa2f7; font-weight: 600; }
+.tok-bi   { color: #7dcfff; }
+.tok-num  { color: #ff9e64; }
+
+@media (max-width: 640px) {
+  .code-gutter { display: none; }
+}

@@ -359,10 +359,13 @@ class PracticeProblem(models.Model):
     knowledge_point = models.CharField('目标知识点', max_length=100)
     title = models.CharField('标题', max_length=120)
     statement = models.TextField('题面')
-    template_code = models.TextField('初始代码', blank=True)
+    template_code = models.TextField('初始代码（编辑器预填的函数框架）', blank=True)
     reference_code = models.TextField('参考答案（学生不可见）', blank=True)
     explanation = models.TextField('解析（学生不可见）', blank=True)
     difficulty = models.CharField('难度', max_length=8, choices=DIFFICULTIES, default='基础')
+    # 函数式题（分层题库文档）：批阅调用该函数比对返回值，为空时走 stdin/stdout 判题。
+    function_name = models.CharField('判定函数名', max_length=60, blank=True)
+    function_argc = models.PositiveSmallIntegerField('函数参数个数', null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
     time_ms = models.PositiveIntegerField('时间限制（毫秒）', default=2000)
     memory_mb = models.PositiveIntegerField('内存限制（MB）', default=128)
@@ -416,6 +419,7 @@ class PracticeAttempt(models.Model):
     passed_cases = models.PositiveIntegerField(default=0)
     total_cases = models.PositiveIntegerField(default=0)
     verdict = models.CharField(max_length=20, default='PENDING')
+    quality = models.JSONField('代码质量分析（缓存）', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     finished_at = models.DateTimeField(null=True)
 
@@ -423,3 +427,26 @@ class PracticeAttempt(models.Model):
         verbose_name = '训练题提交'
         verbose_name_plural = '训练题提交'
         ordering = ['-created_at', '-pk']
+
+
+class PracticeCaseResult(models.Model):
+    """训练题逐用例批阅明细：结果、耗时与学生返回值/输出。"""
+
+    attempt = models.ForeignKey(
+        PracticeAttempt, on_delete=models.CASCADE, related_name='case_results'
+    )
+    order = models.PositiveIntegerField()
+    verdict = models.CharField(max_length=20, default='PENDING')
+    elapsed_ms = models.PositiveIntegerField(default=0)
+    actual_output = models.TextField('学生返回值或输出', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = '训练题用例结果'
+        verbose_name_plural = '训练题用例结果'
+        ordering = ['order']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['attempt', 'order'], name='practice_case_result_order_unique'
+            )
+        ]
