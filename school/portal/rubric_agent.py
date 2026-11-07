@@ -21,6 +21,7 @@ from django.utils import timezone
 from school.course_models import CourseworkRubric
 
 from tools.code_quality_agent import curriculum
+from tools.code_quality_agent import models as agent_models
 
 PROMPT_VERSION = 'v1'
 
@@ -41,6 +42,48 @@ DEFAULT_WEIGHTS = {
     'structure': 5,
     'readability': 10,
 }
+
+# 雷达图的 6 个主能力：由“作业考察的知识点”归纳而来，每项绑定一个评分维度，
+# 从而既能换轴名，又能直接用该维度的分数作图。
+# (能力名, 绑定维度 key, 说明, 归类关键词)
+ABILITY_RULES: tuple[tuple[str, str, str, str], ...] = (
+    (
+        '数据组织与容器操作',
+        'knowledge',
+        '列表、字典、集合、元组、切片、排序与去重等数据结构操作',
+        '列表 字典 集合 元组 切片 索引 排序 去重 保序 二维 键值 插入 合并 反转 队列 栈',
+    ),
+    (
+        '流程控制与分支循环',
+        'logic',
+        '条件分支、循环遍历、累加计数与多分支返回',
+        '循环 for while 分支 条件 判断 遍历 计数 累加 嵌套 枚举 阶梯 统计 分类 范围',
+    ),
+    (
+        '字符串与内置方法',
+        'syntax',
+        '字符串处理、类型与进制转换、常用内置函数',
+        '字符串 字符 ASCII 编码 进制 转换 内置 格式化 拼接 split join len max min',
+    ),
+    (
+        '函数设计与结构',
+        'structure',
+        '函数定义、参数与返回值、职责拆分与结构组织',
+        '函数 封装 返回值 参数 结构 模块 调用 定义',
+    ),
+    (
+        '边界与异常处理',
+        'boundary',
+        '空列表、越界、非法输入与特殊值等边界情况',
+        '边界 健壮 鲁棒 异常 空列表 越界 特殊值 非法 合法性',
+    ),
+    (
+        '规范与可读性',
+        'readability',
+        '命名、注释、缩进与代码风格',
+        '命名 注释 缩进 规范 可读 风格 格式',
+    ),
+)
 
 LEVEL_TEXT = {
     'knowledge': (
@@ -91,6 +134,10 @@ JSON_SCHEMA_HINT = """{
   "knowledge_points": [
     {"name": "列表切片", "detail": "1 起始计数换算为 0 起始下标", "tasks": ["func301"]}
   ],
+  "abilities": [
+    {"label": "数据组织与容器操作", "detail": "列表、切片与排序等容器操作",
+     "dimension": "knowledge", "points": ["列表切片"]}
+  ],
   "dimensions": [
     {"key": "knowledge", "label": "知识点覆盖", "weight": 25,
      "five": "5 分表现", "four": "4 分表现", "three": "3 分表现",
@@ -110,6 +157,17 @@ class LLMError(RuntimeError):
 
 class RubricParseError(ValueError):
     """模型返回内容无法解析成合法评分标准。"""
+
+
+def default_dimensions() -> list[agent_models.Dimension]:
+    """没有作业评分标准时的兜底维度：与题目分析智能体的 6 个维度一致。
+
+    不再读取仓库里的通用量表文件，避免所有作业共用同一套维度。
+    """
+    return [
+        agent_models.Dimension(key, label, DEFAULT_WEIGHTS[key] / 100)
+        for key, label in DIMENSION_POOL.items()
+    ]
 
 
 def llm_configured() -> bool:
@@ -151,15 +209,17 @@ def build_messages(context: dict[str, Any]) -> list[dict[str, str]]:
 
 任务：
 1. 分析这道作业考察以及涉及的知识点，逐条写清楚，并标注涉及哪些函数题；
-2. 生成 5 分制评分量表，维度控制在 6 个，key 必须从下列维度池中选择且不重复：
-   {dimension_lines}
-3. 权重合计必须等于 100；
-4. 每个维度的 5/4/3/2/1 分描述要能直接据此判断学生代码，不使用“较好”“一般”这类空话；
-5. markdown 必须包含两节，表头固定：
+2. 评分维度池（key（中文名））：{dimension_lines}。生成 5 分制评分量表时，维度控制在 6 个，key 必须从该池中选择且不重复；
+3. 从第 1 步的知识点中归纳 6 个主能力，作为雷达图的 6 根轴：每个能力给出名称、说明、涵盖的知识点名称，并从维度池中各选一个 key（6 个能力互不重复），该能力的分数取所绑定维度的分数；
+4. 权重合计必须等于 100；
+5. 每个维度的 5/4/3/2/1 分描述要能直接据此判断学生代码，不使用“较好”“一般”这类空话；
+6. markdown 必须包含三节，表头固定：
    ## 一、作业考察的知识点
    （表格列：序号 | 知识点 | 说明 | 涉及题目）
    ## 二、5 分制量表
    （表格列：维度 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分）
+   ## 三、主能力（雷达图维度）
+   （表格列：主能力 | 对应评分维度 | 涵盖知识点）
 
 输出 JSON，结构如下：
 {JSON_SCHEMA_HINT}
@@ -274,7 +334,77 @@ def normalize_points(raw: Any) -> list[dict[str, Any]]:
     return points[:20]
 
 
-def render_markdown(context: dict[str, Any], points: list[dict], dimensions: list[dict]) -> str:
+def rule_abilities(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """按关键词把知识点归到 6 个主能力。
+
+    每个能力绑定一个评分维度，保证雷达图始终是 6 根轴；没有大模型时用它兜底，
+    旧评分标准（没有 abilities 字段）也按同样规则在出报告时补算。
+    """
+    grouped: dict[str, list[str]] = {label: [] for label, _, _, _ in ABILITY_RULES}
+    for point in points:
+        text = f"{point.get('name', '')} {point.get('detail', '')}"
+        for label, _, _, keywords in ABILITY_RULES:
+            if any(word in text for word in keywords.split()):
+                grouped[label].append(str(point.get('name', '')).strip())
+                break
+    abilities = []
+    for label, dimension, detail, _ in ABILITY_RULES:
+        covered = [name for name in grouped[label] if name]
+        abilities.append(
+            {
+                'label': label,
+                'detail': detail,
+                'dimension': dimension,
+                'points': covered,
+            }
+        )
+    return abilities
+
+
+def normalize_abilities(
+    raw: Any,
+    points: list[dict[str, Any]],
+    allowed: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    """校验模型给出的 6 个主能力；不足 6 个或维度重复时退回规则归类。"""
+    if not isinstance(raw, list):
+        return rule_abilities(points)
+    allowed = allowed or set(DIMENSION_POOL)
+    abilities: list[dict[str, Any]] = []
+    used: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get('label', '')).strip()
+        dimension = str(item.get('dimension', '')).strip()
+        if not label or dimension not in allowed or dimension in used:
+            continue
+        used.add(dimension)
+        abilities.append(
+            {
+                'label': label,
+                'detail': str(item.get('detail', '')).strip(),
+                'dimension': dimension,
+                'points': [
+                    str(name).strip()
+                    for name in item.get('points') or []
+                    if str(name).strip()
+                ][:8],
+            }
+        )
+        if len(abilities) == 6:
+            break
+    if len(abilities) < 6:
+        return rule_abilities(points)
+    return abilities
+
+
+def render_markdown(
+    context: dict[str, Any],
+    points: list[dict],
+    dimensions: list[dict],
+    abilities: list[dict],
+) -> str:
     lines = [
         f"# {context['title']} · 评分标准",
         '',
@@ -307,8 +437,22 @@ def render_markdown(context: dict[str, Any], points: list[dict], dimensions: lis
     lines.extend(
         [
             '',
+            '## 三、主能力（雷达图维度）',
+            '',
+            '| 主能力 | 对应评分维度 | 涵盖知识点 |',
+            '| --- | --- | --- |',
+        ]
+    )
+    for ability in abilities:
+        covered = '、'.join(ability.get('points') or []) or '全部知识点'
+        dimension = ability.get('dimension', '')
+        label = DIMENSION_POOL.get(dimension, dimension)
+        lines.append(f"| {ability.get('label', '')} | {label} | {covered} |")
+    lines.extend(
+        [
+            '',
             '> 评分说明：5 分制按维度打分，换算为百分制后按权重加权求和；'
-            '雷达图各轴即本表维度。',
+            '雷达图各轴为“主能力”，分数取所绑定评分维度的得分。',
         ]
     )
     return '\n'.join(lines) + '\n'
@@ -322,10 +466,20 @@ def parse_response(text: str, context: dict[str, Any]) -> dict[str, Any]:
     if not points:
         raise RubricParseError('模型没有给出任何知识点。')
     dimensions = normalize_dimensions(data.get('dimensions'))
+    abilities = normalize_abilities(data.get('abilities'), points)
     markdown = str(data.get('markdown', '')).strip()
-    if '5 分制量表' not in markdown or '知识点' not in markdown:
-        markdown = render_markdown(context, points, dimensions)
-    return {'points': points, 'dimensions': dimensions, 'markdown': markdown}
+    if (
+        '5 分制量表' not in markdown
+        or '知识点' not in markdown
+        or '主能力' not in markdown
+    ):
+        markdown = render_markdown(context, points, dimensions, abilities)
+    return {
+        'points': points,
+        'abilities': abilities,
+        'dimensions': dimensions,
+        'markdown': markdown,
+    }
 
 
 def rule_based(context: dict[str, Any]) -> dict[str, Any]:
@@ -372,10 +526,12 @@ def rule_based(context: dict[str, Any]) -> dict[str, Any]:
                 'levels': levels,
             }
         )
+    abilities = rule_abilities(points)
     return {
         'points': points,
+        'abilities': abilities,
         'dimensions': dimensions,
-        'markdown': render_markdown(context, points, dimensions),
+        'markdown': render_markdown(context, points, dimensions, abilities),
     }
 
 
@@ -389,6 +545,63 @@ def ensure_heading(markdown: str, context: dict[str, Any]) -> str:
         f"> 题量：{len(context['items'])} 题 · 批阅方式：{context['grading_mode']}\n\n"
     )
     return heading + text + '\n'
+
+
+def build_ability_messages(
+    context: dict[str, Any],
+    points: list[dict[str, Any]],
+    dimension_keys: list[str],
+) -> list[dict[str, str]]:
+    system = (
+        '你是高校 Python 课程助教，负责把作业考察的知识点归纳成雷达图的主能力。'
+        '只输出 JSON，不要解释。'
+    )
+    user = f"""作业：{context['title']}
+考察知识点：
+{json.dumps(points, ensure_ascii=False)}
+可用评分维度 key：{'、'.join(dimension_keys)}
+
+请把这些知识点归纳成 6 个主能力，作为雷达图的 6 根轴：
+1. label 不超过 8 个汉字，要体现这道作业的具体内容，不要写“综合能力”；
+2. points 填属于该能力的知识点名称；
+3. dimension 从可用 key 中各选一个，6 个互不重复。
+
+输出 JSON：
+{{"abilities": [{{"label": "字符串进制转换", "detail": "……", "dimension": "syntax", "points": ["……"]}}]}}
+"""
+    return [
+        {'role': 'system', 'content': system},
+        {'role': 'user', 'content': user},
+    ]
+
+
+def generate_abilities(coursework, offline: bool = False) -> list[dict[str, Any]]:
+    """按该任务已有的考察知识点重新归纳 6 个主能力并存库。
+
+    只更新 abilities，不改动教师确认过的量表与知识点。
+    """
+    rubric = getattr(coursework, 'rubric', None)
+    if rubric is None:
+        raise RubricParseError('该作业还没有评分标准，无法归纳主能力。')
+    points = rubric.knowledge_points or []
+    if not points:
+        raise RubricParseError('该作业的评分标准没有知识点。')
+    keys = [
+        str(item.get('key'))
+        for item in rubric.dimensions or []
+        if isinstance(item, dict) and item.get('key')
+    ]
+    allowed = set(keys) or set(DIMENSION_POOL)
+    if offline or not llm_configured():
+        abilities = rule_abilities(points)
+    else:
+        context = coursework_context(coursework)
+        text = chat(build_ability_messages(context, points, sorted(allowed)))
+        data = json.loads(_extract_json(text))
+        abilities = normalize_abilities(data.get('abilities'), points, allowed)
+    CourseworkRubric.objects.filter(pk=rubric.pk).update(abilities=abilities)
+    rubric.abilities = abilities
+    return abilities
 
 
 def generate_for(coursework, offline: bool = False, force: bool = True) -> CourseworkRubric:
@@ -419,6 +632,7 @@ def generate_for(coursework, offline: bool = False, force: bool = True) -> Cours
             'markdown': ensure_heading(result['markdown'], context),
             'knowledge_points': result['points'],
             'dimensions': result['dimensions'],
+            'abilities': result['abilities'],
             'source': source,
             'model': model,
             'prompt_version': PROMPT_VERSION,

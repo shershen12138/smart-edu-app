@@ -1,8 +1,7 @@
-"""雷达图：每个学生一张，维度取评分量表的每一项。"""
+"""雷达图：轴取报告的主能力（或评分维度），值为对应得分。"""
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import matplotlib
@@ -22,11 +21,6 @@ plt.rcParams["font.sans-serif"] = [
     "DejaVu Sans",
 ]
 plt.rcParams["axes.unicode_minus"] = False
-
-
-def student_slug(name: str, index: int) -> str:
-    digits = re.sub(r"\D", "", name)
-    return f"student{digits}" if digits else f"student{index:02d}"
 
 
 def render(
