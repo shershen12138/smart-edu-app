@@ -4,13 +4,13 @@
 
 **这是已有环境的更新器，不是新电脑安装器。** 同学第一次在自己的电脑上测试，请看 [新电脑安装与测试](../../docs/GETTING_STARTED.md)。源码不含 Docker 安装程序、原始离线镜像或老师私有题目包。
 
-Gitee 的 `codex/simplified-coursework` 分支已包含本目录全部文件。单独发送的 `Ubuntu24更新包_20261006_*.zip` 也是该分支某次提交的源码快照，两者选一份使用即可；想要后续最新修改，以 Gitee 最新提交为准。安装教程等文档后续更新后，不会自动改变已经下载的旧 ZIP。
+当前仓库分支（`main`）已包含本目录全部文件。单独发送的 `Ubuntu24更新包_20261006_*.zip` 也是某次提交的源码快照，两者选一份使用即可；想要后续最新修改，以仓库最新提交为准。安装教程等文档后续更新后，不会自动改变已经下载的旧 ZIP。
 
 ## 在哪里运行
 
 以下操作全部在**实验室 Ubuntu 部署电脑的终端**执行。
 
-1. 从 Gitee 下载 `codex/simplified-coursework` 分支的最新源码 ZIP，解压。
+1. 从仓库下载当前分支（`main`）的最新源码 ZIP，解压。
 2. 打开解压后的源码文件夹：里面应该同时看到 `manage.py`、`school` 和 `deploy`。
 3. 在该文件夹空白处右键，选择“在终端打开”。先确认位置：
 
@@ -31,6 +31,15 @@ Gitee 的 `codex/simplified-coursework` 分支已包含本目录全部文件。�
 如果已经克隆过仓库，先在源码目录运行 `git pull --ff-only`，再执行第 4 步。源码 ZIP 无需安装 Git。下载来的目录与 `/opt/coursejudge` 是两个目录，请不要用源码覆盖原部署目录。
 
 更新前可在该终端执行 `sudo test -f /opt/coursejudge/.env && echo 原配置存在` 以及 `sudo docker version --format '{{.Server.Os}}'`，应看到配置存在和 `linux`。若缺少原目录或镜像，先核对是不是操作错电脑；不要用账号初始化或空数据库替代原环境。确认 `/opt/coursejudge` 所在磁盘有空间保存本次数据库和全部上传文件的备份。
+
+## 本目录每个文件做什么
+
+| 文件 | 功能 | 实现方式 |
+| --- | --- | --- |
+| `update.sh` | 校园版一键更新 | Bash 脚本，按顺序执行：校验 `/opt/coursejudge` 与 `common.sh` → 取 Git 短版本号 → 以现场运行中的镜像为 `BASE_IMAGE` 构建 `Dockerfile.update`（**不重新下载 Python 依赖**）→ 加更新锁并写 `.paused` → 起 db/redis → 备份（`mysqldump`、私有文件卷打包、`.env`/`compose.yaml`/`VERSION.txt` 与 `SHA256SUMS`）→ 停 web/worker/beat → 覆盖 compose 与 `.env` 里的镜像变量 → `migrate` / `check` / `purge_deleted_data --apply --offline` → 同步 `config`、`school`、`templates`、`static`、`manage.py` 到 `/opt/coursejudge/app` 并刷新校验清单 → 启动站点 |
+| `compose.yaml` | 现场服务编排 | MySQL 8.4 + Redis + web + worker（挂载 `docker.sock` 以便起批阅容器）+ beat；私有文件用外部卷 `<stack>_private`；统一 `DJANGO_SETTINGS_MODULE=config.campus_settings`。镜像标签由 `.env` 的 `COURSEJUDGE_*_IMAGE` 覆盖，compose 内写死的标签只是回退值 |
+| `Dockerfile.update` | 基于现网镜像的增量镜像 | 以 `BASE_IMAGE` 为基础，仅 `COPY` 更新后的代码并跑 `collectstatic`；用 `RUN_USER` 参数区分 web（10001）与 worker（0），避免现场重新装依赖 |
+| `README.md` | 本文件 | 面向已部署机的操作手册，与 `docs/DEPLOYMENT.md`（首次部署）职责不同 |
 
 ## 脚本会做什么
 

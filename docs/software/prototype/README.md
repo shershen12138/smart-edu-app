@@ -16,15 +16,15 @@
 
 ## 文件结构
 
-| 文件 | 说明 |
-| --- | --- |
-| `index.html` | 原型首页：角色入口、可交互点清单、与真实实现的对应关系 |
-| `login.html` | 登录与首次登录强制改密流程 |
-| `admin.html` | 管理员端：账号、教学班、名单导入、数据字典、归档 |
-| `teacher.html` | 教师端：作业列表与创建、提交记录与逐题评分、评分量规与质量报告 |
-| `student.html` | 学生端：作业列表、提交、结果、我的质量报告 |
-| `assets/prototype.css` | 原型样式，沿用站点 `static/app.css` 的设计令牌（墨绿主色、同色系灰阶） |
-| `assets/prototype.js` | 示例数据与交互逻辑：分页、弹窗、Tab、Toast、雷达图、评分计算 |
+| 文件 | 说明 | 实现方式 |
+| --- | --- | --- |
+| `index.html` | 原型首页：角色入口、可交互点清单、与真实实现的对应关系 | 纯静态页，四张角色卡片链到对应 HTML；对照表手写维护 |
+| `login.html` | 登录与首次登录强制改密流程 | 两个 `<section>` 用 `hidden` 切换；`initLogin()` 绑定提交拦截、长度与一致性校验 |
+| `admin.html` | 管理员端：账号、教学班、名单导入、数据字典、归档 | 表格由 `renderRoster()` 从 `DATA.roster` 渲染；分页、启停、删除二次确认、导入预览都用同一份内存数组重绘 |
+| `teacher.html` | 教师端：作业列表与创建、提交记录与逐题评分、评分量规 | `initTeacher()` 管批阅方式联动；评分滑块 `input` 事件实时累加；量规页 `drawRadar()` 用 canvas 按六维得分重绘 |
+| `student.html` | 学生端：作业列表、提交、结果、我的质量报告 | `initStudent()` 按扩展名/文件数量做前端校验；进度条是 `setInterval` 模拟，页面已标注不代表真实批阅 |
+| `assets/prototype.css` | 原型样式，沿用站点 `static/app.css` 的设计令牌（墨绿主色、同色系灰阶） | 原生 CSS 变量 + Grid/Flex，无框架、无 CDN |
+| `assets/prototype.js` | 示例数据与交互逻辑：分页、弹窗、Tab、Toast、雷达图、评分计算 | 单个 `DATA` 对象存示例数据，各页 `init*()` 初始化；无网络请求、无持久化 |
 
 ## 可交互点清单
 
@@ -58,13 +58,14 @@
 
 ## 与真实实现的关系
 
-| 原型页面 | 真实实现位置 |
-| --- | --- |
-| `login.html` | `templates/school/login.html`、`school/views.py` |
-| `admin.html` | `school/portal/administration_views.py`、`templates/portal/` |
-| `teacher.html` | `school/portal/learning_views.py`、`rubric_views.py`、`quality_views.py` |
-| `student.html` | `school/portal/learning_views.py`、`templates/portal/work.html` |
-| 六维量规与雷达图 | `school/portal/rubric_agent.py`、`tools/code_quality_agent/` |
+| 原型页面 | 真实实现位置 | 说明 |
+| --- | --- | --- |
+| `login.html` | `templates/school/login.html`、`school/views.py`（`login_view`/`password_view`） | 登录页仍用旧模板目录；当前路由在 `config/urls.py` |
+| `admin.html` | `school/portal/administration_views.py` + `admin_forms.py`、`templates/portal/` | 每个视图首行 `require_role(user, 'admin')` |
+| `teacher.html` | `school/portal/teaching_views.py` + `teaching_forms.py`、`coursework_services.py`、`reporting_services.py` | 作业列表、创建、结果与 CSV 导出都在 `teaching_views.py` |
+| `student.html` | `school/portal/learning_views.py`、`templates/portal/work.html` | 提交与结果页；`entry_detail` 同时是教师人工批阅入口 |
+| 逐题评分（教师） | `learning_views.entry_detail` + `ManualReviewForm`、`submission_services.review_manual_submission` | 与原型“滑块合计分”对应，真实实现按题目动态生成分数与评语字段 |
+| 六维量规与雷达图 | `school/portal/rubric_agent.py`（生成量规与主能力）、`quality_views.py`（报告页/雷达 PNG）、`tools/code_quality_agent/`（评测与绘图） | 质量报告挂在学生与教师共用的 `entry` 页，不是教师端专属 |
 
 真实系统的机器批阅依赖 Docker Linux 引擎与题目包，由 `manage.py run_judge` 工作进程完成；原型只演示界面与交互流程，任何成绩与进度都不具备真实含义。
 

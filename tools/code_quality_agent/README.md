@@ -159,6 +159,23 @@ LLM 是可选扩展点：图本身不调用大模型，所有结论来自 AST �
 题库包放在仓库根目录的 `exercise requirements/`（`func_info_list.txt`、`*习题说明.docx`、`gold.py`、`data/funcXxx.txt`），
 由 `school/management/commands/import_course_packages.py` 导入数据库；网页端只读数据库里的题目与参考答案。
 
+## 与标签库、题库、评分标准的衔接
+
+本目录只做“源码 → 缺陷与得分”，其余环节在其他模块：
+
+| 环节 | 负责模块 | 实现方式 |
+| --- | --- | --- |
+| 知识点词表 | `tools/taglib/loader.py` | 解析根目录 `Python教学Tag库_v1.0.md`，`normalize_tag()` 先精确后包含匹配做归一 |
+| 考点检测器 | 本目录 `static_analysis.KNOWLEDGE_DETECTORS` | key 与 `curriculum.POINT_LABELS` 一一对应；新增标签必须两边同时登记，否则永远检测不到 |
+| 题目/Tag 反查 | `tools/taglib/loader.py`（`qbank_by_tag`）、`school/portal/question_bank.py` | 读 `qbank-tags-v2.json` 与 `Python题库.md`，供弱项练习按 Tag 选题 |
+| 评分标准与六主能力 | `school/portal/rubric_agent.py` | 大模型按题目与参考答案产出维度与主能力，无 Key 时用 `ast` 规则兜底，写入 `CourseworkRubric` |
+| 报告生成与缓存 | `school/portal/quality_service.py` | 源码 sha256 + 量表/知识点/能力签名一致才复用旧 `QualityReport`，否则后台线程重算 |
+
+注意：根目录隐藏目录 `.qbank/` 与 `tools/taglib/` **同名不同物，不要混用**：
+
+- `.qbank/spec_a~c.py` 是**题目**规格，`.qbank/build.py` 由它生成 `Python题库.md` 和 `qbank-package/`，是这两个文件的唯一生成器，`Python题库.md:3090` 的维护说明仍指向它。
+- `tools/taglib/spec_a~c.py` 是**标签词表**规格，`tools/taglib/build.py` 只生成标签库文档与 `tags.json`，不产出题库。
+
 ## 环境准备
 
 需要 Python 3.12 或更高版本，以及两个第三方库：`pylint`（静态检查）与 `matplotlib`（雷达图）。
