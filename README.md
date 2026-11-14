@@ -177,7 +177,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 | `school/portal/urls_common.py` | 仪表盘、个人设置、大模型配置 | 四个路由模块都用 `path('', include(...))` 平铺到根路径，**没有 namespace**，URL name 全局唯一 |
 | `school/portal/urls_administration.py` | 管理员页面 | `teachers/` 与 `students/` 复用同一个 `people` 视图，靠传 `{'kind': ...}` 区分；`work_export` 是 `work_results` 带 `{'export': True}` 的别名路由 |
 | `school/portal/urls_teaching.py` | 教师端作业、结果、导出 | 作业 CRUD、`work/<pk>/package-file/`、`submissions.zip`、`results/` |
-| `school/portal/urls_learning.py` | 学生端提交与结果页 | `work/<pk>/`、`entries/<pk>/`、质量报告与雷达图 |
+| `school/portal/urls_learning.py` | 学生端提交、结果与知识图谱 | `knowledge/`（知识图谱）、`practice/`（弱项练习）、`work/<pk>/`、`entries/<pk>/`、质量报告与雷达图 |
 | `config/legacy_urls.py` | 旧门户 50 条路由 | 不被任何 URLconf `include`；只有 3 个测试模块用 `override_settings(ROOT_URLCONF='config.legacy_urls')` 打开 |
 
 ### 数据层
@@ -220,6 +220,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 | `school/portal/quality_views.py` | 代码质量报告 | 报告页、雷达图 PNG、Markdown 下载；鉴权集中在 `_entry_for`，文件直接流式读私有存储 |
 | `school/portal/rubric_views.py` | 评分标准页 | 只读展示与 `.md` 下载；历史作业用规则兜底补一份，不调用大模型 |
 | `school/portal/practice_views.py` | 弱项练习 | 首页、答题、提交、结果；提交后**同步**调用 `practice_agent.grade_attempt()` 走 Docker 判题 |
+| `school/portal/knowledge_views.py` | Python 知识图谱（仅学生） | `require_role(user, 'student')`；`knowledge_graph.build_graph()` 读 `data/python_graph.json` 并计算放射布局坐标，模板用 ECharts 渲染，支持放射/力导向双布局 |
 | `school/portal/llm_views.py` | 个人大模型配置 | 保存/清除只作用于当前用户；跳转用 `url_has_allowed_host_and_scheme` 防开放重定向 |
 
 ### 业务服务层
@@ -256,7 +257,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 | 位置 | 功能 | 实现方式 |
 | --- | --- | --- |
 | `templates/portal/` | 三端 21 个页面 | `base.html` + 通用件 `form/table/pagination/confirm` + 业务页；模板继承渲染，**没有前端构建步骤** |
-| `static/app.css`、`static/portal.js` | 站点样式与三端交互 | 原生 CSS 设计令牌 + 少量原生 JS；`practice_editor.*` 是练习代码编辑器 |
+| `static/app.css`、`static/portal.js` | 站点样式与三端交互 | 原生 CSS 设计令牌 + 少量原生 JS；`practice_editor.*` 是练习代码编辑器，`vendor/echarts.min.js` 供知识图谱绘图 |
 | `templates/school/`、`templates/403.html`、`templates/404.html` | 旧门户模板 | 只有 `login.html`、`form.html`、`base.html` 仍被当前登录页使用，其余随旧视图废弃 |
 
 ### 命令行
