@@ -1,8 +1,9 @@
 """题目分析智能体：把教师上传的题目交给大模型，产出可执行的评分标准。
 
 设计边界：
-- 只在配置了 OpenAI 兼容端点时调用模型；未配置时抛 LLMNotConfigured，
-  需要演示或离线运行时必须显式 `offline=True`，结果标记为“规则兜底”；
+- 只使用**当前教师自己配置**的 OpenAI 兼容端点（见 llm_client / 大模型配置弹窗）；
+  未配置时抛 LLMNotConfigured，需要演示或离线运行时必须显式 `offline=True`，
+  结果标记为“规则兜底”；
 - 模型输出必须落到固定维度池，避免每次生成不同维度导致雷达图无法比较；
 - 生成结果保存到数据库（CourseworkRubric），同时供质量评测读取。
 """
@@ -14,11 +15,8 @@ import json
 import logging
 import re
 import threading
-import urllib.error
-import urllib.request
 from typing import Any
 
-from django.conf import settings
 from django.db import close_old_connections, transaction
 from django.utils import timezone
 
@@ -29,6 +27,9 @@ from tools.code_quality_agent import curriculum
 from tools.code_quality_agent import models as agent_models
 from tools.code_quality_agent import static_analysis
 from tools.taglib import loader as taglib
+
+from . import llm_client
+from .llm_client import LLMConfigError, LLMError, LLMNotConfigured  # noqa: F401  (兼容旧导入)
 
 logger = logging.getLogger(__name__)
 
@@ -167,14 +168,6 @@ def _tag_vocabulary() -> str:
     return '\n'.join(lines)
 
 
-class LLMNotConfigured(RuntimeError):
-    """没有可用的模型端点或密钥。"""
-
-
-class LLMError(RuntimeError):
-    """端点调用失败。"""
-
-
 class RubricParseError(ValueError):
     """模型返回内容无法解析成合法评分标准。"""
 
@@ -190,14 +183,14 @@ def default_dimensions() -> list[agent_models.Dimension]:
     ]
 
 
-def llm_configured() -> bool:
-    return bool(settings.LLM_BASE_URL and settings.LLM_API_KEY and settings.LLM_MODEL)
+def llm_configured(user=None) -> bool:
+    """当前操作用户是否已配置自己的大模型端点。"""
+    return llm_client.configured(user)
 
 
-def llm_status() -> str:
-    if llm_configured():
-        return f'已配置：{settings.LLM_MODEL} @ {settings.LLM_BASE_URL}'
-    return '未配置 LLM_BASE_URL / LLM_API_KEY / LLM_MODEL，只能使用规则兜底'
+def llm_status(user=None) -> str:
+    """页面展示用的个人配置状态说明（Key 打码）。"""
+    return llm_client.status_text(user)
 
 
 def coursework_context(coursework) -> dict[str, Any]:
@@ -241,17 +234,16 @@ def build_messages(context: dict[str, Any]) -> list[dict[str, str]]:
 {vocabulary_block}
 任务：
 {vocabulary_rule}
-2. 评分维度池（key（中文名））：{dimension_lines}。生成 5 分制评分量表时，维度控制在 6 个，key 必须从该池中选择且不重复；
-3. 从第 1 步的知识点中归纳 6 个主能力，作为雷达图的 6 根轴：每个能力给出名称、说明、涵盖的知识点名称，并从维度池中各选一个 key（6 个能力互不重复），该能力的分数取所绑定维度的分数；
+2. 评分维度池（key（中文名））：{dimension_lines}。维度控制在 6 个，key 必须从该池中选择且不重复；维度只用于给考察重点绑定等级描述，不再单独输出量表章节；
+3. 从第 1 步的知识点中归纳 6 个考察重点，作为雷达图的 6 根轴：每个考察重点给出名称、说明、涵盖的知识点名称，并从维度池中各选一个 key（6 个互不重复）；
 4. 权重合计必须等于 100；
-5. 每个维度的 5/4/3/2/1 分描述要能直接据此判断学生代码，不使用“较好”“一般”这类空话；
-6. markdown 必须包含三节，表头固定：
+5. 每个维度（即其绑定的考察重点）的 5/4/3/2/1 分描述要能直接据此判断学生代码，不使用“较好”“一般”这类空话；
+6. markdown 必须包含两节，表头固定：
    ## 一、作业考察的知识点
    （表格列：序号 | 知识点 | 说明 | 涉及题目）
-   ## 二、5 分制量表
-   （表格列：维度 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分）
-   ## 三、主能力（雷达图维度）
-   （表格列：主能力 | 对应评分维度 | 涵盖知识点）
+   ## 二、考察重点（雷达图维度）
+   （表格列：考察重点 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分 | 涉及题目）
+   五分制量表就是雷达图每根轴的评价标准，不再另设量表章节；
 
 输出 JSON，结构如下：
 {JSON_SCHEMA_HINT}
@@ -262,39 +254,9 @@ def build_messages(context: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
-def chat(messages: list[dict[str, str]], temperature: float = 0.2) -> str:
-    if not llm_configured():
-        raise LLMNotConfigured('未配置大模型端点，无法调用题目分析智能体。')
-    base = settings.LLM_BASE_URL
-    url = base if base.endswith('/chat/completions') else base + '/chat/completions'
-    body = json.dumps(
-        {
-            'model': settings.LLM_MODEL,
-            'messages': messages,
-            'temperature': temperature,
-        }
-    ).encode('utf-8')
-    request = urllib.request.Request(
-        url,
-        data=body,
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {settings.LLM_API_KEY}',
-        },
-        method='POST',
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=settings.LLM_TIMEOUT) as response:
-            payload = json.loads(response.read().decode('utf-8'))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode('utf-8', 'replace')[:200]
-        raise LLMError(f'大模型返回 HTTP {exc.code}：{detail}') from exc
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise LLMError(f'无法连接大模型端点：{exc}') from exc
-    try:
-        return payload['choices'][0]['message']['content']
-    except (KeyError, IndexError, TypeError) as exc:
-        raise LLMError('大模型返回格式不符合对话补全约定。') from exc
+def chat(messages: list[dict[str, str]], temperature: float = 0.2, user=None) -> str:
+    """调用当前用户自己的大模型端点（保留旧签名，新增 user 参数）。"""
+    return llm_client.chat(messages, user=user, temperature=temperature)
 
 
 def _extract_json(text: str) -> str:
@@ -441,13 +403,46 @@ def normalize_abilities(
     return abilities
 
 
+def _axis_dimension(
+    tag: str,
+    dimensions: list[dict],
+    abilities: list[dict],
+) -> dict | None:
+    """为雷达图的一根轴找到绑定维度，缺省按权重最高的维度兜底。"""
+    for ability in abilities or []:
+        if tag in (ability.get('points') or []):
+            key = ability.get('dimension')
+            for dimension in dimensions or []:
+                if dimension.get('key') == key:
+                    return dimension
+    if dimensions:
+        return max(dimensions, key=lambda item: item.get('weight', 0))
+    return None
+
+
+def _level_text(dimension: dict | None, mark: str, index: int) -> str:
+    """取某根轴的 5/4/3/2/1 分描述；无维度时退回内置等级文案。"""
+    if dimension:
+        text = str((dimension.get('levels') or {}).get(mark, '')).strip()
+        if text:
+            return text.replace('|', '／').replace('\n', ' ')
+    fallback_key = list(DIMENSION_POOL)[index % len(DIMENSION_POOL)]
+    text = LEVEL_TEXT[fallback_key][5 - int(mark)]
+    return text.replace('|', '／').replace('\n', ' ')
+
+
 def render_axes_section(
-    context: dict[str, Any], points: list[dict]
+    context: dict[str, Any],
+    points: list[dict],
+    dimensions: list[dict] | None = None,
+    abilities: list[dict] | None = None,
 ) -> str:
     """渲染“考察重点（雷达图维度）”一节：该作业最主要的六个知识点 Tag。
 
     重要度 = Σ(覆盖题目的 1 + 分值/10)，覆盖越广、题目分值越重越主要；
-    与报告页雷达图的六根轴严格一致。
+    与报告页雷达图的六根轴严格一致。五分制量表并入本节：每根轴绑定一个
+    评分维度，把该维度的 5/4/3/2/1 分描述作为这根轴的评价标准，直接用于
+    雷达图各轴打分。
     """
     tag_tasks: dict[str, list[str]] = {}
     for point in points:
@@ -461,15 +456,26 @@ def render_axes_section(
     if not top:
         return ''
     lines = [
-        '## 三、考察重点（雷达图维度）',
+        '## 二、考察重点（雷达图维度）',
         '',
-        '| 考察重点 | 权重 | 涉及题目 |',
-        '| --- | --- | --- |',
+        '| 考察重点 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分 | 涉及题目 |',
+        '| --- | --- | --- | --- | --- | --- | --- | --- |',
     ]
     tasks_by_tag = {name: tasks for name, tasks in tag_tasks.items()}
-    for name, share in top:
+    for index, (name, share) in enumerate(top):
         tasks = '、'.join(dict.fromkeys(tasks_by_tag.get(name, []))) or '全部题目'
-        lines.append(f'| {name} | {share * 100:.0f}% | {tasks} |')
+        dimension = _axis_dimension(name, dimensions or [], abilities or [])
+        cells = [
+            name.replace('|', '／'),
+            f'{share * 100:.0f}%',
+            _level_text(dimension, '5', index),
+            _level_text(dimension, '4', index),
+            _level_text(dimension, '3', index),
+            _level_text(dimension, '2', index),
+            _level_text(dimension, '1', index),
+            tasks,
+        ]
+        lines.append('| ' + ' | '.join(cells) + ' |')
     return '\n'.join(lines)
 
 
@@ -492,29 +498,13 @@ def render_markdown(
     for index, point in enumerate(points, start=1):
         tasks = '、'.join(point['tasks']) or '全部题目'
         lines.append(f"| {index} | {point['name']} | {point['detail']} | {tasks} |")
-    lines.extend(
-        [
-            '',
-            '## 二、5 分制量表',
-            '',
-            '| 维度 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分 |',
-            '| --- | --- | --- | --- | --- | --- | --- |',
-        ]
-    )
-    for dimension in dimensions:
-        levels = dimension['levels']
-        lines.append(
-            f"| {dimension['label']} | {dimension['weight']:.0f}% | "
-            f"{levels['5']} | {levels['4']} | {levels['3']} | "
-            f"{levels['2']} | {levels['1']} |"
-        )
-    axes = render_axes_section(context, points)
+    axes = render_axes_section(context, points, dimensions, abilities)
     if not axes:
         # 词表缺失等极端情况下退回主能力描述，保证文件完整
         lines.extend(
             [
                 '',
-                '## 三、主能力（雷达图维度）',
+                '## 二、主能力（雷达图维度）',
                 '',
                 '| 主能力 | 对应评分维度 | 涵盖知识点 |',
                 '| --- | --- | --- |',
@@ -530,24 +520,35 @@ def render_markdown(
     lines.extend(
         [
             '',
-            '> 评分说明：5 分制按维度打分，换算为百分制后按权重加权求和；'
-            '雷达图各轴为该作业最主要的六个知识点（考察重点）。',
+            '> 评分说明：雷达图六根轴就是本节的六个考察重点，每根轴按其 5/4/3/2/1 分'
+            '标准打分（5 分换算 100 分），再按权重加权求和得到综合得分。',
         ]
     )
     return '\n'.join(lines) + '\n'
 
 
-def with_axes_section(markdown: str, context: dict[str, Any], points: list[dict]) -> str:
-    """把模型生成的 markdown 第三节（主能力）替换为统一的考察重点一节。
+def with_axes_section(
+    markdown: str,
+    context: dict[str, Any],
+    points: list[dict],
+    dimensions: list[dict] | None = None,
+    abilities: list[dict] | None = None,
+) -> str:
+    """把模型生成的 markdown 统一重写为“考察重点（雷达图维度）”结尾。
 
-    大模型自由发挥的“主能力”与报告页雷达图的六根知识点轴不一致，
-    这里在解析阶段统一重写，第三节是 markdown 的最后一节，按标题截断重拼。
+    大模型自由发挥的维度/主能力与报告页雷达图的六根知识点轴不一致，这里在
+    解析阶段统一重写：保留第一节“作业考察的知识点”，截掉其后的量表或主能力
+    章节，重新拼上带五分制量表的考察重点一节（旧版“二、5 分制量表”“三、主能力”
+    也会被一并截掉）。
     """
-    axes = render_axes_section(context, points)
+    axes = render_axes_section(context, points, dimensions, abilities)
     if not axes:
         return markdown
     text = markdown.strip()
-    marker = text.find('## 三、')
+    marker = text.find('## 二、')
+    legacy = text.find('## 三、')
+    if marker < 0 or (0 <= legacy < marker):
+        marker = legacy
     if marker >= 0:
         text = text[:marker].rstrip()
     return text + '\n\n' + axes + '\n'
@@ -563,10 +564,10 @@ def parse_response(text: str, context: dict[str, Any]) -> dict[str, Any]:
     dimensions = normalize_dimensions(data.get('dimensions'))
     abilities = normalize_abilities(data.get('abilities'), points)
     markdown = str(data.get('markdown', '')).strip()
-    if '5 分制量表' not in markdown or '知识点' not in markdown:
+    if '考察重点' not in markdown or '知识点' not in markdown:
         markdown = render_markdown(context, points, dimensions, abilities)
-    # 第三节统一重写为“考察重点”，保证评分标准文件与报告页雷达图六轴一致
-    markdown = with_axes_section(markdown, context, points)
+    # 统一重写为带五分制量表的“考察重点”一节，保证与报告页雷达图六轴一致
+    markdown = with_axes_section(markdown, context, points, dimensions, abilities)
     return {
         'points': points,
         'abilities': abilities,
@@ -686,6 +687,106 @@ def rule_based(context: dict[str, Any], reference_code: str = '') -> dict[str, A
     }
 
 
+AXIS_HEADING = '考察重点（雷达图维度）'
+
+
+def parse_axes(markdown: str) -> list[dict]:
+    """解析评分标准里“考察重点（雷达图维度）”表格。
+
+    返回 [{'name', 'share', 'levels': {'5': .., '1': ..}, 'tasks'}]；
+    表格必须带 5/4/3/2/1 分列（新版结构），权重按合计归一化为份额。
+    解析不到时返回空列表，由调用方退回按知识点自动选取六轴。
+    """
+    lines = (markdown or '').splitlines()
+    start = -1
+    for index, line in enumerate(lines):
+        if line.startswith('## ') and AXIS_HEADING in line:
+            start = index
+            break
+    if start < 0:
+        return []
+    header: list[str] | None = None
+    axes: list[dict] = []
+    for line in lines[start + 1 :]:
+        stripped = line.strip()
+        if stripped.startswith('## '):
+            break
+        if not stripped.startswith('|'):
+            continue
+        cells = [cell.strip() for cell in stripped.strip('|').split('|')]
+        if not cells:
+            continue
+        if header is None:
+            header = cells
+            continue
+        if all(set(cell) <= {'-', ':'} for cell in cells if cell):
+            continue
+        if len(cells) != len(header):
+            continue
+        row = dict(zip(header, cells))
+        name = row.get('考察重点', '').strip()
+        if not name:
+            continue
+        weight_text = row.get('权重', '')
+        try:
+            share = float(weight_text.replace('%', '').strip()) / 100
+        except ValueError:
+            share = 0.0
+        axes.append(
+            {
+                'name': name,
+                'share': share,
+                'levels': {
+                    mark: row.get(f'{mark} 分', '')
+                    for mark in ('5', '4', '3', '2', '1')
+                },
+                'tasks': [
+                    task.strip()
+                    for task in row.get('涉及题目', '').replace('、', ',').split(',')
+                    if task.strip() and task.strip() != '全部题目'
+                ],
+            }
+        )
+    total = sum(axis['share'] for axis in axes)
+    if total <= 0:
+        return []
+    for axis in axes:
+        axis['share'] = round(axis['share'] / total, 4)
+    return axes[:6]
+
+
+def prepare_for_upload(coursework, user, auto_llm: bool) -> tuple[str, str]:
+    """上传题目文件后按“是否勾选大模型生成”决定评分标准的生成方式。
+
+    返回 (状态, 提示文案)：
+      - 'skipped'：非机器批阅作业，不生成评分标准；
+      - 'exists' ：已有评分标准，不覆盖教师内容；
+      - 'llm'    ：已用当前教师的大模型配置生成；
+      - 'rule'   ：未勾选 / 未配置 / 大模型失败，已用规则兜底生成（离线演示）。
+    """
+    if coursework.grading_mode != 'automatic':
+        return 'skipped', ''
+    if CourseworkRubric.objects.filter(coursework=coursework).exists():
+        return 'exists', ''
+
+    if auto_llm and llm_configured(user):
+        try:
+            generate_for(coursework, force=True, user=user)
+        except (LLMError, RubricParseError) as exc:
+            note = f'大模型生成评分标准失败：{exc}；已改用规则兜底生成。'
+        except LLMNotConfigured:
+            note = '未配置大模型，已改用规则兜底生成评分标准。'
+        else:
+            return 'llm', '已调用大模型生成评分标准，可在“评分标准”页面查看。'
+    elif auto_llm:
+        note = '你的账号还没有配置大模型，已按规则兜底生成评分标准（离线演示）。'
+    else:
+        note = '未勾选大模型生成，已按规则兜底生成评分标准（离线演示），结果标注“规则兜底”。'
+
+    generate_for(coursework, offline=True, force=True)
+    return 'rule', note
+
+
 def ensure_heading(markdown: str, context: dict[str, Any]) -> str:
     """模型可能直接返回“## 一、”，补上一级标题与题目信息，保证文件可独立阅读。"""
     text = markdown.strip()
@@ -726,10 +827,10 @@ def build_ability_messages(
     ]
 
 
-def generate_abilities(coursework, offline: bool = False) -> list[dict[str, Any]]:
+def generate_abilities(coursework, offline: bool = False, user=None) -> list[dict[str, Any]]:
     """按该任务已有的考察知识点重新归纳 6 个主能力并存库。
 
-    只更新 abilities，不改动教师确认过的量表与知识点。
+    只更新 abilities，不改动教师确认过的量表与知识点。user 为空时使用作业创建者的配置。
     """
     rubric = getattr(coursework, 'rubric', None)
     if rubric is None:
@@ -743,11 +844,12 @@ def generate_abilities(coursework, offline: bool = False) -> list[dict[str, Any]
         if isinstance(item, dict) and item.get('key')
     ]
     allowed = set(keys) or set(DIMENSION_POOL)
-    if offline or not llm_configured():
+    actor = user or coursework.owner
+    if offline or not llm_configured(actor):
         abilities = rule_abilities(points)
     else:
         context = coursework_context(coursework)
-        text = chat(build_ability_messages(context, points, sorted(allowed)))
+        text = chat(build_ability_messages(context, points, sorted(allowed)), user=actor)
         data = json.loads(_extract_json(text))
         abilities = normalize_abilities(data.get('abilities'), points, allowed)
     CourseworkRubric.objects.filter(pk=rubric.pk).update(abilities=abilities)
@@ -755,7 +857,8 @@ def generate_abilities(coursework, offline: bool = False) -> list[dict[str, Any]
     return abilities
 
 
-def generate_for(coursework, offline: bool = False, force: bool = True) -> CourseworkRubric:
+def generate_for(coursework, offline: bool = False, force: bool = True, user=None):
+    """生成/重建评分标准；user 为空时使用作业创建者的个人大模型配置。"""
     existing = CourseworkRubric.objects.filter(coursework=coursework).first()
     if existing and not force:
         return existing
@@ -764,18 +867,20 @@ def generate_for(coursework, offline: bool = False, force: bool = True) -> Cours
     if not context['items']:
         raise RubricParseError('该作业还没有题目清单，无法分析知识点。')
 
-    if offline or not llm_configured():
+    actor = user or coursework.owner
+    config = llm_client.get_config(actor)
+    if offline or not llm_configured(actor):
         if not offline:
             raise LLMNotConfigured(
-                '未配置大模型端点。请设置 LLM_BASE_URL / LLM_API_KEY / LLM_MODEL，'
-                '或显式使用规则兜底。'
+                '当前账号还没有配置大模型。请点击“配置大模型”，选择服务商并填写你自己的 API Key，'
+                '或改用规则兜底生成。'
             )
         result = rule_based(context, reference_code=_reference_code(coursework))
         source, model = 'rule', ''
     else:
-        text = chat(build_messages(context))
+        text = chat(build_messages(context), user=actor)
         result = parse_response(text, context)
-        source, model = 'llm', settings.LLM_MODEL
+        source, model = 'llm', config.model
 
     rubric, _ = CourseworkRubric.objects.update_or_create(
         coursework=coursework,
@@ -795,8 +900,15 @@ def generate_for(coursework, offline: bool = False, force: bool = True) -> Cours
 def _regenerate_coursework_job(coursework_id) -> None:
     """在独立连接上重建评分标准；失败保留旧标准，教师可手动重试。"""
     try:
-        work = Coursework.objects.get(pk=coursework_id, deleted_at__isnull=True)
-        generate_for(work, offline=not llm_configured(), force=True)
+        work = Coursework.objects.select_related('owner').get(
+            pk=coursework_id, deleted_at__isnull=True
+        )
+        generate_for(
+            work,
+            offline=not llm_configured(work.owner),
+            force=True,
+            user=work.owner,
+        )
     except Exception:
         logger.warning('自动重建评分标准失败 coursework=%s', coursework_id, exc_info=True)
     finally:

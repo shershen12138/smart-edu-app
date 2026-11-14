@@ -21,6 +21,14 @@ class WorkForm(forms.ModelForm):
         ),
         widget=forms.FileInput(attrs={'accept': '.zip'}),
     )
+    auto_rubric = forms.BooleanField(
+        label='自动调用大模型生成评分标准',
+        required=False,
+        help_text=(
+            '仅机器批阅有效：勾选后上传即用你自己配置的大模型生成评分标准，'
+            '打开“评分标准”页面就能直接看到；不勾选则用规则兜底生成（离线演示）。'
+        ),
+    )
     revision = forms.IntegerField(widget=forms.HiddenInput, initial=0)
 
     class Meta:
@@ -41,6 +49,7 @@ class WorkForm(forms.ModelForm):
                 'grading_mode',
                 'classroom',
                 'package_file',
+                'auto_rubric',
                 'deadline',
                 'revision',
             ]

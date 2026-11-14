@@ -4,7 +4,7 @@
     <div>
       <span class="tag">{{ work.classroom.name }}</span>
       <h1 class="space-top">{{ work.title }} · 评分标准</h1>
-      <p class="subtle">读取数据库中的题目信息，生成“考察知识点 + 5 分制量表”，供后续代码质量评测与雷达图使用。</p>
+      <p class="subtle">由题目分析智能体生成“考察知识点 + 考察重点（雷达图维度，含五分制量表）”，供后续代码质量评测与雷达图使用。</p>
     </div>
     <div class="actions">
       {% if rubric %}
@@ -14,31 +14,26 @@
     </div>
   </div>
   <section class="card space-bottom">
-    <h2>题目分析智能体</h2>
-    <p class="subtle">{{ llm_status }}</p>
+    <h2>生成方式</h2>
     {% if rubric %}
       <p>
-        <span class="tag">{% if rubric.source == "llm" %}大模型分析{% else %}规则兜底{% endif %}</span>
+        <span class="tag">{% if rubric.source == "llm" %}大模型生成{% else %}规则兜底{% endif %}</span>
         {% if rubric.model %}<span class="subtle">模型：{{ rubric.model }}</span>{% endif %}
         <span class="subtle">更新时间：{{ rubric.updated_at|date:'Y-m-d H:i' }}</span>
       </p>
-    {% endif %}
-    <div class="actions space-top">
-      <form method="post" data-loading="正在调用大模型分析评分标准，可能需要十几秒…">
-        {% csrf_token %}
-        <button class="button" {% if not llm_ready %}disabled{% endif %}>调用大模型生成</button>
-      </form>
-      <form method="post" data-loading="正在按规则生成评分标准…">
-        {% csrf_token %}
-        <input type="hidden" name="mode" value="offline">
-        <button class="button secondary">规则兜底生成（离线演示）</button>
-      </form>
-    </div>
-    {% if not llm_ready %}
-      <p class="tip space-top">
-        未配置大模型端点，主按钮不可用。规则兜底只依据题库函数名与知识点模板生成，
-        结果会标注“规则兜底”，不能当作大模型结论，也不应直接作为正式评分依据。
-      </p>
+      {% if rubric.source == "llm" %}
+        <p class="subtle">本页内容来自上传题目文件时勾选的“自动调用大模型生成评分标准”（使用你自己的大模型配置）。</p>
+      {% else %}
+        <p class="tip">
+          本页内容为<strong>规则兜底生成（离线演示）</strong>：上传题目文件时未勾选“自动调用大模型生成评分标准”。
+          规则兜底只依据题库函数名与知识点模板生成，不能当作大模型结论。
+          {% if not llm_configured %}
+            <br>另外你的账号还没有配置大模型，可先点击侧边栏“配置大模型”填写自己的 API Key，再重新上传题目文件并勾选该选项。
+          {% endif %}
+        </p>
+      {% endif %}
+    {% else %}
+      <p class="tip">该作业尚未生成评分标准：若是非机器批阅作业，评分标准不参与批阅；若是机器批阅作业，请重新上传题目文件。</p>
     {% endif %}
   </section>
   {% if rubric %}
@@ -51,7 +46,5 @@
       </p>
       <pre style="white-space:pre-wrap">{{ rubric.markdown }}</pre>
     </section>
-  {% else %}
-    <p class="tip">该作业尚未生成评分标准。</p>
   {% endif %}
 {% endblock %}

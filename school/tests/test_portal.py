@@ -399,11 +399,14 @@ class PortalTests(TestCase):
                 'grading_mode',
                 'classroom',
                 'package_file',
+                'auto_rubric',
                 'deadline',
                 'revision',
             },
         )
         self.assertEqual(form.fields['package_file'].label, '机器批阅包')
+        self.assertEqual(form.fields['auto_rubric'].label, '自动调用大模型生成评分标准')
+        self.assertFalse(form.fields['auto_rubric'].required)
 
     def test_updated_package_keeps_used_assets_and_selects_new_configuration(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -101,28 +101,25 @@ def works(request):
     )
 
 
-def _auto_generate_rubric(request, work) -> None:
-    """作业保存后自动调用题目分析智能体；失败只提示，不阻塞上传。"""
-    if getattr(work, 'rubric', None) is not None:
-        return
-    if not rubric_agent.llm_configured():
-        messages.info(
-            request,
-            '未配置大模型（LLM_BASE_URL / LLM_API_KEY / LLM_MODEL），'
-            '已跳过自动生成评分标准。可在作业的“评分标准”页面手动生成或使用规则兜底。',
-        )
-        return
+def _prepare_rubric(request, work, auto_llm: bool) -> None:
+    """按上传时“自动调用大模型生成评分标准”的勾选结果生成评分标准。
+
+    勾选：用当前教师自己的大模型配置生成；未勾选（或未配置、调用失败）：
+    直接用规则兜底生成（离线演示），保证打开“评分标准”页就能看到内容。
+    """
     try:
-        rubric_agent.generate_for(work, force=False)
-    except rubric_agent.LLMNotConfigured:
+        status, note = rubric_agent.prepare_for_upload(work, request.user, auto_llm)
+    except Exception:  # noqa: BLE001 -- 生成失败不能回滚已保存的作业
+        messages.warning(request, '评分标准生成失败，可稍后重新上传题目文件重试。')
         return
-    except (rubric_agent.LLMError, rubric_agent.RubricParseError) as exc:
-        messages.warning(
-            request,
-            f'自动生成评分标准失败：{exc}。可稍后在作业的“评分标准”页面重试。',
-        )
+    if not note:
+        return
+    if status == 'llm':
+        messages.success(request, note)
+    elif status == 'rule':
+        messages.warning(request, note)
     else:
-        messages.success(request, '已自动调用大模型生成评分标准，可在“评分标准”页面查看和调整。')
+        messages.info(request, note)
 
 
 @login_required
@@ -139,7 +136,7 @@ def work_edit(request, pk=None):
             form.add_error(None, exc)
         else:
             messages.success(request, '题目文件和提交时限已保存，学生现在可以查看。')
-            _auto_generate_rubric(request, saved)
+            _prepare_rubric(request, saved, bool(form.cleaned_data.get('auto_rubric')))
             return redirect('work', pk=saved.pk)
     return form_page(
         request,

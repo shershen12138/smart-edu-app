@@ -5,16 +5,34 @@ import json
 import urllib.error
 from unittest import mock
 
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from school.course_models import Coursework, CourseworkItem, CourseworkRubric
-from school.models import Classroom, User, UserRole
+from school.models import Classroom, User, UserLLMConfig, UserRole
 from school.portal import rubric_agent
 
 
+def configure_llm(
+    user,
+    base_url='https://example.com/v1',
+    api_key='sk-test',
+    model='test-model',
+    provider='custom',
+):
+    """给指定用户写入个人大模型配置（替代原来的全局 LLM_* 设置）。"""
+    return UserLLMConfig.objects.create(
+        user=user,
+        provider=provider,
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+    )
+
+
 def full_markdown():
-    return '## 一、作业考察的知识点\n\n## 二、5 分制量表\n\n## 三、主能力（雷达图维度）\n'
+    return '## 一、作业考察的知识点\n\n## 二、考察重点（雷达图维度）\n'
 
 
 def valid_llm_payload(markdown=None):
@@ -57,12 +75,13 @@ def valid_llm_payload(markdown=None):
     )
 
 
-@override_settings(LLM_BASE_URL='', LLM_API_KEY='', LLM_MODEL='')
+@override_settings(LLM_TIMEOUT=5)
 class RubricAgentTestCase(TestCase):
     def setUp(self):
         teacher = User.objects.create_user(
             username='t', password='SafePassword_2026', full_name='教师', must_change_password=False
         )
+        self.teacher = teacher
         UserRole.objects.create(user=teacher, role='teacher')
         self.classroom = Classroom.objects.create(
             code='RM', name='智能体班', course_name='Python', term='2026'
@@ -83,14 +102,14 @@ class RubricAgentTestCase(TestCase):
 
 class StatusAndContextTests(RubricAgentTestCase):
     def test_status_configured_and_unconfigured(self):
-        self.assertIn('未配置', rubric_agent.llm_status())
-        with override_settings(
-            LLM_BASE_URL='https://example.com/v1',
-            LLM_API_KEY='sk-test',
-            LLM_MODEL='test-model',
-        ):
-            self.assertIn('test-model', rubric_agent.llm_status())
-            self.assertTrue(rubric_agent.llm_configured())
+        self.assertIn('尚未配置', rubric_agent.llm_status(self.teacher))
+        self.assertFalse(rubric_agent.llm_configured(self.teacher))
+        configure_llm(self.teacher, api_key='sk-0123456789abcdef')
+        status = rubric_agent.llm_status(self.teacher)
+        self.assertIn('test-model', status)
+        self.assertIn('sk-0***cdef', status)
+        self.assertNotIn('sk-0123456789abcdef', status)
+        self.assertTrue(rubric_agent.llm_configured(self.teacher))
 
     def test_coursework_context_shape(self):
         context = rubric_agent.coursework_context(self.work)
@@ -109,24 +128,21 @@ class StatusAndContextTests(RubricAgentTestCase):
 class ChatTests(RubricAgentTestCase):
     def test_not_configured_raises(self):
         with self.assertRaises(rubric_agent.LLMNotConfigured):
-            rubric_agent.chat([{'role': 'user', 'content': 'x'}])
+            rubric_agent.chat([{'role': 'user', 'content': 'x'}], user=self.teacher)
 
-    def _configured(self):
-        return override_settings(
-            LLM_BASE_URL='https://example.com/v1',
-            LLM_API_KEY='sk-test',
-            LLM_MODEL='test-model',
-            LLM_TIMEOUT=5,
-        )
+    def _configured(self, base_url='https://example.com/v1', model='test-model'):
+        configure_llm(self.teacher, base_url=base_url, model=model)
 
     def test_success_returns_content(self):
         response = io.BytesIO(
             json.dumps({'choices': [{'message': {'content': '你好'}}]}).encode()
         )
-        with self._configured(), mock.patch(
-            'urllib.request.urlopen', return_value=response
-        ) as urlopen:
-            self.assertEqual(rubric_agent.chat([{'role': 'user', 'content': 'x'}]), '你好')
+        self._configured()
+        with mock.patch('urllib.request.urlopen', return_value=response) as urlopen:
+            self.assertEqual(
+                rubric_agent.chat([{'role': 'user', 'content': 'x'}], user=self.teacher),
+                '你好',
+            )
         request = urlopen.call_args.args[0]
         self.assertIn('Authorization', request.headers)
         self.assertTrue(request.full_url.endswith('/chat/completions'))
@@ -135,40 +151,36 @@ class ChatTests(RubricAgentTestCase):
         response = io.BytesIO(
             json.dumps({'choices': [{'message': {'content': 'ok'}}]}).encode()
         )
-        with override_settings(
-            LLM_BASE_URL='https://example.com/v1/chat/completions',
-            LLM_API_KEY='k',
-            LLM_MODEL='m',
-            LLM_TIMEOUT=5,
-        ), mock.patch('urllib.request.urlopen', return_value=response):
+        self._configured(base_url='https://example.com/v1/chat/completions', model='m')
+        with mock.patch('urllib.request.urlopen', return_value=response):
             self.assertEqual(
-                rubric_agent.chat([{'role': 'user', 'content': 'x'}]), 'ok'
+                rubric_agent.chat([{'role': 'user', 'content': 'x'}], user=self.teacher),
+                'ok',
             )
 
     def test_http_error_wrapped(self):
         error = urllib.error.HTTPError(
             'https://example.com', 502, 'Bad Gateway', {}, io.BytesIO(b'upstream down')
         )
-        with self._configured(), mock.patch(
-            'urllib.request.urlopen', side_effect=error
-        ):
+        self._configured()
+        with mock.patch('urllib.request.urlopen', side_effect=error):
             with self.assertRaisesMessage(rubric_agent.LLMError, 'HTTP 502'):
-                rubric_agent.chat([{'role': 'user', 'content': 'x'}])
+                rubric_agent.chat([{'role': 'user', 'content': 'x'}], user=self.teacher)
 
     def test_connection_error_wrapped(self):
-        with self._configured(), mock.patch(
+        self._configured()
+        with mock.patch(
             'urllib.request.urlopen', side_effect=urllib.error.URLError('refused')
         ):
             with self.assertRaisesMessage(rubric_agent.LLMError, '无法连接'):
-                rubric_agent.chat([{'role': 'user', 'content': 'x'}])
+                rubric_agent.chat([{'role': 'user', 'content': 'x'}], user=self.teacher)
 
     def test_unexpected_payload_format(self):
         response = io.BytesIO(b'{"error": "no choices"}')
-        with self._configured(), mock.patch(
-            'urllib.request.urlopen', return_value=response
-        ):
+        self._configured()
+        with mock.patch('urllib.request.urlopen', return_value=response):
             with self.assertRaisesMessage(rubric_agent.LLMError, '返回格式'):
-                rubric_agent.chat([{'role': 'user', 'content': 'x'}])
+                rubric_agent.chat([{'role': 'user', 'content': 'x'}], user=self.teacher)
 
 
 class ExtractJsonTests(TestCase):
@@ -327,20 +339,54 @@ class ParseResponseTests(TestCase):
         result = rubric_agent.parse_response(valid_llm_payload(), self.context())
         self.assertEqual(result['points'][0]['name'], '列表切片')
         self.assertEqual(len(result['dimensions']), 6)
-        self.assertIn('5 分制量表', result['markdown'])
+        self.assertIn('考察重点（雷达图维度）', result['markdown'])
 
     def test_missing_sections_rerendered(self):
         payload = json.loads(valid_llm_payload())
         payload['markdown'] = '随便写点'
         result = rubric_agent.parse_response(json.dumps(payload, ensure_ascii=False), self.context())
-        self.assertIn('5 分制量表', result['markdown'])
+        self.assertIn('考察重点（雷达图维度）', result['markdown'])
 
     def test_axes_section_rewritten_to_tag_axes(self):
-        """模型自拟的“主能力”第三节统一改写为考察重点，与报告页雷达图六轴一致。"""
+        """模型自拟的章节统一改写为考察重点，与报告页雷达图六轴一致。"""
         result = rubric_agent.parse_response(valid_llm_payload(), self.context())
-        self.assertIn('## 三、考察重点（雷达图维度）', result['markdown'])
+        self.assertIn('## 二、考察重点（雷达图维度）', result['markdown'])
         self.assertNotIn('主能力（雷达图维度）', result['markdown'])
+        self.assertNotIn('5 分制量表', result['markdown'])
         self.assertIn('列表切片', result['markdown'])
+
+    def test_parse_axes_reads_scale_table(self):
+        """报告页雷达图直接读这一张表：名称、权重与 5/4/3/2/1 分描述。"""
+        markdown = (
+            '## 二、考察重点（雷达图维度）\n\n'
+            '| 考察重点 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分 | 涉及题目 |\n'
+            '| --- | --- | --- | --- | --- | --- | --- | --- |\n'
+            '| 列表切片 | 70% | 全都对 | 基本对 | 部分对 | 很少对 | 完全不对 | func301、func303 |\n'
+            '| 列表拼接 | 30% | A | B | C | D | E | func301 |\n'
+        )
+        axes = rubric_agent.parse_axes(markdown)
+        self.assertEqual([axis['name'] for axis in axes], ['列表切片', '列表拼接'])
+        self.assertAlmostEqual(axes[0]['share'], 0.7, places=2)
+        self.assertEqual(axes[0]['levels']['5'], '全都对')
+        self.assertEqual(axes[0]['levels']['1'], '完全不对')
+        self.assertEqual(axes[0]['tasks'], ['func301', 'func303'])
+
+    def test_parse_axes_ignores_legacy_markdown(self):
+        legacy = '## 二、5 分制量表\n\n| 维度 | 权重 | 5 分 |\n| --- | --- | --- |\n'
+        self.assertEqual(rubric_agent.parse_axes(legacy), [])
+
+    def test_axes_section_carries_five_point_scale(self):
+        """考察重点一节带五分制量表（用于雷达图绘制），且不再单独设量表章节。"""
+        result = rubric_agent.parse_response(valid_llm_payload(), self.context())
+        markdown = result['markdown']
+        self.assertIn(
+            '| 考察重点 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分 | 涉及题目 |',
+            markdown,
+        )
+        self.assertNotIn('## 二、5 分制量表', markdown)
+        # 该作业只有 func301 的知识点：列表切片这一行应带满 5 个等级描述
+        row = next(line for line in markdown.splitlines() if line.startswith('| 列表切片 |'))
+        self.assertEqual(len([cell for cell in row.split('|')[1:-1] if cell.strip()]), 8)
 
     def test_no_points_rejected(self):
         payload = json.loads(valid_llm_payload())
@@ -417,6 +463,60 @@ class EnsureHeadingTests(RubricAgentTestCase):
         self.assertIn('题量：1 题', result)
 
 
+class PrepareForUploadTests(RubricAgentTestCase):
+    """上传题目文件时的“是否勾选大模型生成评分标准”。"""
+
+    def test_unchecked_generates_rule_rubric(self):
+        status, note = rubric_agent.prepare_for_upload(self.work, self.teacher, False)
+        self.assertEqual(status, 'rule')
+        self.assertIn('未勾选', note)
+        rubric = CourseworkRubric.objects.get(coursework=self.work)
+        self.assertEqual(rubric.source, 'rule')
+        self.assertIn('考察重点（雷达图维度）', rubric.markdown)
+
+    def test_checked_without_config_falls_back_to_rule(self):
+        status, note = rubric_agent.prepare_for_upload(self.work, self.teacher, True)
+        self.assertEqual(status, 'rule')
+        self.assertIn('没有配置大模型', note)
+        self.assertEqual(CourseworkRubric.objects.get(coursework=self.work).source, 'rule')
+
+    def test_checked_with_config_uses_llm(self):
+        configure_llm(self.teacher, model='test-model')
+        with mock.patch.object(rubric_agent, 'chat', return_value=valid_llm_payload()):
+            status, note = rubric_agent.prepare_for_upload(self.work, self.teacher, True)
+        self.assertEqual(status, 'llm')
+        self.assertIn('大模型生成评分标准', note)
+        rubric = CourseworkRubric.objects.get(coursework=self.work)
+        self.assertEqual(rubric.source, 'llm')
+        self.assertEqual(rubric.model, 'test-model')
+
+    def test_checked_but_llm_error_falls_back_to_rule(self):
+        configure_llm(self.teacher)
+        with mock.patch.object(
+            rubric_agent, 'chat', side_effect=rubric_agent.LLMError('连接超时')
+        ):
+            status, note = rubric_agent.prepare_for_upload(self.work, self.teacher, True)
+        self.assertEqual(status, 'rule')
+        self.assertIn('失败', note)
+        self.assertEqual(CourseworkRubric.objects.get(coursework=self.work).source, 'rule')
+
+    def test_manual_grading_skipped(self):
+        self.work.grading_mode = 'manual'
+        self.work.save(update_fields=['grading_mode'])
+        status, note = rubric_agent.prepare_for_upload(self.work, self.teacher, True)
+        self.assertEqual(status, 'skipped')
+        self.assertEqual(note, '')
+        self.assertFalse(CourseworkRubric.objects.filter(coursework=self.work).exists())
+
+    def test_existing_rubric_not_overwritten(self):
+        CourseworkRubric.objects.create(coursework=self.work, markdown='# 教师已确认')
+        status, _note = rubric_agent.prepare_for_upload(self.work, self.teacher, True)
+        self.assertEqual(status, 'exists')
+        self.assertEqual(
+            CourseworkRubric.objects.get(coursework=self.work).markdown, '# 教师已确认'
+        )
+
+
 class GenerateForTests(RubricAgentTestCase):
     def test_existing_rubric_reused_without_force(self):
         CourseworkRubric.objects.create(coursework=self.work, markdown='# 旧标准')
@@ -434,19 +534,33 @@ class GenerateForTests(RubricAgentTestCase):
         self.assertEqual(rubric.model, '')
         self.assertIn('列表拼接', rubric.markdown)
         self.assertEqual(len(rubric.dimensions), 6)
-        # 第三节为考察重点（雷达图六轴）：最主要的六个知识点 Tag
-        self.assertIn('## 三、考察重点（雷达图维度）', rubric.markdown)
+        # 第二节为考察重点（雷达图六轴）：最主要的六个知识点 Tag + 五分制量表
+        self.assertIn('## 二、考察重点（雷达图维度）', rubric.markdown)
+        self.assertIn('| 考察重点 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分 | 涉及题目 |', rubric.markdown)
+        self.assertNotIn('5 分制量表\n', rubric.markdown.split('\n\n')[0])
 
     def test_unconfigured_llm_raises_without_offline(self):
         with self.assertRaises(rubric_agent.LLMNotConfigured):
             rubric_agent.generate_for(self.work)
 
+    def test_upgrade_command_migrates_legacy_markdown(self):
+        """旧版含“二、5 分制量表”的评分标准可离线升级为新版结构。"""
+        rubric_agent.generate_for(self.work, offline=True)
+        legacy = (
+            '## 一、作业考察的知识点\n\n| 1 | 列表拼接 | 说明 | func301 |\n\n'
+            '## 二、5 分制量表\n\n| 维度 | 权重 | 5 分 |\n| --- | --- | --- |\n\n'
+            '## 三、主能力（雷达图维度）\n'
+        )
+        CourseworkRubric.objects.filter(coursework=self.work).update(markdown=legacy)
+        call_command('upgrade_rubric', '--apply', verbosity=0)
+        markdown = CourseworkRubric.objects.get(coursework=self.work).markdown
+        self.assertNotIn('5 分制量表', markdown)
+        self.assertIn('## 二、考察重点（雷达图维度）', markdown)
+        self.assertIn('| 考察重点 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分 | 涉及题目 |', markdown)
+
     def test_llm_path_saves_model_and_markdown(self):
-        with override_settings(
-            LLM_BASE_URL='https://example.com/v1',
-            LLM_API_KEY='k',
-            LLM_MODEL='test-model',
-        ), mock.patch.object(
+        configure_llm(self.teacher, model='test-model')
+        with mock.patch.object(
             rubric_agent, 'chat', return_value=valid_llm_payload()
         ) as chat_mock:
             rubric = rubric_agent.generate_for(self.work)
@@ -496,11 +610,8 @@ class GenerateAbilitiesTests(RubricAgentTestCase):
             },
             ensure_ascii=False,
         )
-        with override_settings(
-            LLM_BASE_URL='https://example.com/v1',
-            LLM_API_KEY='k',
-            LLM_MODEL='m',
-        ), mock.patch.object(rubric_agent, 'chat', return_value=payload) as chat_mock:
+        configure_llm(self.teacher, model='m')
+        with mock.patch.object(rubric_agent, 'chat', return_value=payload) as chat_mock:
             abilities = rubric_agent.generate_abilities(self.work)
         chat_mock.assert_called_once()
         self.assertEqual(len(abilities), 6)
@@ -509,11 +620,8 @@ class GenerateAbilitiesTests(RubricAgentTestCase):
     def test_llm_invalid_response_raises(self):
         # generate_abilities 不吞解析错误：无 JSON 时直接抛给调用方
         self._rubric()
-        with override_settings(
-            LLM_BASE_URL='https://example.com/v1',
-            LLM_API_KEY='k',
-            LLM_MODEL='m',
-        ), mock.patch.object(rubric_agent, 'chat', return_value='不是 JSON'):
+        configure_llm(self.teacher, model='m')
+        with mock.patch.object(rubric_agent, 'chat', return_value='不是 JSON'):
             with self.assertRaises(rubric_agent.RubricParseError):
                 rubric_agent.generate_abilities(self.work)
 

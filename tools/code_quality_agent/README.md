@@ -179,7 +179,7 @@ LLM 是可选扩展点：图本身不调用大模型，所有结论来自 AST �
 
 评分标准不来自仓库文件，而是按作业存在数据库：
 
-1. 教师在“分析题目”触发 `school/portal/rubric_agent.py`：大模型根据题目与参考答案产出知识点、5 分制量表与六个主能力，写入 `CourseworkRubric`；
+1. 教师在“分析题目”触发 `school/portal/rubric_agent.py`：大模型根据题目与参考答案产出知识点，以及六个“考察重点（雷达图维度）”，每个考察重点自带 5 分制量表（5/4/3/2/1 分描述），写入 `CourseworkRubric`；
 2. 没有配置大模型时用规则兜底，同样按该作业的题目生成；
 3. 学生首次打开报告时若该作业还没有量表，`quality_service.ensure_rubric()` 会生成规则版并存库，保证每个任务都有独立的一套；
 4. 运维可用 `manage.py refresh_abilities` 按各作业的知识点重新归纳六个主能力（`--offline` 只做规则归类，`--coursework <id>` 只处理一个作业）。
