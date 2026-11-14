@@ -808,6 +808,142 @@ td small {
   font-weight: 700
 }
 
+/* 综合能力分析：布鲁姆雷达图 + 计算思维能力卡 */
+.capability-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: right;
+  font-size: 12px
+}
+
+.capability-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+  gap: 26px;
+  align-items: start
+}
+
+.capability-grid h3,
+.capability-diagnosis h3 {
+  margin: 0 0 10px;
+  font-size: 15px
+}
+
+.capability-grid .radar-figure {
+  max-width: 100%
+}
+
+.capability-legend {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px
+}
+
+.capability-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap
+}
+
+.capability-legend strong {
+  font-variant-numeric: tabular-nums
+}
+
+.capability-cards {
+  display: grid;
+  gap: 12px
+}
+
+.capability-card {
+  border: 1px solid #e3ece6;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fbfdfc
+}
+
+.capability-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 600
+}
+
+.capability-card header strong {
+  font-size: 20px;
+  color: var(--green);
+  font-variant-numeric: tabular-nums
+}
+
+.capability-card p {
+  margin: 6px 0 0;
+  font-size: 13px
+}
+
+.capability-meter {
+  height: 6px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: #e8f0eb;
+  overflow: hidden
+}
+
+.capability-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0a9479, #7ccfb6)
+}
+
+.capability-evidence {
+  color: var(--muted)
+}
+
+.capability-diagnosis ul,
+.capability-observations ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: 14px
+}
+
+.capability-quote {
+  margin: 6px 0;
+  padding: 8px 10px;
+  background: #f4f8f6;
+  border-left: 3px solid #cfe3d9;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word
+}
+
+.capability-observations summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--green)
+}
+
+.capability-observations li {
+  margin-top: 10px
+}
+
+@media (max-width: 900px) {
+  .capability-grid {
+    grid-template-columns: 1fr
+  }
+
+  .capability-meta {
+    text-align: left
+  }
+}
+
 .button.full {
   width: 100%
 }

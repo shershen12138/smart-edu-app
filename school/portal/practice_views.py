@@ -18,7 +18,7 @@ from school.judge import InfrastructureError
 from school.models import Classroom
 from school.storage import read_private, save_private
 
-from . import knowledge_profile, practice_agent
+from . import capability_service, knowledge_profile, practice_agent
 from .access import allowed, classes_for, require_role, role
 from .common_views import page
 from .practice_agent import LLMNotConfigured, PracticeParseError
@@ -87,6 +87,20 @@ def _grouped_problems(plan):
     return grouped
 
 
+def _capability_context(student):
+    """综合能力画像失败时降级为空态，不能让弱项分析页整体 500。"""
+    try:
+        return capability_service.view_model(student)
+    except Exception:
+        logger.warning('综合能力画像生成失败 student=%s', student.pk, exc_info=True)
+        return {
+            'ready': False,
+            'refreshing': False,
+            'llm_ready': False,
+            'empty_reason': '综合能力分析暂时不可用，请稍后刷新重试。',
+        }
+
+
 @login_required
 @require_http_methods(['GET', 'POST'])
 def practice_home(request):
@@ -151,6 +165,7 @@ def practice_home(request):
         llm_ready=practice_agent.llm_configured(request.user),
         llm_status=practice_agent.status_text(request.user),
         bank_ready=practice_agent.bank_matches_exist(merged_weak),
+        capability=_capability_context(request.user),
         back_url=reverse('dashboard'),
     )
 

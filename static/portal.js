@@ -103,11 +103,16 @@ const initRadar = () => {
       tip.textContent = '';
       const name = document.createElement('strong');
       name.textContent = axis.dataset.label || '';
+      if (axis.dataset.covered === '0') {
+        tip.append(name, ' 暂无该维度的判题数据');
+        tip.hidden = false;
+        return;
+      }
       const level = axis.dataset.level ? `（${axis.dataset.level} 级）` : '';
-      tip.append(
-        name,
-        ` ${axis.dataset.score || '0'} 分${level} · 权重 ${axis.dataset.weight || '0'}%`,
-      );
+      const scope = axis.dataset.coverage
+        ? ` · 覆盖 ${axis.dataset.coverage}% 分值`
+        : ` · 权重 ${axis.dataset.weight || '0'}%`;
+      tip.append(name, ` ${axis.dataset.score || '0'} 分${level}${scope}`);
       tip.hidden = false;
     };
     wrap.querySelectorAll('.radar-axis').forEach((axis) => {

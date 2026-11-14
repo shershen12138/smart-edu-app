@@ -7,6 +7,152 @@
     </div>
   </div>
 
+  <section class="card space-bottom" id="capability">
+    <div class="split">
+      <div>
+        <h2>综合能力分析</h2>
+        <p class="subtle">
+          汇总你所有机器批阅任务的评测报告错误点与提交代码：分数由逐题得分率按分值加权计算，
+          诊断说明由你自己配置的大模型生成；未被考察的维度只标注样本不足，不记 0 分。
+        </p>
+      </div>
+      {% if capability.ready %}
+        <div class="capability-meta subtle">
+          <span>{{ capability.source_note }}</span>
+          <span>{{ capability.works }} 个任务 · {{ capability.graded_tasks }} 题有判题记录</span>
+          {% if capability.updated_at %}<span>更新于 {{ capability.updated_at|date:"m-d H:i" }}</span>{% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    {% if capability.ready %}
+      {% if capability.refreshing %}
+        <p class="tip space-top">检测到新的评测数据，正在后台重新分析；下面是上一次的结果，稍后刷新即可看到更新。</p>
+      {% endif %}
+      <div class="capability-grid space-top">
+        <div>
+          <h3>布鲁姆认知水平</h3>
+          {% if capability.radar.width %}
+            <div class="radar-figure" data-radar>
+              <svg viewBox="0 0 {{ capability.radar.width }} {{ capability.radar.height }}"
+                   role="img"
+                   aria-label="你的布鲁姆认知水平六维雷达图">
+                {% for ring in capability.radar.rings %}
+                  <polygon class="radar-ring" points="{{ ring }}" />
+                {% endfor %}
+                {% for axis in capability.radar.axes %}
+                  <line class="radar-spoke"
+                        x1="{{ capability.radar.center_x }}" y1="{{ capability.radar.center_y }}"
+                        x2="{{ axis.x }}" y2="{{ axis.y }}" />
+                {% endfor %}
+                <polygon class="radar-area" points="{{ capability.radar.polygon }}" />
+                {% for axis in capability.radar.axes %}
+                  <g class="radar-axis" tabindex="0" role="button"
+                     aria-label="{{ axis.label }} {% if axis.covered %}{{ axis.score }} 分{% else %}暂无数据{% endif %}"
+                     data-label="{{ axis.label }}"
+                     data-score="{{ axis.score }}"
+                     data-level="{{ axis.level }}"
+                     data-weight="{{ axis.weight }}"
+                     data-coverage="{{ axis.coverage_percent|floatformat:0 }}"
+                     data-covered="{% if axis.covered %}1{% else %}0{% endif %}">
+                    <circle class="radar-point" cx="{{ axis.x }}" cy="{{ axis.y }}" r="4.5" />
+                    <text class="radar-label" x="{{ axis.label_x }}" y="{{ axis.label_y }}"
+                          text-anchor="{{ axis.anchor }}">{{ axis.label }}</text>
+                    <text class="radar-value" x="{{ axis.label_x }}" y="{{ axis.value_y }}"
+                          text-anchor="{{ axis.anchor }}">
+                      {% if axis.covered %}{{ axis.score|floatformat:"-1" }} 分{% else %}暂无数据{% endif %}
+                    </text>
+                  </g>
+                {% endfor %}
+              </svg>
+              <div class="radar-tooltip" role="status" hidden></div>
+            </div>
+          {% else %}
+            <p class="tip">雷达图暂不可用，下面的维度分数与证据不受影响。</p>
+          {% endif %}
+          <ul class="capability-legend">
+            {% for row in capability.bloom %}
+              <li>
+                <span class="tag">{{ row.label }}</span>
+                {% if row.covered %}
+                  <strong>{{ row.score|floatformat:"-1" }}</strong> 分 · {{ row.level }} {{ row.level_label }}
+                {% else %}
+                  暂无数据
+                {% endif %}
+                <span class="subtle">{{ row.coverage_text }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div>
+          <h3>计算思维水平</h3>
+          <div class="capability-cards">
+            {% for card in capability.thinking %}
+              <article class="capability-card">
+                <header>
+                  <span>{{ card.label }}</span>
+                  <strong>{% if card.covered %}{{ card.score|floatformat:"-1" }}{% else %}—{% endif %}</strong>
+                </header>
+                <div class="capability-meter" role="img"
+                     aria-label="{{ card.label }}{% if card.covered %} {{ card.score|floatformat:'-1' }} 分{% else %} 暂无数据{% endif %}">
+                  <span style="width: {% if card.covered %}{{ card.percent|floatformat:0 }}{% else %}0{% endif %}%"></span>
+                </div>
+                <p class="subtle">
+                  {% if card.covered %}
+                    {{ card.level }} · {{ card.level_label }} · {{ card.coverage_text }}
+                  {% else %}
+                    暂无该维度的判题记录
+                  {% endif %}
+                </p>
+                {% if card.evidence %}
+                  <p class="capability-evidence">{{ card.evidence|join:"；" }}</p>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      {% if capability.summary %}
+        <div class="capability-diagnosis space-top">
+          <h3>诊断摘要</h3>
+          <ul>
+            {% for line in capability.summary %}<li>{{ line }}</li>{% endfor %}
+          </ul>
+          {% if capability.suggestion %}<p class="subtle">{{ capability.suggestion }}</p>{% endif %}
+        </div>
+      {% endif %}
+
+      {% if capability.observations %}
+        <details class="capability-observations space-top">
+          <summary>代码证据与改进建议（{{ capability.observations|length }} 条）</summary>
+          <ul>
+            {% for item in capability.observations %}
+              <li>
+                <span class="tag">{{ item.dimension_label }}</span>
+                <code>{{ item.task_id }}{% if item.line %} 第 {{ item.line }} 行{% endif %}</code>
+                {% if item.quote %}<p class="capability-quote">{{ item.quote }}</p>{% endif %}
+                <p>{{ item.comment }}{% if item.advice %} 建议：{{ item.advice }}{% endif %}</p>
+              </li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endif %}
+
+      {% if capability.code_facts.files %}
+        <p class="subtle space-top">
+          代码结构：共 {{ capability.code_facts.files }} 份提交、{{ capability.code_facts.lines }} 行；
+          自定义函数 {{ capability.code_facts.functions }} 个、类 {{ capability.code_facts.classes }} 个、
+          推导式 {{ capability.code_facts.comprehensions }} 处、最大嵌套 {{ capability.code_facts.max_depth }} 层、
+          魔法数字 {{ capability.code_facts.magic_numbers }} 处。
+        </p>
+      {% endif %}
+    {% else %}
+      <p class="tip space-top">{{ capability.empty_reason }}</p>
+    {% endif %}
+  </section>
+
   {% if tasks %}
     <section class="card space-bottom">
       <h2>训练题智能体</h2>

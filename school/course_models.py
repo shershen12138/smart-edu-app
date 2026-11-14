@@ -289,6 +289,32 @@ class QualityReport(models.Model):
         verbose_name_plural = '代码质量报告'
 
 
+class StudentCapabilityProfile(models.Model):
+    """学生综合能力画像：跨任务聚合布鲁姆六维与计算思维四维。
+
+    分数由评测报告逐题得分率确定性聚合，大模型只负责归因与诊断；
+    payload 与签名一起缓存，数据或提示词版本变化时自动重算。
+    """
+
+    SOURCES = [
+        ('llm', '大模型诊断'),
+        ('rule', '规则诊断'),
+    ]
+
+    student = models.OneToOneField(
+        'school.User', on_delete=models.CASCADE, related_name='capability_profile'
+    )
+    signature = models.CharField('数据指纹', max_length=64)
+    payload = models.JSONField('能力画像', default=dict)
+    source = models.CharField('诊断来源', max_length=8, choices=SOURCES, default='rule')
+    model = models.CharField('模型', max_length=80, blank=True)
+    generated_at = models.DateTimeField('生成时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '学生综合能力画像'
+        verbose_name_plural = '学生综合能力画像'
+
+
 class CourseworkRubric(models.Model):
     """题目分析智能体产出的评分标准（Markdown + 结构化维度）。"""
 
