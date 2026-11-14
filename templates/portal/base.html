@@ -5,8 +5,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{{ title|default:'工作台' }} · 课码</title>
-    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261107-3">
-    <script src="{% static 'portal.js' %}?v=20261107-1" defer></script>
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261114-1">
+    <script src="{% static 'portal.js' %}?v=20261114-1" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
   <body>
@@ -34,6 +34,8 @@
             <a href="{% url 'works' %}">作业管理</a>
             <a href="{% url 'classes' %}">班级清单</a>
             <a href="{% url 'results' %}">统计汇总与报表</a>
+          {% else %}
+            <a href="{% url 'practice' %}">弱项练习</a>
           {% endif %}
         </nav>
         <div class="sidebar-bottom">
@@ -44,6 +46,9 @@
           </small>
           <a href="{% url 'profile' %}">个人中心</a>
           <a href="{% url 'password' %}">修改密码</a>
+          <button class="text-button"
+                  type="button"
+                  data-llm-config-open>{% if llm_current %}大模型配置（已配置）{% else %}配置大模型{% endif %}</button>
           <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}
             <button class="text-button">退出登录</button>
@@ -80,5 +85,95 @@
         <span class="loading-label">正在加载…</span>
       </div>
     </div>
+    {% if user.is_authenticated %}
+      <dialog class="modal" id="llm-config-dialog" aria-labelledby="llm-config-title">
+        <form method="post" action="{% url 'llm_config' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <h2 id="llm-config-title">大模型配置</h2>
+          <p class="subtle">
+            评分标准智能体与训练题智能体使用<strong>你自己的</strong>大模型配置，
+            不会调用他人的 Key；这些信息仅保存在你的账号下。
+          </p>
+          <label>服务商
+            <select name="provider" data-llm-provider>
+              {% for key, item in llm_providers.items %}
+                <option value="{{ key }}"{% if llm_current and llm_current.provider == key %} selected{% endif %}>{{ item.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>接口地址（OpenAI 兼容）
+            <input name="base_url" data-llm-base value="{{ llm_current.base_url|default:'' }}"
+                   placeholder="https://api.deepseek.com" required>
+          </label>
+          <label>模型名
+            <input name="model" data-llm-model value="{{ llm_current.model|default:'' }}"
+                   placeholder="deepseek-chat" required>
+          </label>
+          <label>API Key
+            <input type="password" name="api_key" value="" autocomplete="off"
+                   placeholder="{% if llm_current %}已保存 {{ llm_current_masked }}，留空表示不修改{% else %}sk-...{% endif %}">
+          </label>
+          <p class="tip">当前用哪家的模型由你决定：支持任何 OpenAI 兼容端点。Key 只用于你自己的调用，页面只回显打码后的值。</p>
+          <div class="actions space-top">
+            <button class="button">保存配置</button>
+            <button class="button secondary" type="button" data-llm-config-close>取消</button>
+          </div>
+        </form>
+        {% if llm_current %}
+          <form method="post" action="{% url 'llm_config_clear' %}" class="space-top">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button class="text-button" type="submit">删除我的配置</button>
+          </form>
+        {% endif %}
+      </dialog>
+      <script>
+        // 大模型配置弹窗逻辑内联在页面里（不依赖静态 JS 的浏览器缓存，避免旧缓存导致点击无反应）
+        (function () {
+          const dialog = document.getElementById('llm-config-dialog');
+          if (!dialog) return;
+          const presets = {
+            deepseek: ['https://api.deepseek.com', 'deepseek-chat'],
+            qwen: ['https://dashscope.aliyuncs.com/compatible-mode/v1', 'qwen-plus'],
+            moonshot: ['https://api.moonshot.cn/v1', 'moonshot-v1-8k'],
+            openai: ['https://api.openai.com/v1', 'gpt-4o-mini'],
+            custom: ['', ''],
+          };
+          const provider = dialog.querySelector('[data-llm-provider]');
+          const baseInput = dialog.querySelector('[data-llm-base]');
+          const modelInput = dialog.querySelector('[data-llm-model]');
+          const keyInput = dialog.querySelector('input[name="api_key"]');
+
+          const openDialog = () => {
+            if (typeof dialog.showModal !== 'function') {
+              // 极旧浏览器不支持 <dialog>：退回为普通设置块显示
+              dialog.setAttribute('open', 'open');
+            } else if (!dialog.open) {
+              dialog.showModal();
+            }
+            keyInput?.focus();
+          };
+
+          provider?.addEventListener('change', () => {
+            const preset = presets[provider.value];
+            if (!preset) return;
+            if (baseInput && preset[0]) baseInput.value = preset[0];
+            if (modelInput && preset[1]) modelInput.value = preset[1];
+          });
+          dialog.querySelector('[data-llm-config-close]')?.addEventListener('click', () => dialog.close());
+          dialog.addEventListener('click', (event) => {
+            if (event.target === dialog) dialog.close();
+          });
+
+          document.querySelectorAll('[data-llm-config-open], [data-llm-required]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+              event.preventDefault();
+              openDialog();
+            });
+          });
+        })();
+      </script>
+    {% endif %}
   </body>
 </html>

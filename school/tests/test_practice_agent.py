@@ -1,5 +1,7 @@
 import ast
 import json
+import tempfile
+from pathlib import Path
 from unittest import mock
 
 from django.test import TestCase, override_settings
@@ -27,18 +29,21 @@ from school.models import (
     Problem,
     ProblemVersion,
     User,
+    UserLLMConfig,
     UserRole,
 )
 from school.portal import knowledge_profile, practice_agent, question_bank
 from school.storage import read_private, save_private
 
+# 私有存储重定向到临时目录，避免测试用例/提交代码写进真实 .runtime/private
+_PRIVATE_TMP = tempfile.TemporaryDirectory()
+PRIVATE_STORAGE_OVERRIDE = Path(_PRIVATE_TMP.name).resolve()
+
 TEST_OVERRIDES = dict(
     PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'],
     ROOT_URLCONF='config.urls',
     REDIS_URL='',
-    LLM_BASE_URL='',
-    LLM_API_KEY='',
-    LLM_MODEL='',
+    PRIVATE_STORAGE=PRIVATE_STORAGE_OVERRIDE,
     CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
 )
 
@@ -531,10 +536,17 @@ class PracticeAgentTests(TestCase):
                 },
             ]
         }
-        with mock.patch.object(practice_agent, 'chat', return_value=json.dumps(payload)), \
-                mock.patch.object(practice_agent, 'llm_configured', return_value=True):
+        UserLLMConfig.objects.create(
+            user=self.student,
+            provider='deepseek',
+            base_url='https://api.deepseek.com',
+            model='test-model',
+            api_key='sk-test-0123456789',
+        )
+        with mock.patch.object(practice_agent, 'chat', return_value=json.dumps(payload)):
             plan = practice_agent.generate_practice_plan(self.student)
         self.assertEqual(plan.source, 'llm')
+        self.assertEqual(plan.model, 'test-model')
         problems = list(plan.problems.all())
         self.assertEqual(len(problems), 1)
         self.assertEqual(problems[0].title, '区间裁剪')
@@ -754,14 +766,30 @@ class PracticeViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '当前没有得分率偏低的弱项知识点')
 
+    def test_student_dashboard_keeps_practice_in_sidebar_only(self):
+        """作业看板页不再显示学习工作空间区块，弱项练习入口只在侧边栏。"""
+        self._seed_weak_record()
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode('utf-8')
+        # 看板主体只剩作业列表，没有并列入口卡片
+        self.assertNotIn('按任务补短板', body)
+        self.assertNotIn('做题 · 提交 · 看反馈', body)
+        # 侧边栏仍保留弱项练习导航
+        self.assertIn(f'href="{reverse("practice")}"', body)
+        self.assertIn('弱项练习', body)
+
     def test_home_explains_disabled_reasons(self):
         self._seed_weak_record()
         self.client.force_login(self.student)
         response = self.client.get(reverse('practice'))
         self.assertEqual(response.status_code, 200)
         body = response.content.decode('utf-8')
-        self.assertIn('主按钮为什么禁用', body)
-        self.assertIn('LLM_BASE_URL', body)
+        # 未配置个人大模型：页面提示填写自己的 Key，并给出配置入口
+        self.assertIn('你自己的 API Key', body)
+        self.assertIn('配置我的大模型', body)
+        self.assertIn(reverse('llm_config'), body)
         # 分层题库文档已覆盖该弱项，题库提示不应出现
         self.assertNotIn('“根据现有题库生成训练题”为什么会失败', body)
 

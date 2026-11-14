@@ -30,8 +30,8 @@ from school.judge import CaseOutcome, InfrastructureError, run_case
 from school.models import ProblemVersion, User
 from school.storage import read_private, save_private
 
-from . import grading, knowledge_profile, question_bank
-from .rubric_agent import LLMNotConfigured, chat, llm_configured, llm_status
+from . import grading, knowledge_profile, llm_client, question_bank
+from .llm_client import LLMError, LLMNotConfigured, chat  # noqa: F401
 
 PROMPT_VERSION = 'v1'
 
@@ -365,21 +365,22 @@ def generate_practice_plan(
     if not weak:
         return None
 
-    if offline or not llm_configured():
+    if offline or not llm_configured(student):
         if not offline:
             raise LLMNotConfigured(
-                '未配置大模型端点。请设置 LLM_BASE_URL / LLM_API_KEY / LLM_MODEL，'
-                '或显式使用规则兜底。'
+                '当前账号还没有配置大模型。请点击“配置大模型”，选择服务商并填写你自己的 API Key，'
+                '或改用现有题库生成。'
             )
         questions = rule_based(weak)
         source, model = 'rule', ''
     else:
         text = chat(
             build_messages(weak, context['mastered'], existing_titles(student)),
+            user=student,
             temperature=0.3,
         )
         questions = parse_practice(text, [item['name'] for item in weak])
-        source, model = 'llm', settings.LLM_MODEL
+        source, model = 'llm', llm_client.get_config(student).model
 
     if not questions:
         if source == 'rule':
@@ -505,5 +506,10 @@ def latest_plan(student: User, work=None) -> PracticePlan | None:
     return plans.first()
 
 
-def status_text() -> str:
-    return llm_status()
+def llm_configured(student) -> bool:
+    """该学生是否已配置自己的大模型端点。"""
+    return llm_client.configured(student)
+
+
+def status_text(student) -> str:
+    return llm_client.status_text(student)

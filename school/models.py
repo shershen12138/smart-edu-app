@@ -49,6 +49,28 @@ class UserRole(models.Model):
         constraints = [models.UniqueConstraint(fields=['user', 'role'], name='unique_user_role')]
 
 
+class UserLLMConfig(models.Model):
+    """用户自备的大模型调用配置（OpenAI 兼容端点）。
+
+    评分标准智能体与训练题智能体只使用“当前操作用户”自己的配置，
+    不再读取项目级的全局 Key；同一位用户可随时在弹窗中更换服务商、
+    模型与 API Key。
+    """
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='llm_config')
+    provider = models.CharField('服务商', max_length=24, default='deepseek')
+    base_url = models.CharField('接口地址', max_length=200)
+    model = models.CharField('模型名', max_length=80)
+    api_key = models.CharField('API Key', max_length=200)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'user_llm_configs'
+
+    def __str__(self):
+        return f'{self.user.username} · {self.provider} · {self.model}'
+
+
 class Classroom(models.Model):
     code = models.CharField('班级编号', max_length=40, unique=True)
     name = models.CharField('班级名称', max_length=80)

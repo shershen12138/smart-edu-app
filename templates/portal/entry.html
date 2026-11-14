@@ -11,9 +11,6 @@
         <a class="button" data-loading="正在生成评测报告…"
            href="{% url 'quality_report' entry.pk %}">查看评测报告</a>
       {% endif %}
-      {% if portal_role == "student" %}
-        <a class="button" href="{% url 'practice' %}">针对弱项练习</a>
-      {% endif %}
       <a class="button secondary" data-no-loading href="{% url 'entry_source' entry.pk %}">下载本次{% if entry.coursework.grading_mode == "manual" %}答案 ZIP{% else %} Python 文件{% endif %}</a>
     </div>
   </div>

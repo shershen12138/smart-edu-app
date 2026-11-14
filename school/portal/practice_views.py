@@ -148,8 +148,8 @@ def practice_home(request):
         '个性化训练',
         tasks=sections,
         any_weak=bool(merged_weak),
-        llm_ready=practice_agent.llm_configured(),
-        llm_status=practice_agent.status_text(),
+        llm_ready=practice_agent.llm_configured(request.user),
+        llm_status=practice_agent.status_text(request.user),
         bank_ready=practice_agent.bank_matches_exist(merged_weak),
         back_url=reverse('dashboard'),
     )

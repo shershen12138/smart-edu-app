@@ -819,6 +819,21 @@ td small {
   padding: 0
 }
 
+/* 侧边栏按钮（如"配置大模型"）与"个人中心""修改密码"等链接保持同样字号与排版 */
+.sidebar-bottom>button.text-button {
+  grid-column: 1/-1;
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: inherit;
+  text-align: left;
+  color: var(--green);
+  cursor: pointer
+}
+
 .form-card {
   max-width: 860px
 }
@@ -1459,4 +1474,48 @@ button[aria-busy="true"] {
   .spinner {
     animation-duration: 2.4s;
   }
+}
+
+/* 大模型配置弹窗 */
+.modal {
+  width: min(580px, 92vw);
+  border: 1px solid #d8dee9;
+  border-radius: 14px;
+  padding: 26px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
+  color: #0f172a;
+}
+
+.modal::backdrop {
+  background: rgba(15, 23, 42, .45);
+}
+
+.modal h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.modal label {
+  display: block;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.modal label input,
+.modal label select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 9px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.modal .tip {
+  font-size: 12px;
+  margin-top: 12px;
 }

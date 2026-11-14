@@ -108,11 +108,9 @@ JUDGE_CONTAINER_START_GRACE_SECONDS = float(
 COURSEWORK_CASE_TIME_MS = int(os.getenv('COURSEWORK_CASE_TIME_MS', '2000'))
 COURSEWORK_SUBMISSION_TIME_MS = int(os.getenv('COURSEWORK_SUBMISSION_TIME_MS', '30000'))
 
-# 题目分析智能体：OpenAI 兼容的对话补全端点。
-# 未配置时必须走规则兜底并在结果中标注来源，不能把兜底结果当成模型结论。
-LLM_BASE_URL = os.getenv('LLM_BASE_URL', '').rstrip('/')
-LLM_API_KEY = os.getenv('LLM_API_KEY', '')
-LLM_MODEL = os.getenv('LLM_MODEL', '')
+# 大模型：不再保存项目级端点与密钥。每位用户在“大模型配置”弹窗里
+# 填写自己的服务商、接口地址、模型与 API Key（存 UserLLMConfig），
+# 未配置时只能走规则兜底并在结果中标明来源。
 LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', '60'))
 # 个性化训练：知识点得分率低于该阈值视为弱项，触发训练题智能体出题。
 PRACTICE_WEAK_THRESHOLD = float(os.getenv('PRACTICE_WEAK_THRESHOLD', '0.6'))

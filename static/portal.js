@@ -96,7 +96,11 @@ const initRadar = () => {
       tip.textContent = '';
       const name = document.createElement('strong');
       name.textContent = axis.dataset.label || '';
-      tip.append(name, ` ${axis.dataset.score || '0'} 分 · 权重 ${axis.dataset.weight || '0'}%`);
+      const level = axis.dataset.level ? `（${axis.dataset.level} 级）` : '';
+      tip.append(
+        name,
+        ` ${axis.dataset.score || '0'} 分${level} · 权重 ${axis.dataset.weight || '0'}%`,
+      );
       tip.hidden = false;
     };
     wrap.querySelectorAll('.radar-axis').forEach((axis) => {
@@ -114,3 +118,4 @@ const initRadar = () => {
 };
 
 initRadar();
+

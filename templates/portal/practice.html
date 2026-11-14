@@ -13,12 +13,15 @@
       <p class="subtle">{{ llm_status }}</p>
       {% if any_weak and not llm_ready %}
         <p class="tip space-top">
-          <strong>主按钮为什么禁用：</strong>未配置大模型端点。需要在部署目录的 <code>.env</code>
-          中填写 <code>LLM_BASE_URL</code>（OpenAI 兼容接口地址）、
-          <code>LLM_API_KEY</code>（密钥）和 <code>LLM_MODEL</code>（模型名），
-          然后重启服务。系统不会在缺配置时伪装调用；不配置也可以用各任务下的
-          “根据现有题库生成训练题”按钮直接挑选现成题目。
+          <strong>如何用自己的大模型出题：</strong>点击下方按钮或左侧“配置大模型”，
+          选择服务商（DeepSeek、通义千问、Kimi、OpenAI 或任何 OpenAI 兼容端点）并填写
+          <strong>你自己的 API Key</strong>；保存后回到本页再点一次即可生成。
+          配置只对当前账号生效。不配置也可以直接用各任务下的
+          “根据现有题库为该任务生成训练题”按钮挑选现成题目。
         </p>
+        <div class="actions space-top">
+          <button class="button secondary" type="button" data-llm-config-open>配置我的大模型</button>
+        </div>
       {% endif %}
       {% if any_weak and not bank_ready %}
         <p class="tip space-top">
@@ -61,17 +64,17 @@
           <form method="post" data-loading="正在调用大模型生成训练题，可能需要几十秒…">
             {% csrf_token %}
             <input type="hidden" name="work" value="{{ section.work.pk }}">
-            <button
-              class="button"
-              {% if not llm_ready or not section.weak %}
-                disabled
-                {% if not llm_ready %}
-                  title="不可用：尚未配置大模型端点（.env 中 LLM_BASE_URL、LLM_API_KEY、LLM_MODEL）"
-                {% else %}
-                  title="不可用：该任务没有得分率偏低的弱项知识点"
-                {% endif %}
-              {% endif %}
-            >为该任务调用大模型生成训练题</button>
+            {% if not llm_ready %}
+              <button class="button" type="button" data-llm-required
+                      title="先配置你自己的大模型：选择服务商并填写 API Key">配置我的大模型后出题</button>
+            {% else %}
+              <button class="button"
+                      {% if not section.weak %}
+                        disabled
+                        title="不可用：该任务没有得分率偏低的弱项知识点"
+                      {% endif %}
+              >为该任务调用大模型生成训练题</button>
+            {% endif %}
           </form>
           <form method="post" data-loading="正在从现有题库挑选训练题…">
             {% csrf_token %}
