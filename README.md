@@ -277,7 +277,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 
 ### 测试
 
-`school/tests/` 共 23 个 `test_*.py`，无 `conftest.py`，夹具由各文件 `setUp` 自建。
+测试分两套：`school/tests/`（23 个 `test_*.py`，项目自身回归，655 项）与根目录 `tests/`（3 个模块，软件测试实践作业的单元/等价类/场景用例，60 项，配套 `tests/TEST_PLAN.md`）。两套都没有 `conftest.py`，夹具由各文件 `setUp` 自建。
 
 | 分组 | 模块 | 覆盖内容 |
 | --- | --- | --- |

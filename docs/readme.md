@@ -14,6 +14,7 @@
 | 看做到哪一步、验证了什么 | [VALIDATION.md](VALIDATION.md) | 按日期倒序的验证记录：测试项数、真实 Docker 结果、迁移演练、浏览器实测，以及**未验证的边界**（学校现场、跨网段、并发压测） |
 | 了解系统设计与取舍 | [software/architecture.md](software/architecture.md) | 技术方案调研：架构分层、Docker 沙箱、数据模型与替代方案对比 |
 | 看一次第三方代码评审记录 | [software/CodeReview.md](software/CodeReview.md) | 历史评审报告；其中个别结论已被后续提交修复，只作过程记录 |
+| 看产品原型测试与评估结论 | [PRODUCT_EVALUATION.md](PRODUCT_EVALUATION.md) | 针对当前原型的测试范围、通过项与遗留问题，可作为交叉测试的对照材料 |
 | 看需求/软件工程作业材料 | [requirements/](requirements/) | 问题定义、功能规格、非功能规格、管理员与教师用户故事 |
 | 看项目管理材料 | [mgmt/](mgmt/) | 沟通管理计划、风险登记册 |
 | 只看界面长什么样、不启动服务 | [software/prototype/README.md](software/prototype/README.md) | AI 生成的交互式原型：直接双击 HTML，示例数据、不连后端、不跑学生代码 |
