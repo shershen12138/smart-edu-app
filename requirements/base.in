@@ -1,0 +1,13 @@
+# 运行时直接依赖（宽松版本区间）。
+# 这里只声明"允许用哪些版本"，真正安装的是同目录下的 base.txt（逐条锁定）。
+# 新增依赖时先改本文件，再重新生成 base.txt，避免两份清单漂移。
+Django>=5.2.17,<5.3
+celery[redis]>=5.6.3,<6
+dj-database-url>=3.1,<4
+PyMySQL>=1.1,<2
+cryptography>=44
+whitenoise>=6.9,<7
+python-dotenv>=1.1,<2
+openpyxl>=3.1,<4
+waitress>=3,<4
+langgraph>=0.3,<0.4

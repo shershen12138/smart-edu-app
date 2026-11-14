@@ -1,3 +1,5 @@
+# 运行时依赖的精确锁定（含传递依赖），Docker 镜像与本地安装都以本文件为准。
+# 上游约束见 base.in；改动后请同步本文档与 Dockerfile。手工编辑易错，建议用 pip freeze 生成。
 amqp==5.4.0
 annotated-types==0.8.0
 asgiref==3.12.1

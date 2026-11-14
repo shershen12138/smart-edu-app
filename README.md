@@ -40,11 +40,11 @@
 ```powershell
 cd 仓库根目录
 py -3.12 -m venv .venv                       # 或 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements/dev.txt
 Copy-Item .env.example .env
 ```
 
-`requirements.lock.txt` 是锁定版本，`requirements.txt` 为宽松约束，`requirements-dev.txt` 追加开发工具（含 pylint，缺失时缺陷检测类测试会失败）。`.env` 中按需填写 `REDIS_URL`（留空则用本地文件缓存）、`PRIVATE_STORAGE`（留空默认 `.runtime/private`）、`LLM_TIMEOUT`。`.env` 不进 Git。
+依赖全部收在 `requirements/` 目录：`base.in` 是宽松版本区间，`base.txt` 是精确锁定（含传递依赖，Docker 镜像与部署用它），`dev.txt` 在 `base.txt` 之上追加开发工具（含 pylint 与 matplotlib，缺失时缺陷检测与雷达图会降级）。日常安装用 `dev.txt` 即可，它已包含 `base.txt`。`.env` 中按需填写 `REDIS_URL`（留空则用本地文件缓存）、`PRIVATE_STORAGE`（留空默认 `.runtime/private`）、`LLM_TIMEOUT`。`.env` 不进 Git。
 
 **大模型不再写在 `.env` 里**：每位用户登录后点击侧边栏“配置大模型”，选择服务商（DeepSeek、通义千问、Kimi、OpenAI 或任何 OpenAI 兼容端点）并填写自己的 API Key。配置保存在数据库中（`UserLLMConfig`），只对本人生效；评分标准智能体使用教师自己的配置，训练题智能体使用学生自己的配置，未配置时只能走规则兜底。页面只回显打码后的 Key。
 

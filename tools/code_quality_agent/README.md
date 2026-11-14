@@ -84,7 +84,7 @@ models.py 数据契约（TaskSpec / TaskResult / Issue / Dimension / StudentAnal
 
 LLM 是可选扩展点：图本身不调用大模型，所有结论来自 AST 与 pylint。评分标准与主能力的归纳由 `school/portal/rubric_agent.py` 在教师触发时调用模型，不在评测图内。
 
-依赖 `langgraph`（`requirements.txt` 与 `requirements.lock.txt` 均已列出）。导入 langgraph 时会向 stderr 打印一条与 `allowed_objects` 默认值有关的 `LangChainPendingDeprecationWarning`，它不受 warnings 过滤器控制，属第三方一次性输出，不影响结果。
+依赖 `langgraph`（`requirements/base.in` 与锁定的 `requirements/base.txt` 均已列出）。导入 langgraph 时会向 stderr 打印一条与 `allowed_objects` 默认值有关的 `LangChainPendingDeprecationWarning`，它不受 warnings 过滤器控制，属第三方一次性输出，不影响结果。
 
 ### 模块职责
 
@@ -184,12 +184,12 @@ LLM 是可选扩展点：图本身不调用大模型，所有结论来自 AST �
 
 ```powershell
 # Windows
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements/dev.txt
 ```
 
 ```bash
 # Ubuntu
-.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip install -r requirements/dev.txt
 ```
 
 ## 评分标准从哪来

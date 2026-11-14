@@ -11,11 +11,11 @@
 如果已经安装 Git，也可以在准备存放项目的文件夹打开终端，执行：
 
 ```bash
-git clone --branch codex/simplified-coursework --single-branch https://gitee.com/arongmiao/python-course-judge.git
-cd python-course-judge
+git clone --branch main --single-branch https://github.com/shershen12138/smart-edu-app.git
+cd smart-edu-app
 ```
 
-后续“项目目录”指同时包含 `manage.py`、`school`、`requirements.lock.txt`、`README.md` 的文件夹。ZIP 解压后如果外面还有一层文件夹，要进入里面这一层。
+后续“项目目录”指同时包含 `manage.py`、`school`、`requirements/dev.txt`、`README.md` 的文件夹。ZIP 解压后如果外面还有一层文件夹，要进入里面这一层。
 
 ## 2. 准备软件
 
@@ -42,10 +42,10 @@ Ubuntu 的 Docker 依照 [Docker Engine 官方安装说明](https://docs.docker.
 在资源管理器中打开**项目目录**，地址栏输入 `powershell` 后回车。下面每条命令执行成功后再运行下一条；有报错先保留完整输出处理。
 
 ```powershell
-Get-Item manage.py, requirements.lock.txt
+Get-Item manage.py, requirements\dev.txt
 py -3.12 --version
 py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements/dev.txt
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 notepad .env
 ```
@@ -82,10 +82,10 @@ REDIS_URL=
 在文件管理器中打开**项目目录**，空白处右键“在终端打开”。逐条执行：
 
 ```bash
-ls manage.py requirements.lock.txt
+ls manage.py requirements/dev.txt
 python3.12 --version
 python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements.lock.txt
+.venv/bin/python -m pip install -r requirements/dev.txt
 test -f .env || cp .env.example .env
 nano .env
 ```
@@ -206,7 +206,7 @@ RUN_DOCKER_TESTS=1 .venv/bin/python manage.py test school.tests.test_docker --no
 
 **更新学校网站：**在已经部署好的 Ubuntu 电脑，下载最新分支源码、解压后，在包含 `manage.py` 的目录执行 `sudo bash deploy/linux/update.sh`。需要原 `/opt/coursejudge` 配置和已安装镜像；脚本会先备份再迁移。完整步骤及失败处理见 [学校更新说明](../deploy/linux/README.md)。仅执行 `git pull` 不会自动替换正在运行的 Docker 网站。
 
-**更新自己的测试环境：**有 Git 的源码目录先检查 `git status`，自己的修改先保存，再 `git pull --ff-only`；停掉两个终端中的进程后，安装 `requirements.lock.txt`、运行 `migrate`，再启动两个进程。保留原 `.env` 和 `.runtime`，不要重新执行账号重置。用 ZIP 更新时应保留原环境和数据，避免把旧文件夹当成可直接删除的临时文件。
+**更新自己的测试环境：**有 Git 的源码目录先检查 `git status`，自己的修改先保存，再 `git pull --ff-only`；停掉两个终端中的进程后，安装 `requirements/dev.txt`、运行 `migrate`，再启动两个进程。保留原 `.env` 和 `.runtime`，不要重新执行账号重置。用 ZIP 更新时应保留原环境和数据，避免把旧文件夹当成可直接删除的临时文件。
 
 ## 交给 AI 的请求
 

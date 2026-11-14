@@ -28,7 +28,7 @@ git push -u origin codex/your-feature
 
 ## 合作约定
 
-可选开发工具：`pip install -r requirements-dev.txt`。
+可选开发工具：`pip install -r requirements/dev.txt`（已包含运行时锁定 `requirements/base.txt`）。
 使用虚拟环境解释器运行检查。Python 可用 `python -m ruff format`，Django 模板可用 `python -m djlint --reformat`，只格式化本次修改的文件。Windows 可执行 `scripts/check.ps1`；Ubuntu 可激活 `.venv` 后运行 `bash scripts/check.sh`。真实 Docker 测试命令见安装指南。
 
 - 页面只显示当前题目和作业；草稿原地更新。已发布内容变化时后台保存快照，保留旧提交与成绩依据。

@@ -1,0 +1,14 @@
+# 开发与测试环境：运行时锁定 + 开发工具。安装用 `pip install -r requirements/dev.txt`。
+# 已包含 base.txt 全部内容，不必再单独安装 base.txt。
+-r base.txt
+
+# 格式化与静态检查
+ruff==0.16.8
+djlint==1.46.2
+pylint>=3.3,<5
+
+# 代码质量报告：雷达图依赖 matplotlib；缺失时 radar_png() 降级为无图
+matplotlib>=3.8,<4
+
+# 类型存根，供 IDE 与 pyright 使用
+django-stubs>=5.2,<6

@@ -1,8 +1,8 @@
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
-COPY requirements.lock.txt /app/requirements.lock.txt
-RUN pip install --no-cache-dir -r requirements.lock.txt
+COPY requirements/ /app/requirements/
+RUN pip install --no-cache-dir -r requirements/base.txt
 COPY . /app
 RUN useradd --create-home --uid 10001 coursejudge && mkdir -p /app/.runtime /storage && chown -R coursejudge:coursejudge /app /storage
 USER coursejudge

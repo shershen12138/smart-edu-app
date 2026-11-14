@@ -4,7 +4,7 @@ $projectDirectory = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectDirectory
 $pythonPath = Join-Path $projectDirectory '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $pythonPath)) {
-    Write-Error '请先使用 Python 3.12 创建 .venv 并安装 requirements.lock.txt。'
+    Write-Error '请先使用 Python 3.12 创建 .venv 并安装 requirements/dev.txt。'
     exit 1
 }
 & $pythonPath manage.py migrate

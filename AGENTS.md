@@ -9,7 +9,7 @@
 
 ## 环境与数据
 
-本地使用 Python 3.12、`requirements.lock.txt`、SQLite 与 `run_judge`；没有 Node 构建步骤。Windows 虚拟环境解释器是 `.venv/Scripts/python.exe`，Ubuntu 是 `.venv/bin/python`。网页与本地批阅分别运行；机器批阅需要 Docker Linux 引擎和 `python:3.12-slim`。
+本地使用 Python 3.12、`requirements/dev.txt`（内含锁定的 `requirements/base.txt`）、SQLite 与 `run_judge`；没有 Node 构建步骤。Windows 虚拟环境解释器是 `.venv/Scripts/python.exe`，Ubuntu 是 `.venv/bin/python`。网页与本地批阅分别运行；机器批阅需要 Docker Linux 引擎和 `python:3.12-slim`。
 
 学校部署使用 Docker、MySQL、Redis 与 Celery；源码仓库中的根 `compose.yaml` 为通用 HTTPS 部署参考，`deploy/linux/compose.yaml` 为现有校园部署更新配置，两者不能混用。不要替换现场网络、防火墙和动态 IP 脚本。
 
