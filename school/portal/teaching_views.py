@@ -143,6 +143,8 @@ def work_edit(request, pk=None):
         '修改作业' if pk else '上传题目文件',
         form,
         reverse('works'),
+        template='work_form',
+        work=work,
         description='先选择机器批阅或非机器批阅。机器批阅上传机器批阅包；非机器批阅上传包含题目DOCX和数据文件的ZIP。',
         secondary_action=(
             link('更新单个文件', 'work_package_file', work.pk)

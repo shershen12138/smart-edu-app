@@ -33,7 +33,9 @@ if (gradingModes.length) {
 
 // 加载遮罩：链接跳转与表单提交时显示，避免长请求期间页面毫无反馈。
 // 延迟 120ms 再出现，本地快速跳转不会闪一下；30s 兜底隐藏，防止下载类操作卡住。
-const loadingOverlay = document.querySelector('[data-loading]');
+// 必须只取全局遮罩：表单本身也带 data-loading（用于自定义提示文案），
+// 若用 [data-loading] 会先选中表单，首屏 load 时把表单隐藏，上传页因此空白。
+const loadingOverlay = document.querySelector('.loading-overlay');
 const loadingLabel = loadingOverlay?.querySelector('.loading-label');
 let loadingShowTimer = 0;
 let loadingHideTimer = 0;

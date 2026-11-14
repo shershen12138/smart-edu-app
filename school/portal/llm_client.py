@@ -95,7 +95,7 @@ def status_text(user) -> str:
     config = get_config(user)
     if not config:
         return (
-            '当前账号尚未配置大模型：点击“配置大模型”选择服务商并填写你自己的 API Key，'
+            '当前账号尚未配置大模型：点击“大模型配置”选择服务商并填写你自己的 API Key，'
             '之后评分标准智能体与训练题智能体都会使用这份个人配置。'
         )
     if not configured(user):
@@ -148,7 +148,7 @@ def chat(messages: list[dict[str, str]], user, temperature: float = 0.2) -> str:
     config = get_config(user)
     if not configured(user):
         raise LLMNotConfigured(
-            '当前账号还没有配置大模型。请点击“配置大模型”，选择服务商并填写你自己的 API Key。'
+            '当前账号还没有配置大模型。请点击“大模型配置”，选择服务商并填写你自己的 API Key。'
         )
     base = config.base_url
     url = base if base.endswith('/chat/completions') else base + '/chat/completions'

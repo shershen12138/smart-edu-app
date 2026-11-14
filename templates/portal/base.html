@@ -5,8 +5,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{{ title|default:'工作台' }} · 课码</title>
-    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261114-9">
-    <script src="{% static 'portal.js' %}?v=20261114-9" defer></script>
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261114-11">
+    <script src="{% static 'portal.js' %}?v=20261114-10" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
   <body>
@@ -47,15 +47,17 @@
           <small>
             {% if portal_role == "admin" %}管理员{% elif portal_role == "teacher" %}教师{% elif portal_role == "student" %}学生{% else %}待授权{% endif %}
           </small>
-          <a href="{% url 'profile' %}">个人中心</a>
-          <a href="{% url 'password' %}">修改密码</a>
-          <button class="text-button"
-                  type="button"
-                  data-llm-config-open>{% if llm_current %}大模型配置（已配置）{% else %}配置大模型{% endif %}</button>
-          <form method="post" action="{% url 'logout' %}">
-            {% csrf_token %}
-            <button class="text-button">退出登录</button>
-          </form>
+          <div class="sidebar-actions" role="navigation" aria-label="账号操作">
+            <a class="sidebar-action" href="{% url 'profile' %}">个人中心</a>
+            <a class="sidebar-action" href="{% url 'password' %}">修改密码</a>
+            <button class="sidebar-action" type="button" data-llm-config-open>
+              大模型配置{% if llm_current %}<span class="sidebar-action-tag">已配置</span>{% endif %}
+            </button>
+            <form method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button class="sidebar-action" type="submit">退出登录</button>
+            </form>
+          </div>
         </div>
       </aside>
     {% endif %}

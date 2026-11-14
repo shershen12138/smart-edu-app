@@ -1,0 +1,187 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <h1>{{ title }}</h1>
+      {% if description %}<p>{{ description }}</p>{% endif %}
+    </div>
+    {% if secondary_action %}
+      <a class="button secondary" href="{{ secondary_action.url }}">{{ secondary_action.label }}</a>
+    {% endif %}
+  </div>
+
+  <form method="post"
+        enctype="multipart/form-data"
+        class="work-form"
+        data-loading="正在保存作业与批阅包…">
+    {% csrf_token %}
+    {{ form.revision }}
+    {% if form.non_field_errors %}
+      <div class="message error" role="alert">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="work-form-layout">
+      <div class="work-form-main">
+        <section class="card form-section">
+          <header class="form-section-head">
+            <span class="form-step" aria-hidden="true">1</span>
+            <div>
+              <h2>选择批阅方式</h2>
+              <p class="subtle">机器批阅自动运行测试用例并按通过比例计分；非机器批阅由教师按评分标准打分。</p>
+            </div>
+          </header>
+          <div class="choice-grid">
+            {% for radio in form.grading_mode %}
+              <label class="choice-card" for="{{ radio.id_for_label }}">
+                {{ radio.tag }}
+                <span class="choice-copy">
+                  <strong>{{ radio.choice_label }}</strong>
+                  <small>
+                    {% if forloop.first %}
+                      学生提交单个 .py，系统自动运行用例、生成评测报告与代码质量分析。
+                    {% else %}
+                      学生提交包含多个 .py 的 ZIP，由教师逐项评分，不启动评测容器。
+                    {% endif %}
+                  </small>
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+          {{ form.grading_mode.errors }}
+        </section>
+
+        <section class="card form-section">
+          <header class="form-section-head">
+            <span class="form-step" aria-hidden="true">2</span>
+            <div>
+              <h2>时间与教学班</h2>
+              <p class="subtle">学生只能看到自己所在教学班的任务，截止时间后不能再提交。</p>
+            </div>
+          </header>
+          <div class="field-grid">
+            <label class="field" for="{{ form.classroom.id_for_label }}">
+              <span class="field-label">{{ form.classroom.label }}</span>
+              {{ form.classroom }}
+              {{ form.classroom.errors }}
+            </label>
+            <label class="field" for="{{ form.deadline.id_for_label }}">
+              <span class="field-label">{{ form.deadline.label|default:'截止时间' }}</span>
+              {{ form.deadline }}
+              {{ form.deadline.errors }}
+            </label>
+          </div>
+        </section>
+
+        <section class="card form-section">
+          <header class="form-section-head">
+            <span class="form-step" aria-hidden="true">3</span>
+            <div>
+              <h2>上传题目文件</h2>
+              <p class="subtle">保存时会立即校验 ZIP 结构；校验失败会在下方给出具体缺项。</p>
+            </div>
+          </header>
+
+          <div class="upload-field">
+            {{ form.package_file }}
+            <label class="upload-drop" for="{{ form.package_file.id_for_label }}">
+              <span class="upload-icon" aria-hidden="true">↑</span>
+              <span class="upload-copy">
+                <strong>点击选择 ZIP 文件</strong>
+                <small data-file-name>尚未选择文件</small>
+                <small data-package-hint>
+                  机器批阅包：题目 DOCX + sample*.py + gold.py + func_info_list.txt + data 目录，不超过 10 MB。
+                </small>
+              </span>
+              <span class="button secondary small" aria-hidden="true">浏览文件</span>
+            </label>
+          </div>
+          {{ form.package_file.errors }}
+
+          {% if work %}
+            {% if work.package.archive_path or work.materials_path %}
+              <p class="tip space-top">
+                当前作业已有题目文件；不重新上传将保留原文件，切换批阅方式时必须重新上传。
+                只改单个文件可使用右上角“更新单个文件”。
+              </p>
+            {% endif %}
+          {% endif %}
+
+          <label class="switch-card" data-auto-rubric for="{{ form.auto_rubric.id_for_label }}">
+            {{ form.auto_rubric }}
+            <span>
+              <strong>{{ form.auto_rubric.label }}</strong>
+              <small>{{ form.auto_rubric.help_text }}</small>
+            </span>
+          </label>
+          {{ form.auto_rubric.errors }}
+        </section>
+      </div>
+
+      <aside class="work-form-aside">
+        <section class="card aside-card">
+          <h2>上传前检查</h2>
+          <ul class="check-list">
+            <li>机器批阅包必须包含题目 DOCX、sample*.py、gold.py、func_info_list.txt 与 data 目录。</li>
+            <li>非机器批阅包包含一份题目 DOCX 和学生所需的数据文件。</li>
+            <li>单个 ZIP 不超过 10 MB，包内路径与文件名不要使用中文以外的特殊字符。</li>
+            <li>已有学生提交后，批阅方式不能再切换。</li>
+            <li>勾选“自动调用大模型生成评分标准”会使用你个人的模型配置，未配置时自动退回规则生成。</li>
+          </ul>
+        </section>
+        <section class="card aside-card">
+          <h2>ZIP 结构示例</h2>
+          <pre class="file-tree">chapter.zip
+├─ 03-列表习题说明.docx
+├─ sample03.py
+├─ gold.py
+├─ func_info_list.txt
+└─ data/
+   └─ func301.txt</pre>
+          <p class="subtle aside-note">gold.py 只用于服务端评测，不会发给学生。</p>
+        </section>
+      </aside>
+    </div>
+
+    <div class="form-actions">
+      <button class="button" type="submit">保存并发布</button>
+      <a class="button secondary" href="{{ back_url }}">取消并返回</a>
+      <span class="subtle form-actions-note">保存后学生即可在截止时间前查看与提交。</span>
+    </div>
+  </form>
+
+  <script>
+    (function () {
+      const fileInput = document.getElementById('id_package_file');
+      const fileName = document.querySelector('[data-file-name]');
+      if (fileInput && fileName) {
+        fileInput.addEventListener('change', () => {
+          const picked = fileInput.files && fileInput.files[0];
+          fileName.textContent = picked ? picked.name : '尚未选择文件';
+          fileName.classList.toggle('is-set', Boolean(picked));
+        });
+      }
+
+      const autoRubric = document.getElementById('id_auto_rubric');
+      const autoCard = document.querySelector('[data-auto-rubric]');
+      const packageHint = document.querySelector('[data-package-hint]');
+      const syncMode = () => {
+        const mode = document.querySelector('input[name="grading_mode"]:checked')?.value;
+        const manual = mode === 'manual';
+        if (autoRubric) {
+          autoRubric.disabled = manual;
+          if (manual) autoRubric.checked = false;
+        }
+        if (autoCard) autoCard.classList.toggle('is-disabled', manual);
+        if (packageHint) {
+          packageHint.textContent = manual
+            ? '非机器批阅包：一份题目 DOCX + 学生数据文件，不超过 10 MB。'
+            : '机器批阅包：题目 DOCX + sample*.py + gold.py + func_info_list.txt + data 目录，不超过 10 MB。';
+        }
+      };
+      document.querySelectorAll('input[name="grading_mode"]').forEach((radio) => {
+        radio.addEventListener('change', syncMode);
+      });
+      syncMode();
+    })();
+  </script>
+{% endblock %}

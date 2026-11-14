@@ -375,7 +375,7 @@ def generate_practice_plan(
     if offline or not llm_configured(student):
         if not offline:
             raise LLMNotConfigured(
-                '当前账号还没有配置大模型。请点击“配置大模型”，选择服务商并填写你自己的 API Key，'
+                '当前账号还没有配置大模型。请点击“大模型配置”，选择服务商并填写你自己的 API Key，'
                 '或改用现有题库生成。'
             )
         questions = rule_based(weak)

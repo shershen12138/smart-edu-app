@@ -172,14 +172,64 @@ button:disabled {
   grid-row: span 2
 }
 
-.sidebar-bottom>a,
-.sidebar-bottom>form {
-  font-size: 12px;
-  margin-top: 10px
-}
-
 .sidebar-bottom>small {
   color: var(--muted)
+}
+
+/* 个人中心 / 修改密码 / 大模型配置 / 退出登录：统一为等高、等距的操作列表 */
+.sidebar-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line)
+}
+
+.sidebar-actions form {
+  margin: 0
+}
+
+.sidebar-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--green);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background .15s ease
+}
+
+.sidebar-action:hover {
+  background: var(--green-light);
+  text-decoration: none
+}
+
+.sidebar-action:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px
+}
+
+.sidebar-action-tag {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500
 }
 
 .avatar {
@@ -1163,6 +1213,342 @@ td small {
   font-size: 15px
 }
 
+/* 作业上传页：分步卡片、批阅方式选择、ZIP 上传区与右侧检查清单 */
+.work-form {
+  max-width: 1180px
+}
+
+.work-form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start
+}
+
+.work-form-main {
+  display: grid;
+  gap: 18px
+}
+
+.form-section {
+  padding: 24px
+}
+
+.form-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px
+}
+
+.form-step {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green-light);
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 700
+}
+
+.form-section-head h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  line-height: 1.3
+}
+
+.form-section-head .subtle {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6
+}
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px
+}
+
+.choice-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font-weight: 400;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease
+}
+
+.choice-card:hover {
+  border-color: #c9dcd3
+}
+
+.choice-card:has(input:checked) {
+  border-color: var(--green);
+  background: var(--green-light)
+}
+
+.choice-card input {
+  flex: none;
+  margin: 3px 0 0;
+  accent-color: var(--green)
+}
+
+.choice-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0
+}
+
+.choice-copy strong {
+  font-size: 14px
+}
+
+.choice-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px
+}
+
+.field {
+  display: grid;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400
+}
+
+.field-label {
+  font-weight: 600
+}
+
+.field input,
+.field select {
+  margin-top: 6px
+}
+
+.upload-field {
+  position: relative
+}
+
+.upload-field input[type=file] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  overflow: hidden
+}
+
+.upload-drop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 20px;
+  border: 1px dashed #c9dcd3;
+  border-radius: 12px;
+  background: #fbfdfc;
+  font-weight: 400;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease
+}
+
+.upload-drop:hover,
+.upload-field:focus-within .upload-drop {
+  border-color: var(--green);
+  background: var(--green-light)
+}
+
+.upload-field:focus-within .upload-drop {
+  outline: 2px solid #acd6c4;
+  outline-offset: 2px
+}
+
+.upload-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--green-light);
+  color: var(--green);
+  font-size: 18px;
+  font-weight: 700
+}
+
+.upload-copy {
+  flex: 1;
+  display: grid;
+  gap: 3px;
+  min-width: 0
+}
+
+.upload-copy strong {
+  font-size: 14px
+}
+
+.upload-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5
+}
+
+.upload-copy [data-file-name].is-set {
+  color: var(--green);
+  font-weight: 600;
+  word-break: break-all
+}
+
+.upload-drop .button {
+  flex: none;
+  pointer-events: none
+}
+
+.switch-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font-weight: 400;
+  cursor: pointer;
+  transition: border-color .15s ease, opacity .15s ease
+}
+
+.switch-card:hover {
+  border-color: #c9dcd3
+}
+
+.switch-card input {
+  flex: none;
+  margin: 3px 0 0;
+  accent-color: var(--green)
+}
+
+.switch-card span {
+  display: grid;
+  gap: 4px
+}
+
+.switch-card strong {
+  font-size: 13px
+}
+
+.switch-card small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5
+}
+
+.switch-card.is-disabled {
+  opacity: .55;
+  cursor: not-allowed
+}
+
+.work-form-aside {
+  display: grid;
+  gap: 16px;
+  position: sticky;
+  top: 18px
+}
+
+.aside-card {
+  padding: 20px
+}
+
+.aside-card h2 {
+  margin: 0 0 12px;
+  font-size: 15px
+}
+
+.check-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6
+}
+
+.file-tree {
+  margin: 0;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f4f8f6;
+  color: #41544d;
+  font: 12px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow: auto
+}
+
+.aside-note {
+  margin: 10px 0 0;
+  font-size: 12px
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  padding: 16px 22px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white)
+}
+
+.form-actions-note {
+  margin-left: auto;
+  font-size: 12px
+}
+
+@media (max-width: 1000px) {
+  .work-form-layout {
+    grid-template-columns: 1fr
+  }
+
+  .work-form-aside {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr))
+  }
+}
+
+@media (max-width: 700px) {
+  .choice-grid,
+  .field-grid,
+  .work-form-aside {
+    grid-template-columns: 1fr
+  }
+
+  .form-section {
+    padding: 18px
+  }
+
+  .form-actions-note {
+    margin-left: 0
+  }
+}
+
 .button.full {
   width: 100%
 }
@@ -1172,21 +1558,6 @@ td small {
   background: none;
   color: var(--green);
   padding: 0
-}
-
-/* 侧边栏按钮（如"配置大模型"）与"个人中心""修改密码"等链接保持同样字号与排版 */
-.sidebar-bottom>button.text-button {
-  grid-column: 1/-1;
-  display: block;
-  width: 100%;
-  margin-top: 10px;
-  padding: 0;
-  font-family: inherit;
-  font-size: 12px;
-  line-height: inherit;
-  text-align: left;
-  color: var(--green);
-  cursor: pointer
 }
 
 .form-card {
@@ -1750,15 +2121,6 @@ footer {
   }
 }
 
-.sidebar-bottom>a {
-  grid-column: 1/-1
-}
-
-.sidebar-bottom>form {
-  grid-column: 1/-1;
-  margin-top: 0
-}
-
 .page-back { margin-bottom: 20px; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 .sidebar nav a[aria-current=page] { background: var(--green-light); color: var(--green); font-weight: 700; }
@@ -1766,10 +2128,10 @@ summary { cursor: pointer; line-height: 1.8; }
 .batch-tools { display: flex; gap: 18px; align-items: end; flex-wrap: wrap; }
 .batch-tools label { flex: 1; min-width: 180px; }
 @media(max-width:700px) {
-  .sidebar .sidebar-bottom { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; padding-top: 12px; }
+  .sidebar .sidebar-bottom { display: block; margin-top: 12px; padding-top: 12px; }
   .sidebar-bottom .avatar, .sidebar-bottom>strong, .sidebar-bottom>small { display: none; }
-  .sidebar-bottom>a, .sidebar-bottom button { font-size: 12px; }
-  .sidebar-bottom>form { margin: 0; }
+  .sidebar .sidebar-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 0; padding-top: 0; border-top: 0; }
+  .sidebar-action { font-size: 12px; }
   .actions .button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 }
 

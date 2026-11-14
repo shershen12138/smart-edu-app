@@ -430,6 +430,8 @@ class CapabilityProfileTests(TestCase):
         # 训练题智能体改为区块标题，弱项达成率带进度条
         self.assertIn('agent-intro', body)
         self.assertIn('rate-cell', body)
+        # 侧边栏四个账号入口使用同一套样式（个人中心/修改密码/大模型配置/退出登录）
+        self.assertEqual(body.count('class="sidebar-action"'), 4)
         self.assertTrue(StudentCapabilityProfile.objects.filter(student=self.student).exists())
         # 综合能力卡片位于知识点画像之前
         self.assertLess(body.index('综合能力分析'), body.index('知识点画像'))

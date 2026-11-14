@@ -20,8 +20,8 @@ def page(request, template, title, **context):
     return render(request, 'portal/' + template + '.html', {'title': title, **context})
 
 
-def form_page(request, title, form, back_url, **context):
-    return page(request, 'form', title, form=form, back_url=back_url, **context)
+def form_page(request, title, form, back_url, template='form', **context):
+    return page(request, template, title, form=form, back_url=back_url, **context)
 
 
 def table(request, title, headers, rows, row_builder=None, **context):
