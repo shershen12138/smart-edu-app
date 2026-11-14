@@ -2,7 +2,7 @@
 
 隐藏目录（Git 跟踪，但默认文件列表看不到）。它**不是运行时模块**，没有任何 Django 代码 import 它；它是一套离线脚本，负责把「题目规格」编译成「题库文档 + 判题数据包」。
 
-一句话：**改题目只改这里的三份 spec，然后跑一次 `build.py`，根目录的 `Python题库.md` 和 `qbank-package/` 会被整体重生成并自检。**
+一句话：**改题目只改这里的三份 spec，然后跑一次 `build.py`，`data/` 下的 `Python题库.md` 和 `qbank-package/` 会被整体重生成并自检。**
 
 ## 文件清单
 
@@ -64,7 +64,7 @@ def load_specs():
 
 ## 产物一：`Python题库.md`
 
-写在仓库根目录，是**人工可读 + 机器可解析**的双用途文档。结构由 `render_head` / `render_index` / `render_question` / `render_tail` 拼出：
+写在 `data/Python题库.md`，是**人工可读 + 机器可解析**的双用途文档。结构由 `render_head` / `render_index` / `render_question` / `render_tail` 拼出：
 
 - 头部：题库说明、判题口径（只认 `return`，`print` 被丢弃）、`argc` 与默认参数规则
 - 目录索引：按知识域列出 44 题
@@ -93,15 +93,15 @@ _SECTION_RE = re.compile(r'^\*\*([234])、')
 
 这是标准「函数式机器批阅包」的四件套。`school/portal/parsers.py` 校验上传包时要求：根目录**恰好一个** `func_info_list.txt`、**一个** `sample*.py`、`gold.py` 存在，外加**一个题目 DOCX**。
 
-⚠️ `qbank-package/` 里**没有 DOCX**，所以不能直接压缩上传当作业包；它的用途是格式样张与数据来源，需要时把 `Python题库.md` 的题面另存为 docx 补进去。
+⚠️ `data/qbank-package/` 里**没有 DOCX**，所以不能直接压缩上传当作业包；它的用途是格式样张与数据来源，需要时把 `data/Python题库.md` 的题面另存为 docx 补进去。
 
 ## 谁在用它
 
 | 产物 | 使用方 | 说明 |
 | --- | --- | --- |
-| `Python题库.md` | `school/portal/question_bank.py` | 运行时读取（`settings.BASE_DIR / 'Python题库.md'`），解析后供学生「弱项练习」按 Tag 选题；文件缺失或格式变动会直接影响该功能 |
+| `Python题库.md` | `school/portal/question_bank.py` | 运行时读取（`settings.BASE_DIR / 'data/Python题库.md'`，由 `bank_path()` 拼出），解析后供学生「弱项练习」按 Tag 选题；文件缺失或格式变动会直接影响该功能 |
 | `Python题库.md` | `tools/taglib/build.py` | 生成 Tag 库时把它当校验输入：要求文档里出现的**每一个旧标签都能归一**到叶子 tag，做不到就中止 |
-| `qbank-package/` | 无运行时引用 | 全仓库 Python 代码没有读取它；仅作格式参考、手工试批阅 |
+| `data/qbank-package/` | 无运行时引用 | 全仓库 Python 代码没有读取它；仅作格式参考、手工试批阅 |
 | `.qbank/build.py` | 无代码引用 | 只能手动执行，不在任何启动脚本或 CI 里 |
 
 ## 怎么跑
@@ -136,7 +136,7 @@ Markdown: NNNN 行
 | | `.qbank/` | `tools/taglib/` |
 | --- | --- | --- |
 | `spec_*.py` 是什么 | **题目**规格（题面、函数体、用例） | **标签词表**规格（U01~U12 单元、tag 名、别名） |
-| `build.py` 产物 | 根目录 `Python题库.md` + `qbank-package/` | 根目录 `Python考点Tag库.md` + `tags/tags.json` |
-| 依赖关系 | 独立 | 读取 `Python题库.md` 做标签归一的校验 |
+| `build.py` 产物 | `data/Python题库.md` + `data/qbank-package/` | 根目录 `Python考点Tag库.md` + `tags/tags.json` |
+| 依赖关系 | 独立 | 读取 `data/Python题库.md` 做标签归一的校验 |
 
 另外注意：`tools/taglib/build.py` 声明的产物名（`Python考点Tag库.md`、`tags/tags.json`）与仓库现存文件（`Python教学Tag库_v1.0.md`、`qbank-tags-v2.json`、无 `tags/` 目录）不一致，说明该脚本的产物已改名或被手工整理过。运行它前先确认产物落在哪里，避免生成出重复的文档。

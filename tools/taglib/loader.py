@@ -28,8 +28,9 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[2]
-TAGLIB_MD = ROOT / 'Python教学Tag库_v1.0.md'
-QBANK_TAGS = ROOT / 'qbank-tags-v2.json'
+DATA_DIR = ROOT / 'data'
+TAGLIB_MD = DATA_DIR / 'Python教学Tag库_v1.0.md'
+QBANK_TAGS = DATA_DIR / 'qbank-tags-v2.json'
 
 _UNIT_RE = re.compile(r'^#\s+(U\d+.*)$')
 _MODULE_RE = re.compile(r'^##\s+(U\d+-M\d+)\s+(.*)$')

@@ -2,7 +2,7 @@
 """提高覆盖率的补充测试：question_bank 纯函数与题库选题链路。
 
 被测：school/portal/question_bank.py（解析、打包、选题、反查）
-数据源：仓库根的《Python题库.md》与《Python教学Tag库_v1.0.md》（只读，不改文件）。
+数据源：`data/` 下的《Python题库.md》与《Python教学Tag库_v1.0.md》（只读，不改文件）。
 """
 from unittest import mock
 

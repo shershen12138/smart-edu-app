@@ -23,7 +23,7 @@ from spec_b import UNITS_B
 from spec_c import UNITS_C
 
 ROOT = Path(__file__).resolve().parents[2]
-QBANK = ROOT / "Python题库.md"
+QBANK = ROOT / "data" / "Python题库.md"
 OUT_MD = ROOT / "Python考点Tag库.md"
 OUT_JSON = ROOT / "tags" / "tags.json"
 

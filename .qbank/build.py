@@ -15,8 +15,9 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 ROOT = HERE.parent
-OUT_MD = ROOT / "Python题库.md"
-PKG = ROOT / "qbank-package"
+DATA = ROOT / "data"
+OUT_MD = DATA / "Python题库.md"
+PKG = DATA / "qbank-package"
 
 PRELUDE = {
     "func1003": '''class AgeError(Exception):

@@ -29,6 +29,7 @@ from .knowledge_profile import weak_keywords
 
 logger = logging.getLogger(__name__)
 
+DATA_DIR = 'data'
 BANK_FILENAME = 'Python题库.md'
 
 _HEADER_RE = re.compile(
@@ -44,7 +45,7 @@ _DIFFICULTY_BY_STARS = {'★☆☆': ('基础', 0), '★★☆': ('进阶', 1), 
 
 
 def bank_path() -> Path:
-    return Path(settings.BASE_DIR) / BANK_FILENAME
+    return Path(settings.BASE_DIR) / DATA_DIR / BANK_FILENAME
 
 
 def _clean_cell(raw: str) -> str:

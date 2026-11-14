@@ -27,7 +27,7 @@
 - 删除账号、班级、作业时实际清理相应数据库关系与专用文件；教学班归档保留数据，所有角色的日常页面与旧链接隐藏该班内容，管理员在归档页取消勾选后恢复。
 - 名单导入后显示处理结果；同一班级的名单、人数和报表统一统计口径，支持页码跳转与每页条数。管理员总名单统计全部日常可见学生账号（含未分班），并显示所属教学班；选定具体班级后才是该班人数。管理员名单页不显示“本班作业”。
 - 教师可查看机器批阅的期望结果及实际返回值；学生端仍不显示答案。两种批阅方式都支持按班打包下载每名学生最后一次提交；人工答案 ZIP 会直接展开到“学号_姓名_提交次数”目录。保留教师均分、最高/最低分及分布图。
-- 评分标准由题目分析智能体生成，知识点统一为《Python教学Tag库》标准名（`tools/taglib/`，词表见 `Python教学Tag库_v1.0.md`）；学生每次提交生成代码质量评测报告：六轴“考察重点”雷达图 + 逐题明细（机器可判定的知识点 ✓/✗、缺陷所在行与修改建议）。用户未配置个人大模型时只用规则兜底，结果标注来源。
+- 评分标准由题目分析智能体生成，知识点统一为《Python教学Tag库》标准名（`tools/taglib/`，词表见 `data/Python教学Tag库_v1.0.md`）；学生每次提交生成代码质量评测报告：六轴“考察重点”雷达图 + 逐题明细（机器可判定的知识点 ✓/✗、缺陷所在行与修改建议）。用户未配置个人大模型时只用规则兜底，结果标注来源。
 - 学生端“弱项练习”按任务区分：取每个任务**第一次提交**评测报告逐题明细里的缺陷，归到 Tag 库对应知识点作为该任务弱项，再据此从题库或大模型生成该任务的训练题；训练题不计入正式成绩。
 - 大模型为**用户自备**：只有“教师生成评分标准”和“学生生成弱项训练题”两处调用大模型；两者都在点击按钮时弹出配置窗口，可自选服务商（DeepSeek、通义千问、Kimi、OpenAI 或任意 OpenAI 兼容端点）并填写自己的 API Key，配置只对本人生效，页面只回显打码 Key。
 
@@ -188,6 +188,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 | `school/course_models.py` | 当前业务 18 个模型 | 字典、`EvaluationPackage`、`Coursework`/`CourseworkItem`、`CourseworkSubmission`、逐题 `CourseworkQuestionResult` 与逐用例 `CourseworkCaseResult`、`CourseworkPackageUpdate`（包更新状态机）、`CourseworkGradeHistory`（成绩历史）、`PrivateFileCleanup`（待删文件队列）、`QualityReport`、`CourseworkRubric`、练习五件套；文件不存路径只存私有存储键名，题目与分值用 `JSONField` 快照 |
 | `school/accounts.py` | 建号时同步明文密码副本 | `AccountManager._create_user_object` 在 `STORE_RECOVERY_PASSWORDS` 开启时写入 `recovery_password`，登录校验仍用 Django 哈希 |
 | `school/storage.py` | 私有文件存储（不是 Django Storage 后端） | UUID 键写入 `PRIVATE_STORAGE/objects/`，`open('xb')` 防覆盖，读取前用 `is_relative_to()` 拦路径穿越；数据库只保存键名 |
+| `data/` | 题库与标签数据源（只读，不被 Django 加载） | `Python题库.md`（44 题 / 440 用例）、`Python教学Tag库_v1.0.md`（词表）、`qbank-tags-v2.json`（逐题打标）、`qbank-package/`（判题数据样张）；路径由 `question_bank.bank_path()` 与 `tools/taglib/loader.py` 的 `DATA_DIR` 常量定位 |
 
 ### 权限、中间件与请求上下文
 
@@ -248,9 +249,9 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 | `school/portal/quality_service.py` | 代码质量报告与缓存 | `supported(entry)` 只认机器批阅单文件；`generate()` 用“源码 sha256 + 量表/知识点/能力签名”判断能否复用旧报告；`schedule_generate` 在 `on_commit` 后起守护线程 |
 | `school/portal/knowledge_profile.py` | 知识点画像 | 按任务聚合逐题缺陷 → 弱项 / 已掌握 |
 | `school/portal/practice_agent.py` | 弱项练习智能体 | `generate_practice_plan()` 优先大模型，失败或离线时用 `question_bank` 规则兜底；`grade_attempt()` 在 Docker 里跑练习用例 |
-| `school/portal/question_bank.py` | Markdown 题库解析 | `load_bank()` 缓存解析结果，按 Tag 匹配选题 |
+| `school/portal/question_bank.py` | Markdown 题库解析 | `bank_path()` 定位 `data/Python题库.md`；`load_bank()` 缓存解析结果，按 Tag 匹配选题 |
 | `tools/code_quality_agent/` | 静态评测工具（不依赖 Django） | LangGraph 状态图编排 pylint + AST 考点检测 + 题意规则，另见该目录 README |
-| `tools/taglib/` | Tag 库加载与归一 | 解析 `Python教学Tag库_v1.0.md`，精确/包含归一，读 `qbank-tags-v2.json` 做题目标签反查 |
+| `tools/taglib/` | Tag 库加载与归一 | 解析 `data/Python教学Tag库_v1.0.md`，精确/包含归一，读 `data/qbank-tags-v2.json` 做题目标签反查 |
 
 ### 前端
 
