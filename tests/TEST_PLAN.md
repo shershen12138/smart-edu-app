@@ -7,16 +7,17 @@
 | 被测系统 | smart-edu-app（Django 弱项练习与机器批阅子系统） |
 | 测试框架 | Django TestCase（unittest 风格，等价于 pytest 基座，可直接用 pytest 运行） |
 | 运行方式 | `.venv/Scripts/python.exe manage.py test tests` |
-| 测试代码位置 | `tests/test_unit_core_logic.py`、`tests/test_equiv_boundary.py`、`tests/test_e2e_scenario.py` |
-| 测试用例总数 | 57 个，全部通过 |
+| 测试代码位置 | `tests/test_unit_core_logic.py`、`tests/test_equiv_boundary.py`、`tests/test_e2e_scenario.py`、`tests/test_question_bank_coverage.py`、`tests/test_profile_coverage.py`、`tests/test_knowledge_graph.py` |
+| 测试用例总数 | 113 个，全部通过 |
 
 ## 选定的核心逻辑
 
 | 模块 | 职责 |
 |---|---|
-| `school/portal/knowledge_profile.py` | 弱项画像统计（得分率聚合、弱项/掌握划分、阈值钳制、关键词拆分） |
-| `school/portal/practice_agent.py` | 训练题解析（模型 JSON → 题目结构）、评测用例清洗、批阅结果格式化 |
-| `school/portal/question_bank.py` | 题库用例单元格清洗、返回值打包（判题器协议） |
+| `school/portal/knowledge_profile.py` | 弱项画像统计（得分率聚合、弱项/掌握划分、阈值钳制、关键词拆分、教师端班级汇总） |
+| `school/portal/practice_agent.py` | 训练题解析（模型 JSON → 题目结构）、评测用例清洗、批阅结果格式化、计划查询与 LLM 生成 |
+| `school/portal/question_bank.py` | 题库文档解析、返回值打包（判题器协议）、按 Tag/关键词选题 |
+| `school/portal/knowledge_graph.py` | 知识图谱数据校验与放射布局计算（学生端知识图谱模块） |
 
 ## 任务 1：核心逻辑单元测试
 
@@ -84,21 +85,41 @@
 
 批阅结果通过 mock `practice_agent.run_case` 模拟（与既有 `school/tests/test_practice_agent.py` 做法一致）；真实 Docker 容器批阅由 `RUN_DOCKER_TESTS=1` 门控的 `school/tests/test_docker.py` 覆盖，不在本任务范围。
 
+## 任务 4（二轮迭代）：覆盖率提升补充测试
+
+第二轮针对首次覆盖率统计的缺口补测（56 个新用例，总覆盖 77% → 96%）：
+
+| 文件 | 测试类 | 补测内容 |
+|---|---|---|
+| `test_question_bank_coverage.py` | `PackValueTests` | float/complex/tuple/set/dict 打包、非法类型抛 TypeError |
+| | `ParseHelpersTests` | `_code_block` 缺块、签名解析边界（无参/默认值/*args）、非法字面量、用例行清洗、题面解析三类缺失字段 |
+| | `LoadBankTests` | 真实题库解析、lru_cache 缓存、缺文件回退空元组、`bank_size` 一致性 |
+| | `MatchScoreTests` | 标签分段命中、反向包含、无命中、短分段忽略 |
+| | `FindQuestionsTests` | Tag 精确选题、`exclude` 生效、难度递增、关键词兜底、`has_matches` 两分支 |
+| `test_profile_coverage.py` | `ProfileAggregationTests` | 任务画像聚合、无提交返回空、班级汇总（空班/无报告/聚合排序/无评分标准跳过） |
+| | `PracticeAgentCoverageTests` | 计划上下文、`latest_plan` 状态与任务过滤、`existing_titles`、LLM 分支（mock chat/get_config：成功入库、垃圾输出报错）、规则兜底无题报错、函数式批阅计分 |
+| `test_knowledge_graph.py` | `ValidateTests` | 校验五类失败分支（重复 id、计数不一致、未知关系、悬空引用） |
+| | `LayoutTests` | 放射布局坐标（根在原点、模块角度均分、层级半径）、单子节点除零保护 |
+| | `BuildGraphTests` | 真实数据端到端构建（结构、坐标、边类型、模块索引） |
+
 ## 任务 4：覆盖率统计
 
 ```powershell
 .venv/Scripts/python.exe -m coverage run --source=school manage.py test tests
-.venv/Scripts/python.exe -m coverage report --include="school/portal/practice_agent.py,school/portal/knowledge_profile.py,school/portal/question_bank.py"
+.venv/Scripts/python.exe -m coverage report --include="school/portal/practice_agent.py,school/portal/knowledge_profile.py,school/portal/question_bank.py,school/portal/knowledge_graph.py"
 ```
 
-实测结果（本次提交）：
+实测结果（第二轮补测后）：
 
 | 模块 | 语句 | 未覆盖 | 覆盖率 |
 |---|---|---|---|
-| knowledge_profile.py | 132 | 40 | 70% |
-| practice_agent.py | 232 | 40 | 83% |
-| question_bank.py | 195 | 51 | 74% |
-| **核心逻辑合计** | 559 | 131 | **77%**（≥ 60% 达标） |
+| knowledge_profile.py | 135 | 4 | 97% |
+| practice_agent.py | 238 | 20 | 92% |
+| question_bank.py | 195 | 4 | 98% |
+| knowledge_graph.py | 58 | 0 | 100% |
+| **核心逻辑合计** | 637 | 28 | **96%**（首轮 77%，二轮提升至 96%） |
+
+剩余未覆盖行说明：LLM 客户端请求细节（`chat` 内部 HTTP，由 `school/tests/test_llm_config.py` 覆盖）、批阅基础设施异常路径（`InfrastructureError`，Docker 专属）、`_unpack_value` 极端嵌套分支——均属于需要真实外部服务或无外部等价类的降级路径。
 
 ## 已知边界与说明
 

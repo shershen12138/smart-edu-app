@@ -125,6 +125,19 @@ class FormatValueTests(TestCase):
         packed = '{"type": "tuple", "items": [{"type": "int", "value": 1}, {"type": "str", "value": "a"}]}'
         self.assertEqual(practice_agent.format_value(packed), "(1, 'a')")
 
+    def test_packed_set_and_dict(self):
+        packed_set = '{"type": "set", "items": [{"type": "int", "value": 1}, {"type": "int", "value": 2}]}'
+        self.assertEqual(practice_agent.format_value(packed_set), '{1, 2}')
+        packed_dict = (
+            '{"type": "dict", "items": [[{"type": "str", "value": "k"}, {"type": "int", "value": 1}]]}'
+        )
+        self.assertEqual(practice_agent.format_value(packed_dict), "{'k': 1}")
+
+    def test_non_object_json_passthrough(self):
+        """JSON 数组/标量（无 type 键）不是打包结构，原样返回。"""
+        self.assertEqual(practice_agent.format_value('[1, 2]'), '[1, 2]')
+        self.assertEqual(practice_agent.format_value('123'), '123')
+
 
 class ParsePracticeTests(TestCase):
     """大模型输出 → 训练题结构（practice_agent.parse_practice）。"""
