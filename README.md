@@ -1,6 +1,6 @@
 # 课码 · Python 作业在线批阅系统
 
-2026-10-06 版本，当前协作分支为 **`codex/simplified-coursework`**。机器批阅作业由学生提交一个 `.py`，非机器批阅作业由学生提交包含多题源码的 ZIP。
+2026-11-14 版本，当前协作分支为 **`main`**。机器批阅作业由学生提交一个 `.py`，非机器批阅作业由学生提交包含多题源码的 ZIP。
 
 ## 第一次打开仓库，先选用途
 
@@ -27,10 +27,91 @@
 - 删除账号、班级、作业时实际清理相应数据库关系与专用文件；教学班归档保留数据，所有角色的日常页面与旧链接隐藏该班内容，管理员在归档页取消勾选后恢复。
 - 名单导入后显示处理结果；同一班级的名单、人数和报表统一统计口径，支持页码跳转与每页条数。管理员总名单统计全部日常可见学生账号（含未分班），并显示所属教学班；选定具体班级后才是该班人数。管理员名单页不显示“本班作业”。
 - 教师可查看机器批阅的期望结果及实际返回值；学生端仍不显示答案。两种批阅方式都支持按班打包下载每名学生最后一次提交；人工答案 ZIP 会直接展开到“学号_姓名_提交次数”目录。保留教师均分、最高/最低分及分布图。
+- 评分标准由题目分析智能体生成，知识点统一为《Python教学Tag库》标准名（`tools/taglib/`，词表见 `Python教学Tag库_v1.0.md`）；学生每次提交生成代码质量评测报告：六轴“考察重点”雷达图 + 逐题明细（机器可判定的知识点 ✓/✗、缺陷所在行与修改建议）。用户未配置个人大模型时只用规则兜底，结果标注来源。
+- 学生端“弱项练习”按任务区分：取每个任务**第一次提交**评测报告逐题明细里的缺陷，归到 Tag 库对应知识点作为该任务弱项，再据此从题库或大模型生成该任务的训练题；训练题不计入正式成绩。
+- 大模型为**用户自备**：只有“教师生成评分标准”和“学生生成弱项训练题”两处调用大模型；两者都在点击按钮时弹出配置窗口，可自选服务商（DeepSeek、通义千问、Kimi、OpenAI 或任意 OpenAI 兼容端点）并填写自己的 API Key，配置只对本人生效，页面只回显打码 Key。
 
 ## 本地运行
 
-需要 Python 3.12；本地使用 SQLite，前端无需 Node 构建。完整步骤见 [新电脑安装与测试](docs/GETTING_STARTED.md)。网页和自动批阅分别在两个终端运行，测试自动批阅还需要可用的 Docker Linux 引擎及 `python:3.12-slim` 镜像。只打开网页不代表批阅已启动。
+需要 Python 3.12；本地默认 SQLite（`DATABASE_URL` 留空），前端无需 Node 构建。机器批阅需要可用的 Docker Linux 容器引擎和 `python:3.12-slim` 镜像；**只打开网页不代表批阅已启动**。完整安装说明见 [新电脑安装与测试](docs/GETTING_STARTED.md)。
+
+### 1. 准备虚拟环境与依赖（仅首次）
+
+```powershell
+cd 仓库根目录
+py -3.12 -m venv .venv                       # 或 python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
+Copy-Item .env.example .env
+```
+
+`requirements.lock.txt` 是锁定版本，`requirements.txt` 为宽松约束，`requirements-dev.txt` 追加开发工具（含 pylint，缺失时缺陷检测类测试会失败）。`.env` 中按需填写 `REDIS_URL`（留空则用本地文件缓存）、`PRIVATE_STORAGE`（留空默认 `.runtime/private`）、`LLM_TIMEOUT`。`.env` 不进 Git。
+
+**大模型不再写在 `.env` 里**：每位用户登录后点击侧边栏“配置大模型”，选择服务商（DeepSeek、通义千问、Kimi、OpenAI 或任何 OpenAI 兼容端点）并填写自己的 API Key。配置保存在数据库中（`UserLLMConfig`），只对本人生效；评分标准智能体使用教师自己的配置，训练题智能体使用学生自己的配置，未配置时只能走规则兜底。页面只回显打码后的 Key。
+
+### 2. 初始化数据库
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
+### 3. 启动网页服务（终端 A，必须）
+
+```powershell
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
+```
+
+出现 `Starting development server at http://127.0.0.1:8000/` 后浏览器访问。开发时**不要加** `--noreload`，改代码会自动重启；该终端需要一直开着。
+
+### 4. 启动自动批阅工作进程（终端 B，机器批阅必须）
+
+```powershell
+docker info                                  # 确认 Docker 引擎可用
+docker pull python:3.12-slim                 # 首次或镜像缺失时执行
+.\.venv\Scripts\python.exe manage.py run_judge
+```
+
+没有它，学生提交会一直停在“排队中”，训练题也不会产生批阅结果。没有可用 Docker 时仍可管理网站、收取作业与人工批阅，但机器批阅不会完成；系统不提供在宿主机直接执行学生代码的降级路径。
+
+### 5. 一键脚本（可选）
+
+```powershell
+.\scripts\start.ps1          # 先迁移，再启动网页服务
+.\scripts\start.ps1 -Worker  # 启动自动批阅工作进程
+.\scripts\check.ps1          # check + 迁移检查 + 测试
+```
+
+### 6. 停止服务
+
+两个终端各自 `Ctrl + C`。后台启动的进程可统一清理：
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
+  Where-Object { $_.CommandLine -match 'runserver|run_judge' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+### 7. 日志与故障排查
+
+| 位置 | 内容 |
+| --- | --- |
+| 终端输出 | 手动启动时的实时日志，排查首选 |
+| `.runtime/webserver.log`、`.runtime/webserver.err.log` | 用 `Start-Process` 后台启动时的输出 |
+| `.runtime/judge.log`、`.runtime/judge.err.log` | 批阅工作进程的后台输出 |
+| `.runtime/logs/exception.log` | ERROR 级异常及完整堆栈，10 MB × 5 轮转 |
+
+| 现象 | 原因 |
+| --- | --- |
+| `127.0.0.1 拒绝连接` | 网页进程未启动或已退出 |
+| `WinError 10048` 端口被占用 | 已有实例在跑，先停旧进程 |
+| 提交一直“排队中” | `run_judge` 未运行 |
+| `DOCKER_UNAVAILABLE` | Docker Desktop 未启动或 `python:3.12-slim` 镜像缺失 |
+
+学生源码、测试用例、评分标准与评测报告等私有文件存放在 `PRIVATE_STORAGE`（默认 `.runtime/private/objects/`），数据库只保存键名。`.runtime/` 整体不进 Git，备份时必须与数据库同时进行。测试已把存储指向临时目录，不会污染真实数据；长期使用后可用下述脚本预览或清理数据库不再引用的孤儿文件。
+
+```powershell
+.\.venv\Scripts\python.exe scripts\clean_orphans.py            # 只统计，不删除
+.\.venv\Scripts\python.exe scripts\clean_orphans.py --delete   # 执行删除
+```
 
 ### 新建本地测试账号
 
@@ -74,34 +155,34 @@
 
 ### 启动自动批阅工作进程
 
-```powershell
-docker info
-docker pull python:3.12-slim
-.\.venv\Scripts\python.exe manage.py run_judge
-```
-
-需要 Docker Linux 容器引擎。也可用 `./scripts/start.ps1 -Worker` 开启工作进程。没有可用 Docker 时，可管理网站、收取作业并进行非机器批阅，机器批阅不会正常完成；没有在主机直接执行学生代码的降级路径。学校现有环境使用 Docker、MySQL、Redis 和 Celery，按 [校园更新说明](deploy/linux/README.md) 更新。
+启动命令与依赖见上文[本地运行](#本地运行)第 4 步；本章节只补充部署差异。需要 Docker Linux 容器引擎，也可用 `./scripts/start.ps1 -Worker` 开启工作进程。没有可用 Docker 时，可管理网站、收取作业并进行非机器批阅，机器批阅不会正常完成；没有在主机直接执行学生代码的降级路径。学校现有环境使用 Docker、MySQL、Redis 和 Celery，按 [校园更新说明](deploy/linux/README.md) 更新。
 
 ## 开发与验证
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py check
 .\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
-.\.venv\Scripts\python.exe manage.py test school.tests
+.\.venv\Scripts\python.exe manage.py test school
 ```
 
-真实容器测试需 `RUN_DOCKER_TESTS=1`，两种系统的具体命令见安装指南。2026-10-06 已验证 SQLite / MySQL 业务回归、MySQL 0008→0009 迁移、浏览器操作和 13 项真实 Docker 测试；这不替代学校目标机验收及实际班级集中提交压测。
+测试会把私有存储重定向到临时目录，不会在 `.runtime/private` 留下文件；批量跑完后可用 `scripts/clean_orphans.py` 核对存储健康度。真实容器测试需 `RUN_DOCKER_TESTS=1`，两种系统的具体命令见安装指南。2026-11-14 已验证 SQLite 业务回归（600+ 项测试）、Tag 化评分标准与评测报告、按任务弱项练习；这不替代学校目标机验收及实际班级集中提交压测。
 
 | 目录 / 文件 | 用途 |
 | --- | --- |
 | school/portal/ | 简化版表单、权限、业务服务、网页及函数批阅适配器 |
-| school/course_models.py | 字典、章节配置、作业、提交、题目结果、用例结果 |
+| school/portal/knowledge_profile.py | 知识点画像：按任务聚合评测报告逐题明细的缺陷，产出弱项/已掌握 |
+| school/portal/practice_agent.py、practice_views.py | 弱项练习：按任务生成训练计划、判题与结果页 |
+| school/portal/quality_service.py、rubric_agent.py | 代码质量评测报告与评分标准智能体（Tag 化、六轴雷达） |
+| tools/taglib/ | 《Python教学Tag库》解析、知识点归一与题目反查 |
+| school/course_models.py | 字典、章节配置、作业、提交、题目结果、用例结果、评测报告、训练题 |
 | school/models.py | 复用账号、班级、授权与审计；旧数据表保留 |
 | school/judge.py | Docker 限制与隔离执行 |
 | templates/portal/、static/portal.js | 三端页面及交互 |
+| scripts/start.ps1、check.ps1、clean_orphans.py | 启动、校验、私有存储孤儿文件清理 |
 | config/urls.py | 当前网站入口 |
 | config/legacy_urls.py | 仅供旧回归测试，不挂到网站 |
-| school/tests/test_portal.py | 本轮账号、权限、提交、评分、导出测试 |
+| school/tests/ | 三端回归测试（test_portal、test_practice_agent、test_quality_report、test_rubric_* 等） |
+| docs/ | 安装、部署、需求与交接文档 |
 
 ### teaching_views.py 的修改方法与设计模式
 
