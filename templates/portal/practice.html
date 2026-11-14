@@ -7,22 +7,22 @@
     </div>
   </div>
 
-  <section class="card space-bottom" id="capability">
-    <div class="split">
-      <div>
-        <h2>综合能力分析</h2>
-        <p class="subtle">
+  <section class="card capability-panel{% if capability.ready %} has-foot{% endif %} space-bottom" id="capability">
+    <div class="capability-head">
+      <div class="capability-heading">
+        <div class="capability-title">
+          <h2>综合能力分析</h2>
+          {% if capability.ready %}
+            <span class="capability-source{% if capability.source == 'llm' %} is-llm{% endif %}">
+              <span class="capability-source-dot" aria-hidden="true"></span>{{ capability.source_note }}
+            </span>
+          {% endif %}
+        </div>
+        <p class="subtle capability-lead">
           汇总你所有机器批阅任务的评测报告错误点与提交代码：分数由逐题得分率按分值加权计算，
           诊断说明由你自己配置的大模型生成；未被考察的维度只标注样本不足，不记 0 分。
         </p>
       </div>
-      {% if capability.ready %}
-        <div class="capability-meta subtle">
-          <span>{{ capability.source_note }}</span>
-          <span>{{ capability.works }} 个任务 · {{ capability.graded_tasks }} 题有判题记录</span>
-          {% if capability.updated_at %}<span>更新于 {{ capability.updated_at|date:"m-d H:i" }}</span>{% endif %}
-        </div>
-      {% endif %}
     </div>
 
     {% if capability.ready %}
@@ -140,34 +140,45 @@
         </details>
       {% endif %}
 
-      {% if capability.code_facts.files %}
-        <p class="subtle space-top">
-          代码结构：共 {{ capability.code_facts.files }} 份提交、{{ capability.code_facts.lines }} 行；
-          自定义函数 {{ capability.code_facts.functions }} 个、类 {{ capability.code_facts.classes }} 个、
-          推导式 {{ capability.code_facts.comprehensions }} 处、最大嵌套 {{ capability.code_facts.max_depth }} 层、
-          魔法数字 {{ capability.code_facts.magic_numbers }} 处。
-        </p>
-      {% endif %}
+      <footer class="capability-foot">
+        <div class="capability-foot-stats">
+          <span><strong>{{ capability.works }}</strong> 个任务</span>
+          <span><strong>{{ capability.graded_tasks }}</strong> 题有判题记录</span>
+          {% if capability.updated_at %}<span>更新于 {{ capability.updated_at|date:"m-d H:i" }}</span>{% endif %}
+        </div>
+        {% if capability.code_facts.files %}
+          <p class="capability-foot-code">
+            代码结构：{{ capability.code_facts.files }} 份提交 · {{ capability.code_facts.lines }} 行 ·
+            自定义函数 {{ capability.code_facts.functions }} · 类 {{ capability.code_facts.classes }} ·
+            推导式 {{ capability.code_facts.comprehensions }} · 最大嵌套 {{ capability.code_facts.max_depth }} 层 ·
+            魔法数字 {{ capability.code_facts.magic_numbers }} 处
+          </p>
+        {% endif %}
+      </footer>
     {% else %}
       <p class="tip space-top">{{ capability.empty_reason }}</p>
     {% endif %}
   </section>
 
   {% if tasks %}
-    <section class="card space-bottom">
-      <h2>训练题智能体</h2>
-      <p class="subtle">{{ llm_status }}</p>
+    <section class="agent-intro space-bottom">
+      <div class="section-heading">
+        <div class="agent-heading">
+          <h2>训练题智能体</h2>
+          <p class="subtle">{{ llm_status }}</p>
+        </div>
+        {% if any_weak and not llm_ready %}
+          <button class="button secondary" type="button" data-llm-config-open>配置我的大模型</button>
+        {% endif %}
+      </div>
       {% if any_weak and not llm_ready %}
-        <p class="tip space-top">
-          <strong>如何用自己的大模型出题：</strong>点击下方按钮或左侧“配置大模型”，
+        <p class="tip">
+          <strong>如何用自己的大模型出题：</strong>点击右侧按钮或左侧“配置大模型”，
           选择服务商（DeepSeek、通义千问、Kimi、OpenAI 或任何 OpenAI 兼容端点）并填写
           <strong>你自己的 API Key</strong>；保存后回到本页再点一次即可生成。
           配置只对当前账号生效。不配置也可以直接用各任务下的
           “根据现有题库为该任务生成训练题”按钮挑选现成题目。
         </p>
-        <div class="actions space-top">
-          <button class="button secondary" type="button" data-llm-config-open>配置我的大模型</button>
-        </div>
       {% endif %}
       {% if any_weak and not bank_ready %}
         <p class="tip space-top">
@@ -179,8 +190,15 @@
     </section>
 
     {% for section in tasks %}
-      <section class="card space-bottom">
-        <h2>{{ section.work_title }} · 知识点画像</h2>
+      <section class="card task-card space-bottom">
+        <div class="task-head">
+          <h2>{{ section.work_title }} · 知识点画像</h2>
+          {% if section.weak %}
+            <span class="tag amber">{{ section.weak|length }} 个弱项</span>
+          {% else %}
+            <span class="tag">暂无弱项</span>
+          {% endif %}
+        </div>
         {% if section.weak %}
           <div class="table-card">
             <table>
@@ -191,7 +209,14 @@
                 {% for item in section.weak %}
                   <tr>
                     <td>{{ item.name }}</td>
-                    <td>{{ item.percent }}%</td>
+                    <td>
+                      <span class="rate-cell">
+                        <span class="rate-track" aria-hidden="true">
+                          <span class="rate-fill" style="width: {{ item.percent }}%"></span>
+                        </span>
+                        <span class="rate-value">{{ item.percent }}%</span>
+                      </span>
+                    </td>
                     <td>{{ item.earned }} / {{ item.total }}</td>
                     <td>{{ item.attempts }}</td>
                   </tr>
@@ -203,7 +228,12 @@
           <p class="tip space-top">该任务第一次提交的评测报告里没有得分率偏低的弱项知识点。</p>
         {% endif %}
         {% if section.mastered %}
-          <p class="subtle space-top">已掌握：{% for item in section.mastered %}{{ item.name }}（{{ item.percent }}%）{% if not forloop.last %}、{% endif %}{% endfor %}</p>
+          <div class="mastered-row">
+            <span class="mastered-label">已掌握</span>
+            {% for item in section.mastered %}
+              <span class="chip">{{ item.name }} <b>{{ item.percent }}%</b></span>
+            {% endfor %}
+          </div>
         {% endif %}
 
         <div class="actions space-top">
@@ -237,10 +267,11 @@
         </div>
 
         {% if section.plan %}
-          <h3 class="space-top">该任务本次训练计划
+          <div class="plan-head space-top">
+            <h3>该任务本次训练计划</h3>
             <span class="tag">{% if section.plan.source == "llm" %}大模型生成{% else %}规则兜底{% endif %}</span>
             <span class="subtle">生成时间：{{ section.plan.created_at|date:'Y-m-d H:i' }}</span>
-          </h3>
+          </div>
           {% for point, problems in section.grouped.items %}
             <table>
               <thead>

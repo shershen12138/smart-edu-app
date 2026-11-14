@@ -424,6 +424,12 @@ class CapabilityProfileTests(TestCase):
         self.assertIn('规则诊断（未使用大模型）', body)
         self.assertIn('覆盖 100% 分值', body)
         self.assertIn('data-radar', body)
+        # 来源做成标题旁的状态徽标，任务数/更新时间放在底部信息条
+        self.assertIn('capability-source', body)
+        self.assertIn('capability-foot-stats', body)
+        # 训练题智能体改为区块标题，弱项达成率带进度条
+        self.assertIn('agent-intro', body)
+        self.assertIn('rate-cell', body)
         self.assertTrue(StudentCapabilityProfile.objects.filter(student=self.student).exists())
         # 综合能力卡片位于知识点画像之前
         self.assertLess(body.index('综合能力分析'), body.index('知识点画像'))

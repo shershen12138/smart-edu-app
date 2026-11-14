@@ -809,12 +809,61 @@ td small {
 }
 
 /* 综合能力分析：布鲁姆雷达图 + 计算思维能力卡 */
-.capability-meta {
+.capability-panel.has-foot {
+  padding-bottom: 0
+}
+
+.capability-head {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  text-align: right;
-  font-size: 12px
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px
+}
+
+.capability-heading {
+  min-width: 0
+}
+
+.capability-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px
+}
+
+.capability-title h2 {
+  margin: 0
+}
+
+.capability-lead {
+  max-width: 92ch;
+  margin: 0
+}
+
+.capability-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eef2f0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap
+}
+
+.capability-source.is-llm {
+  background: var(--green-light);
+  color: var(--green)
+}
+
+.capability-source-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor
 }
 
 .capability-grid {
@@ -836,10 +885,11 @@ td small {
 
 .capability-legend {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 12px 0 26px;
   padding: 0;
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 18px;
   font-size: 13px
 }
 
@@ -854,6 +904,34 @@ td small {
   font-variant-numeric: tabular-nums
 }
 
+.capability-foot {
+  margin: 22px -24px 0;
+  padding: 14px 24px 16px;
+  border-top: 1px solid var(--line);
+  background: #fbfdfc;
+  border-radius: 0 0 12px 12px
+}
+
+.capability-foot-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  font-size: 12px;
+  color: var(--muted)
+}
+
+.capability-foot-stats strong {
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums
+}
+
+.capability-foot-code {
+  margin: 7px 0 0;
+  font-size: 12px;
+  color: var(--muted)
+}
+
 .capability-cards {
   display: grid;
   gap: 12px
@@ -863,7 +941,12 @@ td small {
   border: 1px solid #e3ece6;
   border-radius: 12px;
   padding: 12px 14px;
-  background: #fbfdfc
+  background: #fbfdfc;
+  transition: border-color .15s ease
+}
+
+.capability-card:hover {
+  border-color: #cfe3d9
 }
 
 .capability-card header {
@@ -939,9 +1022,145 @@ td small {
     grid-template-columns: 1fr
   }
 
-  .capability-meta {
-    text-align: left
+  .capability-legend {
+    grid-template-columns: 1fr
   }
+}
+
+@media (max-width: 700px) {
+  /* 与 .card 的 20px 内边距保持一致，避免底部信息条左右溢出 */
+  .capability-foot {
+    margin-left: -20px;
+    margin-right: -20px;
+    padding-left: 20px;
+    padding-right: 20px
+  }
+}
+
+/* 训练题智能体：以区块标题呈现，不再占用整张卡片 */
+.agent-intro {
+  margin-top: 4px
+}
+
+.agent-intro .section-heading {
+  align-items: flex-start;
+  margin-bottom: 10px
+}
+
+.agent-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 20px
+}
+
+.agent-heading h2::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 20px;
+  border-radius: 2px;
+  background: var(--green)
+}
+
+.agent-heading .subtle {
+  margin: 6px 0 0;
+  max-width: 100ch;
+  font-size: 12px
+}
+
+.agent-intro .tip {
+  max-width: 100ch;
+  margin-bottom: 0
+}
+
+.agent-intro .button {
+  flex: none
+}
+
+/* 任务卡片：标题行、达成率进度条、已掌握标签 */
+.task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px
+}
+
+.task-head h2 {
+  margin: 0
+}
+
+.rate-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 132px
+}
+
+.rate-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #e8f0eb;
+  overflow: hidden
+}
+
+.rate-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #c98a1a, #e3b054)
+}
+
+.rate-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink)
+}
+
+.mastered-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px
+}
+
+.mastered-label {
+  font-size: 12px;
+  color: var(--muted)
+}
+
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f2f6f3;
+  border: 1px solid #e3ece6;
+  font-size: 12px
+}
+
+.chip b {
+  color: var(--green);
+  font-weight: 600
+}
+
+.plan-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px
+}
+
+.plan-head h3 {
+  margin: 0;
+  font-size: 15px
 }
 
 .button.full {
