@@ -8,7 +8,14 @@
     "modules": 77,
     "tags_total": 856,
     "questions": 44,
-    "note": "标签唯一键=tag；role=primary 决定能否做对，secondary 影响解法优劣；weight 同题内归一化为 1"
+    "note": "标签唯一键=tag；role=primary 决定能否做对，secondary 影响解法优劣；weight 同题内归一化为 1",
+    "thinking_abilities": [
+      "decomposition",
+      "pattern",
+      "abstraction",
+      "algorithm"
+    ],
+    "thinking_note": "thinking_abilities 按主次排序（首个为主能力），thinking_basis 为判定依据；与知识点标签正交"
   },
   "questions": [
     {
@@ -63,6 +70,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "algorithm"
+      ],
+      "thinking_basis": "抽象：把温度换算建模为公式与数值类型；算法设计：按顺序完成换算、舍入与格式化",
       "error_modes": [
         "输出格式不符"
       ],
@@ -125,6 +137,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "pattern"
+      ],
+      "thinking_basis": "算法设计：用循环加取模迭代剥离每一位；模式识别：每次剥掉末位的重复规律",
       "error_modes": [
         "累加初始值错误"
       ],
@@ -186,6 +203,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "abstraction"
+      ],
+      "thinking_basis": "分解问题：拆成时、分、秒三个子换算；抽象：把时间建模为总秒数再分配",
       "error_modes": [
         "输出格式不符"
       ],
@@ -248,6 +270,11 @@
         "代码编写题",
         "边界处理"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "algorithm"
+      ],
+      "thinking_basis": "抽象：把负数取整与取模的数学约定抽象为规则；算法设计：一次计算三个结果并按序组装",
       "error_modes": [
         "类型不匹配"
       ],
@@ -309,6 +336,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "pattern"
+      ],
+      "thinking_basis": "算法设计：选择 n &= n-1 的迭代策略计数；模式识别：每轮消掉一个最低位 1 的规律",
       "error_modes": [
         "循环边界 off-by-one"
       ],
@@ -370,6 +402,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "abstraction"
+      ],
+      "thinking_basis": "算法设计：按百、十、个位顺序拆解再重组；抽象：用数位表示法描述三位数",
       "error_modes": [
         "逻辑与需求不符"
       ],
@@ -431,6 +468,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "algorithm"
+      ],
+      "thinking_basis": "抽象：把位级逻辑运算映射为三个运算符；算法设计：按序组合三种运算结果",
       "error_modes": [],
       "legacy_tags": [
         "运算符/位运算",
@@ -489,6 +531,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "pattern"
+      ],
+      "thinking_basis": "分解问题：把统计拆成字母、数字两个计数任务；模式识别：对每个字符套用同一分类规则",
       "error_modes": [
         "条件覆盖不全"
       ],
@@ -550,6 +597,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "algorithm"
+      ],
+      "thinking_basis": "抽象：把回文抽象为序列的对称性；算法设计：先规范化再用切片反转比对",
       "error_modes": [],
       "legacy_tags": [
         "字符串/切片",
@@ -610,6 +662,11 @@
         "代码编写题",
         "边界处理"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "pattern"
+      ],
+      "thinking_basis": "分解问题：拆成计数与找最长两个子问题；模式识别：用一次线性扫描维护最值",
       "error_modes": [],
       "legacy_tags": [
         "字符串/split分割",
@@ -669,6 +726,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "pattern",
+        "abstraction"
+      ],
+      "thinking_basis": "模式识别：把大小写变换映射到对应字符串方法；抽象：把同一字符串的多视图抽象为四个结果",
       "error_modes": [],
       "legacy_tags": [
         "字符串/大小写转换",
@@ -728,6 +790,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "abstraction"
+      ],
+      "thinking_basis": "分解问题：拆成最值、最小值、均值三个子结果；抽象：用统计量概括整个数据集",
       "error_modes": [
         "除零错误"
       ],
@@ -790,6 +857,11 @@
         "结果预测题",
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "pattern"
+      ],
+      "thinking_basis": "分解问题：四种切片互相独立，逐个完成；模式识别：切片语法在四个子任务中重复套用",
       "error_modes": [
         "索引越界"
       ],
@@ -852,6 +924,11 @@
         "代码编写题",
         "复杂度优化"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "pattern"
+      ],
+      "thinking_basis": "算法设计：双层循环加相邻交换的排序步骤；模式识别：每轮把当前最大值冒到末尾的规律",
       "error_modes": [
         "循环边界 off-by-one"
       ],
@@ -913,6 +990,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "abstraction"
+      ],
+      "thinking_basis": "算法设计：选辅助列表或集合实现保序去重；抽象：用已见集合表示访问状态",
       "error_modes": [
         "逻辑与需求不符"
       ],
@@ -974,6 +1056,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "abstraction"
+      ],
+      "thinking_basis": "算法设计：先计数再按次数与字典序取最优；抽象：用计数字典表示词频分布",
       "error_modes": [
         "键不存在"
       ],
@@ -1036,6 +1123,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "abstraction"
+      ],
+      "thinking_basis": "分解问题：拆成平均分与最高分两个子结果；抽象：把二维记录抽象为姓名与分数对",
       "error_modes": [
         "除零错误"
       ],
@@ -1097,6 +1189,11 @@
       "ability": [
         "结果预测题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "algorithm"
+      ],
+      "thinking_basis": "抽象：用集合表示元素归属关系；算法设计：集合运算后排序输出去重结果",
       "error_modes": [],
       "legacy_tags": [
         "集合/交并差运算",
@@ -1156,6 +1253,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "abstraction"
+      ],
+      "thinking_basis": "算法设计：用多关键字排序键表达复合优先级；抽象：把排序规则抽象为元组键",
       "error_modes": [
         "逻辑与需求不符"
       ],
@@ -1217,6 +1319,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "pattern"
+      ],
+      "thinking_basis": "算法设计：按区间顺序判断，保证分支完整；模式识别：每个区间映射到固定等级",
       "error_modes": [
         "条件覆盖不全",
         "分支顺序错误"
@@ -1279,6 +1386,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "algorithm"
+      ],
+      "thinking_basis": "分解问题：拆成区间遍历、数位判定、结果拼接；算法设计：遍历候选并按条件收集再格式化",
       "error_modes": [
         "输出格式不符"
       ],
@@ -1341,6 +1453,11 @@
         "代码编写题",
         "复杂度优化"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "pattern"
+      ],
+      "thinking_basis": "算法设计：试除到平方根控制复杂度；模式识别：因子成对出现的规律用于剪枝",
       "error_modes": [
         "循环边界 off-by-one",
         "条件覆盖不全"
@@ -1404,6 +1521,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "pattern"
+      ],
+      "thinking_basis": "算法设计：一次遍历完成筛选与累加；模式识别：识别被 3 整除且不被 5 整除的组合条件",
       "error_modes": [
         "累加初始值错误"
       ],
@@ -1466,6 +1588,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "algorithm"
+      ],
+      "thinking_basis": "抽象：把半径与圆周率表示为函数参数；算法设计：代入公式后统一舍入",
       "error_modes": [
         "默认参数陷阱",
         "参数顺序错误"
@@ -1528,6 +1655,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "abstraction"
+      ],
+      "thinking_basis": "分解问题：把商与余数作为两个返回值拆分；抽象：用元组表示一次除法的完整结果",
       "error_modes": [
         "返回值遗漏"
       ],
@@ -1599,6 +1731,11 @@
         "代码编写题",
         "结构设计"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "algorithm"
+      ],
+      "thinking_basis": "分解问题：把求次大值拆成去重与取第二；算法设计：一次遍历维护最大值与次大值",
       "error_modes": [
         "循环边界 off-by-one"
       ],
@@ -1660,6 +1797,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "algorithm"
+      ],
+      "thinking_basis": "抽象：把键值对抽象为文本表示；算法设计：遍历 items 并用 join 拼接",
       "error_modes": [
         "类型不匹配"
       ],
@@ -1721,6 +1863,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "pattern",
+        "algorithm"
+      ],
+      "thinking_basis": "模式识别：识别 n! = n × (n-1)! 的自相似结构；算法设计：用递归出口加递归调用实现",
       "error_modes": [
         "返回值遗漏"
       ],
@@ -1783,6 +1930,11 @@
         "代码编写题",
         "复杂度优化"
       ],
+      "thinking_abilities": [
+        "pattern",
+        "algorithm"
+      ],
+      "thinking_basis": "模式识别：识别斐波那契的递推共性；算法设计：按递归式实现并说明重复计算",
       "error_modes": [
         "复杂度超限"
       ],
@@ -1845,6 +1997,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "pattern",
+        "algorithm"
+      ],
+      "thinking_basis": "模式识别：识别 gcd(a,b)=gcd(b,a%b) 的规律；算法设计：按欧几里得步骤递归下降",
       "error_modes": [],
       "legacy_tags": [
         "函数/递归",
@@ -1896,6 +2053,11 @@
       "ability": [
         "代码改写题"
       ],
+      "thinking_abilities": [
+        "pattern",
+        "abstraction"
+      ],
+      "thinking_basis": "模式识别：把筛选加映射统一为一个推导式；抽象：把集合到集合的变换抽象为表达式",
       "error_modes": [],
       "legacy_tags": [
         "推导式/列表推导式",
@@ -1955,6 +2117,11 @@
       "ability": [
         "代码改写题"
       ],
+      "thinking_abilities": [
+        "pattern",
+        "algorithm"
+      ],
+      "thinking_basis": "模式识别：把字符到次数的映射写成字典推导式；算法设计：去重后逐个计数填充映射",
       "error_modes": [],
       "legacy_tags": [
         "推导式/字典推导式",
@@ -2014,6 +2181,11 @@
       "ability": [
         "代码改写题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "pattern"
+      ],
+      "thinking_basis": "抽象：用惰性序列表示待求和的数据流；模式识别：条件筛选与求和的组合模式",
       "error_modes": [],
       "legacy_tags": [
         "推导式/生成器表达式",
@@ -2073,6 +2245,11 @@
       "ability": [
         "代码改写题"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "pattern"
+      ],
+      "thinking_basis": "分解问题：把筛选与翻倍拆成两步组合；模式识别：函数式管道 filter 后接 map 的通用模式",
       "error_modes": [],
       "legacy_tags": [
         "函数/lambda匿名函数",
@@ -2134,6 +2311,11 @@
         "代码编写题",
         "调试排错"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "algorithm"
+      ],
+      "thinking_basis": "分解问题：拆成正常求值、除零、格式错误三支；算法设计：用异常捕获组织分支并统一返回值",
       "error_modes": [
         "异常捕获过宽"
       ],
@@ -2197,6 +2379,11 @@
         "代码编写题",
         "边界处理"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "algorithm"
+      ],
+      "thinking_basis": "分解问题：拆成过滤非法值、求平均两段；算法设计：遍历转换失败即跳过并计数",
       "error_modes": [
         "异常捕获过宽",
         "除零错误"
@@ -2260,6 +2447,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "decomposition"
+      ],
+      "thinking_basis": "抽象：用自定义异常类型表示非法年龄状态；分解问题：拆成合法、越界、类型错误三类结果",
       "error_modes": [],
       "legacy_tags": [
         "异常处理/自定义异常",
@@ -2320,6 +2512,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "decomposition"
+      ],
+      "thinking_basis": "抽象：用字典表示按姓名分组的累计状态；分解问题：拆成分组与累加两个动作",
       "error_modes": [
         "键不存在"
       ],
@@ -2381,6 +2578,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "decomposition",
+        "abstraction"
+      ],
+      "thinking_basis": "分解问题：拆成行数、单词数、字符数三项统计；抽象：把文本抽象为可计数的序列",
       "error_modes": [
         "逻辑与需求不符"
       ],
@@ -2444,6 +2646,11 @@
         "代码编写题",
         "边界处理"
       ],
+      "thinking_abilities": [
+        "algorithm",
+        "decomposition"
+      ],
+      "thinking_basis": "算法设计：先筛选再按多关键字排序；分解问题：把筛选与排序拆成两步",
       "error_modes": [
         "条件覆盖不全"
       ],
@@ -2506,6 +2713,10 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "abstraction"
+      ],
+      "thinking_basis": "抽象：把矩形抽象为属性加方法的类",
       "error_modes": [
         "作用域误用"
       ],
@@ -2568,6 +2779,10 @@
       "ability": [
         "代码改写题"
       ],
+      "thinking_abilities": [
+        "abstraction"
+      ],
+      "thinking_basis": "抽象：把对象抽象为其文本表示形式",
       "error_modes": [
         "输出格式不符"
       ],
@@ -2630,6 +2845,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "pattern"
+      ],
+      "thinking_basis": "抽象：用基类与派生类表示动物层次；模式识别：同名方法在不同子类中给出不同实现",
       "error_modes": [],
       "legacy_tags": [
         "面向对象/继承",
@@ -2690,6 +2910,11 @@
       "ability": [
         "代码编写题"
       ],
+      "thinking_abilities": [
+        "abstraction",
+        "decomposition"
+      ],
+      "thinking_basis": "抽象：把余额与操作抽象为对象状态；分解问题：拆成存款、取款、校验三个子任务",
       "error_modes": [
         "逻辑与需求不符"
       ],

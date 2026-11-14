@@ -102,8 +102,9 @@ class LoadBankTests(TestCase):
         bank = question_bank.load_bank()
         self.assertGreater(len(bank), 0)
         question = bank[0]
-        for key in ('code', 'title', 'statement', 'tags', 'template_code', 'reference_code',
-                    'function_name', 'function_argc', 'cases', 'difficulty', 'points'):
+        for key in ('code', 'title', 'statement', 'tags', 'thinking_abilities',
+                    'template_code', 'reference_code', 'function_name', 'function_argc',
+                    'cases', 'difficulty', 'points'):
             self.assertIn(key, question)
         self.assertTrue(question['function_name'])
 
@@ -209,3 +210,56 @@ class FindQuestionsTests(TestCase):
         self.assertTrue(question_bank.has_matches([{'name': tag}]))
         self.assertFalse(question_bank.has_matches([{'name': '量子纠缠可视化调试'}]))
         self.assertFalse(question_bank.has_matches([]))
+
+
+class AbilitySelectionTests(TestCase):
+    """按计算思维能力（分解问题/模式识别/抽象/算法设计）选题与组卷。"""
+
+    @classmethod
+    def setUpTestData(cls):
+        question_bank.load_bank.cache_clear()
+        cls.bank = question_bank.load_bank()
+
+    def test_bank_questions_carry_ability_labels(self):
+        """题库每题都解析出能力中文名（来自打标文件）。"""
+        self.assertTrue(self.bank)
+        for question in self.bank:
+            self.assertTrue(question['thinking_abilities'], question['code'])
+
+    def test_find_questions_by_ability(self):
+        """按能力选题：命中题确实标注该能力，主能力优先、组内难度递增。"""
+        questions = question_bank.find_questions_by_ability('算法设计', limit=3)
+        self.assertTrue(questions)
+        self.assertTrue(all('算法设计' in item['thinking_abilities'] for item in questions))
+        # 首题把该能力作为主能力，说明主能力优先排序生效
+        self.assertEqual(questions[0]['thinking_abilities'][0], '算法设计')
+        primary_ranks = [
+            item['difficulty_rank']
+            for item in questions
+            if item['thinking_abilities'][0] == '算法设计'
+        ]
+        self.assertEqual(primary_ranks, sorted(primary_ranks))
+
+    def test_find_questions_ability_path(self):
+        """能力键走能力选题，而不是落到关键词模糊匹配。"""
+        questions = question_bank.find_questions('algorithm', limit=2)
+        self.assertTrue(questions)
+        self.assertTrue(all('算法设计' in item['thinking_abilities'] for item in questions))
+
+    def test_find_questions_by_abilities(self):
+        """多能力组卷：并集覆盖任一能力，require_all 只保留同时具备的题。"""
+        union = question_bank.find_questions_by_abilities(['抽象', '算法设计'], limit=6)
+        self.assertTrue(union)
+        self.assertTrue(
+            all(set(item['thinking_abilities']) & {'抽象', '算法设计'} for item in union)
+        )
+        intersection = question_bank.find_questions_by_abilities(
+            ['抽象', '算法设计'], limit=6, require_all=True
+        )
+        self.assertTrue(
+            all({'抽象', '算法设计'} <= set(item['thinking_abilities']) for item in intersection)
+        )
+
+    def test_unknown_ability_returns_empty(self):
+        self.assertEqual(question_bank.find_questions_by_ability('量子计算'), [])
+        self.assertEqual(question_bank.find_questions_by_abilities([]), [])

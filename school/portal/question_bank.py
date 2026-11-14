@@ -8,7 +8,8 @@ Python题库.md 是团队维护的结构化题库文档，v2 起改为"函数式
 - 解析出题目、函数签名、框架代码、参考答案与用例；
 - 用例的期望返回值统一转成判题器的打包 JSON（与 school.portal.grading
   的 PACKER 约定一致），学生返回值经同一打包流程后逐值比对；
-- 按弱项关键词反查考点标签选题；文件缺失或解析异常时返回空题库。
+- 按弱项关键词反查考点标签选题，或按计算思维能力（分解问题、模式识别、
+  抽象、算法设计）组卷；文件缺失或解析异常时返回空题库。
 """
 
 from __future__ import annotations
@@ -174,6 +175,7 @@ def _parse_question(lines: list[str]) -> dict[str, Any] | None:
         'title': f'{code} {title.strip()}',
         'statement': statement,
         'tags': tags,
+        'thinking_abilities': [label for _key, label, _basis in taglib.thinking_abilities_for_question(code)],
         'function_name': function_name,
         'function_argc': function_argc,
         'template_code': framework,
@@ -231,6 +233,30 @@ def _match_score(question: dict[str, Any], tokens: list[str]) -> int:
     return total
 
 
+def _bank_hits(
+    entries: tuple[dict, ...] | list[dict],
+    limit: int,
+    exclude: set[str] | None = None,
+    role_first: bool = False,
+) -> list[dict[str, Any]]:
+    """把打标文件命中的题号映射回题库题目，按难度递增取前 limit 题。
+
+    ``role_first`` 为真时把「主考点/主能力」的题排在前面，同组内仍按难度递增。
+    """
+    excluded = exclude or set()
+    bank = {question['code']: question for question in load_bank()}
+    matched: list[tuple[int, int, str, dict[str, Any]]] = []
+    for entry in entries:
+        question = bank.get(entry['qid'])
+        if question and question['code'] not in excluded:
+            primary = not role_first or entry.get('role') == 'primary'
+            matched.append(
+                (0 if primary else 1, question['difficulty_rank'], question['code'], question)
+            )
+    matched.sort(key=lambda item: item[:3])
+    return [question for _role, _rank, _code, question in matched[:limit]]
+
+
 def find_questions_by_tag(
     tag: str, limit: int = 2, exclude: set[str] | None = None
 ) -> list[dict[str, Any]]:
@@ -239,21 +265,37 @@ def find_questions_by_tag(
     评分标准的知识点、薄弱项与题库 tag 已统一为同一词表，
     精确命中优先于关键词模糊匹配。
     """
-    excluded = exclude or set()
-    matched: list[tuple[int, str, dict[str, Any]]] = []
-    for entry in taglib.questions_for_tag(tag):
-        for question in load_bank():
-            if question['code'] == entry['qid'] and question['code'] not in excluded:
-                matched.append((question['difficulty_rank'], question['code'], question))
-    matched.sort(key=lambda item: (item[0], item[1]))
-    return [question for _rank, _code, question in matched[:limit]]
+    return _bank_hits(taglib.questions_for_tag(tag), limit, exclude)
+
+
+def find_questions_by_ability(
+    name: str, limit: int = 2, exclude: set[str] | None = None
+) -> list[dict[str, Any]]:
+    """按计算思维能力（键如 ``algorithm`` 或中文名如「算法设计」）选题。
+
+    主能力（题目首项标注）排在前面，同能力内按难度递增。
+    """
+    return _bank_hits(taglib.questions_for_ability(name), limit, exclude, role_first=True)
+
+
+def find_questions_by_abilities(
+    names: list[str] | tuple[str, ...] | set[str],
+    limit: int = 4,
+    exclude: set[str] | None = None,
+    require_all: bool = False,
+) -> list[dict[str, Any]]:
+    """按多个能力组卷：默认取并集，``require_all`` 时只取同时覆盖的能力题。"""
+    entries = taglib.questions_for_abilities(names, require_all=require_all)
+    return _bank_hits(entries, limit, exclude, role_first=True)
 
 
 def find_questions(
     name: str, limit: int = 2, exclude: set[str] | None = None
 ) -> list[dict[str, Any]]:
-    """按弱项（Tag 标准名）选题：Tag 精确命中优先，不足时按关键词模糊匹配补齐。"""
+    """按弱项选题：能力名/键优先，其次 Tag 标准名，不足按关键词模糊匹配补齐。"""
     excluded = exclude or set()
+    if taglib.normalize_thinking_ability(name):
+        return find_questions_by_ability(name, limit=limit, exclude=excluded)
     if str(name or '').strip() in taglib.tag_names():
         tagged = find_questions_by_tag(name, limit=limit, exclude=excluded)
         if len(tagged) >= limit:
