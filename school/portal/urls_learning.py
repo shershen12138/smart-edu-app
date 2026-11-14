@@ -1,10 +1,10 @@
 from django.urls import path
 
+from . import knowledge_views, practice_views, quality_views
 from . import learning_views as views
-from . import practice_views
-from . import quality_views
 
 urlpatterns = [
+    path('knowledge/', knowledge_views.knowledge_map, name='knowledge_map'),
     path('practice/', practice_views.practice_home, name='practice'),
     path(
         'practice/problem/<int:pk>/',

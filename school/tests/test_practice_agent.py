@@ -1,5 +1,6 @@
 import ast
 import json
+import re
 import tempfile
 from pathlib import Path
 from unittest import mock
@@ -948,3 +949,40 @@ class QuestionBankTests(TestCase):
     def test_has_matches(self):
         self.assertTrue(question_bank.has_matches([{'name': '列表切片'}]))
         self.assertFalse(question_bank.has_matches([{'name': '量子纠缠纠错'}]))
+
+
+class KnowledgeMapViewTests(TestCase):
+    def setUp(self):
+        self.student = make_user('student', 'student')
+        self.teacher = make_user('teacher', 'teacher')
+
+    def test_requires_login(self):
+        response = self.client.get(reverse('knowledge_map'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+    def test_student_sees_graph_and_teacher_forbidden(self):
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('knowledge_map'))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode('utf-8')
+        self.assertIn('知识图谱', body)
+        self.assertIn('基础语法与数据类型', body)
+        self.assertIn('面向对象', body)
+        self.assertIn('data-kg-chart', body)
+        self.assertIn('data-kg-focus', body)
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.client.get(reverse('knowledge_map')).status_code, 403)
+
+    def test_injected_graph_is_json_object(self):
+        self.client.force_login(self.student)
+        body = self.client.get(reverse('knowledge_map')).content.decode('utf-8')
+        match = re.search(
+            r'<script id="kg-data" type="application/json">(.*?)</script>', body, re.S
+        )
+        self.assertIsNotNone(match)
+        data = json.loads(match.group(1))
+        self.assertIsInstance(data, dict)
+        self.assertEqual(len(data['nodes']), 68)
+        self.assertEqual(len(data['edges']), 75)
+        self.assertTrue(all('x' in node and 'y' in node for node in data['nodes']))

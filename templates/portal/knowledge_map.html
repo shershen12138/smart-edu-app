@@ -1,0 +1,68 @@
+{% extends "portal/base.html" %}
+{% load static %}
+{% block content %}
+  <div class="page-heading split">
+    <div>
+      <h1>知识图谱</h1>
+      <p class="subtle">整理自《Python学习手册（第4版）》与《Python语言程序设计》两本教材：{{ hub_total }} 个大知识点相互关联，延伸出 {{ point_total }} 个知识点。可拖拽节点、滚轮缩放，点击节点查看详情。</p>
+    </div>
+  </div>
+
+  {{ graph_data|json_script:"kg-data" }}
+  <script src="{% static 'vendor/echarts.min.js' %}"></script>
+
+  <section class="card space-bottom">
+    <div class="kg-wrap" data-kg>
+      <div class="kg-toolbar">
+        <input type="search" class="kg-search" data-kg-search
+               placeholder="搜索知识点，如：切片、递归…" aria-label="搜索知识点">
+        <div class="kg-seg" data-kg-layout-group role="group" aria-label="布局切换">
+          <button type="button" data-kg-layout="radial">放射布局</button>
+          <button type="button" data-kg-layout="force">力导向</button>
+        </div>
+        <label><input type="checkbox" data-kg-edge-labels> 关系标签</label>
+        <label><input type="checkbox" data-kg-edge-arrows> 依赖箭头</label>
+        <button type="button" class="button secondary small" data-kg-reset>重置视图</button>
+        <span class="kg-stats" data-kg-stats aria-live="polite"></span>
+      </div>
+      <div class="kg-levels" data-kg-levels role="group" aria-label="层级筛选">
+        <label><input type="checkbox" value="1" checked> 根节点</label>
+        <label><input type="checkbox" value="2" checked> 大知识点</label>
+        <label><input type="checkbox" value="3" checked> 知识点</label>
+        <label><input type="checkbox" value="4" checked> 子知识点</label>
+      </div>
+      <div class="kg-category-filter" data-kg-cats role="group" aria-label="模块筛选"></div>
+      <div class="kg-body">
+        <div class="kg-chart" data-kg-chart aria-label="知识图谱画布" role="img"></div>
+        <div class="kg-legend" data-kg-legend aria-label="模块图例"></div>
+        <div class="kg-empty" data-kg-empty hidden>
+          <p data-kg-empty-text>没有符合条件的知识点</p>
+          <button type="button" class="button secondary small" data-kg-clear>清空筛选</button>
+        </div>
+        <aside class="kg-panel" data-kg-panel hidden aria-label="知识点详情">
+          <button type="button" class="kg-panel-close" data-kg-panel-close aria-label="关闭详情">×</button>
+          <div data-kg-panel-body></div>
+        </aside>
+      </div>
+      <p class="tip">节点大小表示重要度，颜色区分模块：大知识点高饱和、子知识点同色系浅色；实线带箭头为前置依赖，虚线为易混淆对比。悬停高亮相邻节点，点击查看详情。</p>
+    </div>
+  </section>
+
+  <section class="card space-bottom">
+    <h2>大知识点一览</h2>
+    <p class="subtle">5 个大知识点相互平级，通过"前置依赖 / 易混淆对比"关系连接；点击模块名可在图中定位。</p>
+    <div class="kg-index">
+      {% for module in graph_modules %}
+        <div class="kg-index-item">
+          <button type="button" class="kg-index-title" data-kg-focus="{{ module.id }}">{{ module.name }}</button>
+          <p class="subtle">{{ module.summary }}</p>
+          <div class="tag-row">
+            {% for point in module.points %}
+              <span class="tag">{{ point }}</span>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}
