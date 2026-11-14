@@ -32,7 +32,8 @@ from . import rubric_agent
 logger = logging.getLogger(__name__)
 
 # 雷达图几何版本：坐标算法或轴定义调整后，旧报告自动重算，避免页面回退到旧图。
-RADAR_VERSION = 'radar-v2'
+# radar-v3：雷达轴改为读评分标准的五分制量表，分数按 5/4/3/2/1 等级换算。
+RADAR_VERSION = 'radar-v3'
 
 def ensure_rubric(coursework):
     """确保该作业有一份自己的评分标准，返回它（可能为 None）。
@@ -204,16 +205,36 @@ def display_dimensions(dimensions, abilities) -> list[agent_models.Dimension]:
     return shown
 
 
+def coverage_level(rate: float) -> int:
+    """把 0~1 的检测点覆盖率映射到评分标准里的 5/4/3/2/1 分等级。
+
+    分级口径：100% → 5 分；≥80% → 4 分；≥60% → 3 分；≥40% → 2 分；否则 1 分。
+    与评分标准“考察重点”一节的五分制描述对应：5 分 100、4 分 80、3 分 60、
+    2 分 40、1 分 20，雷达图各轴按等级换算分数。
+    """
+    if rate >= 1.0:
+        return 5
+    if rate >= 0.8:
+        return 4
+    if rate >= 0.6:
+        return 3
+    if rate >= 0.4:
+        return 2
+    return 1
+
+
 def knowledge_axes(
     knowledge_points: dict[str, tuple[str, ...]],
     items,
     analysis,
-) -> tuple[list[agent_models.Dimension], dict[str, float]] | None:
-    """雷达图的六根轴：该作业最主要的六个知识点 Tag（考察重点）。
+    rubric_axes: list[dict] | None = None,
+) -> tuple[list[agent_models.Dimension], dict[str, float], dict[str, int]] | None:
+    """雷达图的六根轴：该作业评分标准“考察重点（雷达图维度）”里的六个知识点。
 
-    重要度由“覆盖题数 + 题目分值”共同决定（见 taglib.top_tags），不是单纯出现频次；
-    每根轴的分数取该 Tag 下全部检测点在学生代码中的覆盖率，
-    没有可机检检测点的 Tag 退回“知识点覆盖”维度的得分。
+    轴的名称与权重优先取评分标准里的五分制量表表（教师/大模型确认过的口径），
+    缺失时才按“覆盖题数 + 题目分值”自动挑选（taglib.top_tags）。
+    每根轴的分数按五级量表的等级换算：检测点覆盖率 → 5/4/3/2/1 分 →
+    100/80/60/40/20。没有可机检检测点的轴退回“知识点覆盖”维度得分后同样折级。
     只统计能归一到《Python教学Tag库》标准名的知识点；旧评分标准的
     自定义名称全部无法归一时返回 None，由调用方退回主能力轴。
     """
@@ -226,7 +247,10 @@ def knowledge_axes(
     if not tag_tasks:
         return None
     weights = dict(items)
-    top = taglib.top_tags(tag_tasks, weights, limit=6)
+    if rubric_axes:
+        top = [(axis['name'], axis['share']) for axis in rubric_axes if axis['name']]
+    else:
+        top = taglib.top_tags(tag_tasks, weights, limit=6)
     if not top:
         return None
 
@@ -237,30 +261,42 @@ def knowledge_axes(
 
     dimensions: list[agent_models.Dimension] = []
     scores: dict[str, float] = {}
+    levels: dict[str, int] = {}
     for name, share in top:
         key = f'tag:{name}'
-        task_keys = agent_curriculum.TAG_TO_POINTS.get(name, ())
+        tasks = tag_tasks.get(taglib.normalize_tag(name) or name, [])
+        task_keys = agent_curriculum.TAG_TO_POINTS.get(taglib.normalize_tag(name) or name, ())
         judged = ok = 0
-        for task in tag_tasks[name]:
+        for task in tasks:
             required = [point for point in task_keys if point in points_by_task.get(task, ())]
             judged += len(required)
             covered = covered_by_task.get(task, set())
             ok += len([point for point in required if point in covered])
-        score = 100.0 * ok / judged if judged else knowledge_score
+        rate = ok / judged if judged else knowledge_score / 100
+        level = coverage_level(min(max(rate, 0.0), 1.0))
         dimensions.append(agent_models.Dimension(key, name, share))
-        scores[key] = round(score, 1)
-    return dimensions, scores
+        levels[key] = level
+        scores[key] = float(level * 20)
+    return dimensions, scores, levels
 
 
-def radar_geometry(scores, width: int = 480, height: int = 360, radius: float = 104) -> dict:
-    """把主能力得分换算成 SVG 极坐标，供前端绘制可交互的雷达图。
+def radar_geometry(
+    scores,
+    width: int = 480,
+    height: int = 360,
+    radius: float = 104,
+    levels: dict[str, int] | None = None,
+) -> dict:
+    """把各轴得分换算成 SVG 极坐标，供前端绘制可交互的雷达图。
 
     Django 模板做不了三角函数，这里一次算好网格、轴线、数据多边形与标签位置，
-    页面只负责画；悬停提示由 portal.js 根据 data-label / data-score 填充。
+    页面只负责画；悬停提示由 portal.js 根据 data-label / data-score / data-level
+    填充（level 为评分标准五分制量表里的等级）。
     """
     center_x = width / 2
     center_y = height / 2
     count = len(scores) or 1
+    levels = levels or {}
     axes = []
     for index, item in enumerate(scores):
         angle = -math.pi / 2 + 2 * math.pi * index / count
@@ -271,6 +307,7 @@ def radar_geometry(scores, width: int = 480, height: int = 360, radius: float = 
             {
                 'label': str(item.get('label', '')),
                 'score': round(score, 1),
+                'level': levels.get(str(item.get('key', '')), 0),
                 'weight': item.get('weight', 0),
                 'x': round(center_x + distance * cos_v, 1),
                 'y': round(center_y + distance * sin_v, 1),
@@ -348,6 +385,14 @@ def _knowledge_signature(points: dict[str, tuple[str, ...]]) -> str:
     )
 
 
+def _axes_signature(axes: list[dict]) -> str:
+    """雷达轴（考察重点）的指纹：教师改评分标准的量表后，旧报告要自动重算。"""
+    return '|'.join(
+        f"{axis['name']}:{axis['share']}:{axis['levels'].get('5', '')}"
+        for axis in axes
+    )
+
+
 def _abilities_signature(abilities: list[dict]) -> str:
     """主能力的指纹：重新生成评分标准后，旧报告要自动重算。"""
     return '|'.join(
@@ -373,6 +418,8 @@ def generate(entry, force: bool = False) -> QualityReport:
     dimensions, rubric_note = dimensions_for(entry.coursework, stored)
     abilities = abilities_for(entry.coursework, stored)
     knowledge_points = knowledge_points_for(entry.coursework, items, stored)
+    # 雷达六轴与五分制量表以评分标准里的“考察重点（雷达图维度）”为准
+    rubric_axes = rubric_agent.parse_axes(getattr(stored, 'markdown', '') or '')
     # 量表维度、题库考点、知识点或主能力变了都要重算，不能只比源码摘要。
     signature = (
         '|'.join(
@@ -385,6 +432,8 @@ def generate(entry, force: bool = False) -> QualityReport:
         + _knowledge_signature(knowledge_points)
         + '#'
         + _abilities_signature(abilities)
+        + '#'
+        + _axes_signature(rubric_axes)
         + '#'
         + RADAR_VERSION
     )
@@ -407,13 +456,17 @@ def generate(entry, force: bool = False) -> QualityReport:
         dimensions=dimensions,
         rubric_note=rubric_note,
     )
-    # 雷达图六轴优先用该作业最主要的六个知识点（考察重点），
-    # 旧评分标准没有 Tag 化知识点时退回 6 个主能力轴。
-    axes = knowledge_axes(knowledge_points, task_weights, analysis)
+    # 雷达图六轴优先用评分标准里的六个考察重点（带五分制量表），
+    # 旧评分标准没有该表时按知识点自动挑选，再没有才退回 6 个主能力轴。
+    axes = knowledge_axes(knowledge_points, task_weights, analysis, rubric_axes=rubric_axes)
+    axis_levels: dict[str, int] = {}
+    axis_scales: dict[str, dict] = {}
     if axes:
-        shown, tag_scores = axes
+        shown, tag_scores, axis_levels = axes
         analysis.scores.update(tag_scores)
         axis_label = '考察重点'
+        for axis in rubric_axes:
+            axis_scales[f'tag:{axis["name"]}'] = axis['levels']
     else:
         shown = display_dimensions(dimensions, abilities)
         axis_label = '主能力' if [item.label for item in shown] != [
@@ -423,7 +476,9 @@ def generate(entry, force: bool = False) -> QualityReport:
     markdown = agent.markdown(analysis, shown, rubric_note, knowledge_points)
     payload = agent.payload(analysis, shown, rubric_note, bool(radar), knowledge_points)
     payload['axis_label'] = axis_label
-    payload['radar'] = radar_geometry(payload['scores'])
+    payload['axis_levels'] = axis_levels
+    payload['axis_scales'] = axis_scales
+    payload['radar'] = radar_geometry(payload['scores'], levels=axis_levels)
     payload['rubric_signature'] = signature
 
     markdown_key = storage.save_private(markdown, '.md')

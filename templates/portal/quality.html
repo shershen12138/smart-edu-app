@@ -70,9 +70,9 @@
               <polygon class="radar-area" points="{{ detail.radar.polygon }}" />
               {% for axis in detail.radar.axes %}
                 <g class="radar-axis" tabindex="0" role="button"
-                   aria-label="{{ axis.label }} {{ axis.score }} 分"
+                   aria-label="{{ axis.label }} {{ axis.score }} 分{% if axis.level %}（{{ axis.level }} 级）{% endif %}"
                    data-label="{{ axis.label }}" data-score="{{ axis.score }}"
-                   data-weight="{{ axis.weight }}">
+                   data-level="{{ axis.level }}" data-weight="{{ axis.weight }}">
                   <circle class="radar-point" cx="{{ axis.x }}" cy="{{ axis.y }}" r="4.5" />
                   <text class="radar-label" x="{{ axis.label_x }}" y="{{ axis.label_y }}"
                         text-anchor="{{ axis.anchor }}">{{ axis.label|truncatechars:10 }}</text>

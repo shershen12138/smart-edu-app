@@ -483,18 +483,63 @@ class QualityReportTests(TestCase):
             knowledge_points, {'func301': 20, 'func303': 10}, analysis
         )
         self.assertIsNotNone(axes)
-        dimensions, tag_scores = axes
+        dimensions, tag_scores, tag_levels = axes
         labels = [dimension.label for dimension in dimensions]
         self.assertEqual(
             labels, ['列表切片', '列表拼接', '步长切片']
         )
         # 权重归一化
         self.assertAlmostEqual(sum(item.weight for item in dimensions), 1.0, places=2)
-        # 步长切片：func303 的 slice_reverse 已覆盖 → 100 分
+        # 五分制量表：覆盖率 100% → 5 级 → 100 分
         self.assertEqual(tag_scores['tag:步长切片'], 100.0)
-        # 列表拼接：func301 的 list_concat 已覆盖 → 100 分；列表切片：slice_bounds 未覆盖 → 0 分
+        self.assertEqual(tag_levels['tag:步长切片'], 5)
         self.assertEqual(tag_scores['tag:列表拼接'], 100.0)
-        self.assertEqual(tag_scores['tag:列表切片'], 0.0)
+        # 列表切片：slice_bounds 未覆盖 → 1 级（量表的 1 分）→ 20 分
+        self.assertEqual(tag_scores['tag:列表切片'], 20.0)
+        self.assertEqual(tag_levels['tag:列表切片'], 1)
+
+    def test_knowledge_axes_follow_rubric_scale(self):
+        """雷达轴与等级以评分标准“考察重点（雷达图维度）”的五分制量表为准。"""
+        from tools.code_quality_agent import models as agent_models
+        from tools.code_quality_agent.pipeline import StudentAnalysis
+
+        knowledge_points = {'func301': ('列表拼接',)}
+        results = [
+            agent_models.TaskResult(
+                spec=agent_models.TaskSpec('func301', '合并截取', ('list_concat',)),
+                parsed=True,
+                covered=['list_concat'],
+            ),
+        ]
+        analysis = StudentAnalysis(
+            name='学生', file_name='a.py', results=results,
+            scores={'knowledge': 80.0}, total=80.0,
+        )
+        rubric_axes = [
+            {
+                'name': '列表拼接',
+                'share': 0.7,
+                'levels': {'5': 'a', '4': 'b', '3': 'c', '2': 'd', '1': 'e'},
+                'tasks': ['func301'],
+            },
+            {
+                'name': '列表切片',
+                'share': 0.3,
+                'levels': {'5': 'a', '4': 'b', '3': 'c', '2': 'd', '1': 'e'},
+                'tasks': ['func301'],
+            },
+        ]
+        axes = quality_service.knowledge_axes(
+            knowledge_points, {'func301': 20}, analysis, rubric_axes=rubric_axes
+        )
+        dimensions, tag_scores, tag_levels = axes
+        # 轴的名称与权重来自评分标准，而不是重新按频次挑选
+        self.assertEqual([d.label for d in dimensions], ['列表拼接', '列表切片'])
+        self.assertEqual([round(d.weight, 2) for d in dimensions], [0.7, 0.3])
+        self.assertEqual(tag_scores['tag:列表拼接'], 100.0)
+        # 列表切片在该作业没有可机检检测点 → 退回“知识点覆盖”维度得分 80 → 4 级/80 分
+        self.assertEqual(tag_levels['tag:列表切片'], 4)
+        self.assertEqual(tag_scores['tag:列表切片'], 80.0)
 
     def test_knowledge_axes_fall_back_for_legacy_names(self):
         """旧评分标准的自定义知识点名无法归一到词表时，退回主能力轴。"""
