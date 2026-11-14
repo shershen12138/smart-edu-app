@@ -80,6 +80,13 @@ window.addEventListener('pageshow', (event) => {
   if (event.persisted) hideLoading();
 });
 
+// 首屏加载：脚本以 defer 执行时页面通常还在下载资源，期间同样给出加载反馈。
+// 复用 120ms 延迟与 pageshow 兜底：页面快速就绪时 hideLoading 会清掉未触发的显示定时器，不会闪烁。
+if (document.readyState !== 'complete') {
+  showLoading('正在加载…');
+  window.addEventListener('load', hideLoading, { once: true });
+}
+
 // 雷达图：悬停或键盘聚焦某个维度时，在数据点上方显示名称与得分
 const initRadar = () => {
   document.querySelectorAll('[data-radar]').forEach((wrap) => {
