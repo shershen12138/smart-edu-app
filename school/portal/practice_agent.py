@@ -136,6 +136,13 @@ def _extract_json(text: str) -> str:
     raise PracticeParseError('模型输出中没有找到 JSON 对象。')
 
 
+def _clean_text(value: Any) -> str:
+    """把模型输出的字段值转成字符串；None 与缺失等价，不得变成字面量 'None'。"""
+    if value is None:
+        return ''
+    return str(value).strip()
+
+
 def _normalize_cases(raw: Any) -> list[dict[str, str]]:
     cases: list[dict[str, str]] = []
     if not isinstance(raw, list):
@@ -143,8 +150,8 @@ def _normalize_cases(raw: Any) -> list[dict[str, str]]:
     for item in raw:
         if not isinstance(item, dict):
             continue
-        stdin = str(item.get('input', '')).strip()
-        expected = str(item.get('output', '')).strip()
+        stdin = _clean_text(item.get('input'))
+        expected = _clean_text(item.get('output'))
         if not stdin or not expected:
             continue
         cases.append(
@@ -170,16 +177,16 @@ def parse_practice(text: str, weak_names: list[str]) -> list[dict[str, Any]]:
     for item in data['questions']:
         if not isinstance(item, dict):
             continue
-        point = str(item.get('knowledge_point', '')).strip()
-        title = str(item.get('title', '')).strip()
-        statement = str(item.get('statement', '')).strip()
+        point = _clean_text(item.get('knowledge_point'))
+        title = _clean_text(item.get('title'))
+        statement = _clean_text(item.get('statement'))
         cases = _normalize_cases(item.get('test_cases'))
         if point not in allowed or not title or not statement or not cases:
             continue
         if per_point.get(point, 0) >= MAX_QUESTIONS_PER_POINT:
             continue
         per_point[point] = per_point.get(point, 0) + 1
-        difficulty = str(item.get('difficulty', '')).strip()
+        difficulty = _clean_text(item.get('difficulty'))
         if difficulty not in ('基础', '进阶'):
             difficulty = '进阶'
         questions.append(
@@ -187,9 +194,9 @@ def parse_practice(text: str, weak_names: list[str]) -> list[dict[str, Any]]:
                 'knowledge_point': point,
                 'title': title,
                 'statement': statement,
-                'template_code': str(item.get('template_code', '')).strip(),
-                'reference_code': str(item.get('reference_code', '')).strip(),
-                'explanation': str(item.get('explanation', '')).strip(),
+                'template_code': _clean_text(item.get('template_code')),
+                'reference_code': _clean_text(item.get('reference_code')),
+                'explanation': _clean_text(item.get('explanation')),
                 'difficulty': difficulty,
                 'cases': cases,
             }

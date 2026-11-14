@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 
 from django.conf import settings
@@ -47,6 +48,9 @@ def weak_threshold() -> float:
     try:
         threshold = float(value)
     except (TypeError, ValueError):
+        threshold = DEFAULT_WEAK_THRESHOLD
+    # NaN 与 inf 不参与大小比较，必须显式拒绝，否则阈值静默失效。
+    if not math.isfinite(threshold):
         threshold = DEFAULT_WEAK_THRESHOLD
     return min(max(threshold, 0.0), 1.0)
 
