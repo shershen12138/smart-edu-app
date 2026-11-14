@@ -156,8 +156,8 @@ LLM 是可选扩展点：图本身不调用大模型，所有结论来自 AST �
 
 ## 题库来源
 
-题库包放在仓库根目录的 `exercise requirements/`（`func_info_list.txt`、`*习题说明.docx`、`gold.py`、`data/funcXxx.txt`），
-由 `school/management/commands/import_course_packages.py` 导入数据库；网页端只读数据库里的题目与参考答案。
+真实章节题目包**不在仓库里**（`exercise requirements/` 已从 Git 移除，避免把老师私有题目与答案提交上去）。需要时由教师提供，解压后放到仓库根目录的 `exercise requirements/` 下，结构为 `func_info_list.txt`、`*习题说明.docx`、`gold.py`、`data/funcXxx.txt`，
+再由 `school/management/commands/import_course_packages.py` 导入数据库；网页端只读数据库里的题目与参考答案。
 
 ## 与标签库、题库、评分标准的衔接
 
