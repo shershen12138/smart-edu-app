@@ -1564,6 +1564,48 @@ td small {
   max-width: 860px
 }
 
+/* 个人中心：账号信息行（字段名称 + 具体信息 同行横向对齐） */
+.profile-card {
+  max-width: 560px
+}
+
+.profile-list {
+  display: grid;
+  margin: 0
+}
+
+.profile-row {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  align-items: baseline;
+  gap: 18px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line)
+}
+
+.profile-row:last-child {
+  border-bottom: 0
+}
+
+.profile-row dt {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink)
+}
+
+.profile-row dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  word-break: break-all
+}
+
+/* 修改密码：卡片底部弱提示（与个人中心同一卡片尺寸） */
+.password-hint {
+  margin: 0;
+  font-size: 12px
+}
+
 .form-card p,
 form>p {
   margin-bottom: 22px
@@ -1884,9 +1926,20 @@ pre {
   margin: auto
 }
 
+/* 品牌名“课码”：登录页第一视觉焦点，字号大于下方宣传语 */
+.login-brand {
+  font-size: 54px;
+  font-weight: 800;
+  letter-spacing: 10px;
+  line-height: 1.2;
+  color: var(--green);
+  margin-bottom: 14px
+}
+
 .login-story h1 {
-  font-size: 43px;
-  line-height: 1.5
+  font-size: 22px;
+  line-height: 1.7;
+  color: var(--ink)
 }
 
 .login-story p {
@@ -2232,6 +2285,26 @@ button[aria-busy="true"] {
   color: #0f172a;
 }
 
+/* API Key 输入行：输入框 + 显示 / 复制按钮 */
+.api-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.api-key-row input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.api-key-row .button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .modal .tip {
   font-size: 12px;
   margin-top: 12px;
@@ -2245,9 +2318,47 @@ button[aria-busy="true"] {
 
 .kg-toolbar {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kg-toolbar-row {
+  display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px 14px;
+}
+
+.kg-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 2px 4px;
+  background: var(--white);
+}
+
+.kg-zoom-btn {
+  width: 30px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kg-zoom-btn:hover {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.kg-zoom-btn:active {
+  background: var(--green-light);
+  transform: scale(.94);
 }
 
 .kg-search {

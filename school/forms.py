@@ -17,6 +17,14 @@ class LoginForm(AuthenticationForm):
     )
 
 
+class CleanPasswordChangeForm(PasswordChangeForm):
+    """修改密码表单：仅移除“为了校验，请输入与上面相同的密码。”帮助文案，不改校验逻辑。"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['new_password2'].help_text = ''
+
+
 class AccountForm(forms.Form):
     username = forms.CharField(
         label='登录名', max_length=150, validators=[UnicodeUsernameValidator()]

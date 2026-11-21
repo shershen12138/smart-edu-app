@@ -149,6 +149,8 @@ const initKnowledgeGraph = () => {
   const edgeLabelToggle = wrap.querySelector('[data-kg-edge-labels]');
   const edgeArrowToggle = wrap.querySelector('[data-kg-edge-arrows]');
   const resetButton = wrap.querySelector('[data-kg-reset]');
+  const zoomInButton = wrap.querySelector('[data-kg-zoom-in]');
+  const zoomOutButton = wrap.querySelector('[data-kg-zoom-out]');
   const statsEl = wrap.querySelector('[data-kg-stats]');
   const legendEl = wrap.querySelector('[data-kg-legend]');
   const emptyEl = wrap.querySelector('[data-kg-empty]');
@@ -348,16 +350,69 @@ const initKnowledgeGraph = () => {
     }
   };
 
-  // 缩放联动：知识点标签在 zoom≥0.8 时显示，关系标签在 zoom≥1.2 且开关打开时显示
+  // —— 缩放联动 ——
+  // 知识点标签在 zoom≥0.8 时显示，关系标签在 zoom≥1.2 且开关打开时显示。
+  // 滚轮 / 触控板双指 / 触屏捏合走 ECharts 原生 roam，这里只记录比例，
+  // 且仅在标签显示档位跨越阈值时才重建画面；缩放过程中逐帧重建会不断
+  // 打断渲染，导致卡顿甚至把缩放顶回原位（此前“缩放不灵敏”的根因）。
+  const ZOOM_MIN = 0.3;
+  const ZOOM_MAX = 3;
+  const clampZoom = (value) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+
+  const labelTier = (zoom) => (zoom >= 0.8 ? 1 : 0);
+  const edgeTier = (zoom) => (state.edgeLabels && zoom >= 1.2 ? 1 : 0);
+  let shownLabelTier = labelTier(state.zoom);
+  let shownEdgeTier = edgeTier(state.zoom);
+
+  // 档位变化时同步标签显隐（重建会保留当前缩放，画面不跳动）
+  const syncLabelTiers = () => {
+    const nextLabel = labelTier(state.zoom);
+    const nextEdge = edgeTier(state.zoom);
+    if (nextLabel !== shownLabelTier || nextEdge !== shownEdgeTier) {
+      shownLabelTier = nextLabel;
+      shownEdgeTier = nextEdge;
+      render(focusKeepIds());
+    }
+  };
+
   chart.on('graphRoam', (event) => {
     if (event.zoom) {
-      state.zoom = Math.min(3, Math.max(0.3, state.zoom * event.zoom));
-      render(focusKeepIds());
+      state.zoom = clampZoom(state.zoom * event.zoom);
+      syncLabelTiers();
     }
   });
 
+  // +/− 按钮：向目标比例平滑动画（与滚轮/捏合共用同一缩放状态与边界）
+  let zoomAnimId = 0;
+  const animateZoomTo = (target) => {
+    cancelAnimationFrame(zoomAnimId);
+    const from = state.zoom;
+    const to = clampZoom(target);
+    if (to === from) return;
+    const start = performance.now();
+    const duration = 220;
+    const step = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      state.zoom = from + (to - from) * eased;
+      chart.setOption({ series: [{ zoom: state.zoom }] });
+      if (progress < 1) {
+        zoomAnimId = requestAnimationFrame(step);
+      } else {
+        state.zoom = to;
+        syncLabelTiers();
+      }
+    };
+    zoomAnimId = requestAnimationFrame(step);
+  };
+  const zoomStep = (direction) => animateZoomTo(state.zoom * (direction > 0 ? 1.35 : 1 / 1.35));
+
+  zoomInButton?.addEventListener('click', () => zoomStep(1));
+  zoomOutButton?.addEventListener('click', () => zoomStep(-1));
+
   const centerOn = (node) => {
     if (state.layout !== 'radial') return;
+    cancelAnimationFrame(zoomAnimId);
     const xs = graph.nodes.map((item) => item.x);
     const ys = graph.nodes.map((item) => item.y);
     const minX = Math.min(...xs);
@@ -368,12 +423,15 @@ const initKnowledgeGraph = () => {
     const py = ((node.y - minY) / height) * 100;
     chart.setOption({ series: [{ center: [`${px}%`, `${py}%`], zoom: 1.4 }] });
     state.zoom = 1.4;
+    syncLabelTiers();
   };
 
   const resetView = () => {
+    cancelAnimationFrame(zoomAnimId);
     state.zoom = 1;
     state.focusCat = null;
     chart.setOption({ series: [{ center: ['50%', '50%'], zoom: 1 }] });
+    syncLabelTiers();
     render();
   };
 

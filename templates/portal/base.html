@@ -5,8 +5,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{{ title|default:'工作台' }} · 课码</title>
-    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261114-11">
-    <script src="{% static 'portal.js' %}?v=20261114-10" defer></script>
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261121-2">
+    <script src="{% static 'portal.js' %}?v=20261121-1" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
   <body>
@@ -51,7 +51,7 @@
             <a class="sidebar-action" href="{% url 'profile' %}">个人中心</a>
             <a class="sidebar-action" href="{% url 'password' %}">修改密码</a>
             <button class="sidebar-action" type="button" data-llm-config-open>
-              大模型配置{% if llm_current %}<span class="sidebar-action-tag">已配置</span>{% endif %}
+              模型配置{% if llm_current %}<span class="sidebar-action-tag">已配置</span>{% endif %}
             </button>
             <form method="post" action="{% url 'logout' %}">
               {% csrf_token %}
@@ -91,13 +91,14 @@
       </div>
     </div>
     {% if user.is_authenticated %}
-      <dialog class="modal" id="llm-config-dialog" aria-labelledby="llm-config-title">
+      <dialog class="modal" id="llm-config-dialog" aria-labelledby="llm-config-title"
+              data-reveal-url="{% url 'llm_config_reveal' %}">
         <form method="post" action="{% url 'llm_config' %}">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
-          <h2 id="llm-config-title">大模型配置</h2>
+          <h2 id="llm-config-title">模型配置</h2>
           <p class="subtle">
-            评分标准智能体与训练题智能体使用<strong>你自己的</strong>大模型配置，
+            评分标准智能体与训练题智能体使用<strong>你自己的</strong>模型配置，
             不会调用他人的 Key；这些信息仅保存在你的账号下。
           </p>
           <label>服务商
@@ -116,9 +117,16 @@
                    placeholder="deepseek-chat" required>
           </label>
           <label>API Key
-            <input type="password" name="api_key" value="" autocomplete="off"
-                   placeholder="{% if llm_current %}已保存 {{ llm_current_masked }}，留空表示不修改{% else %}sk-...{% endif %}">
+            <div class="api-key-row">
+              <input type="password" name="api_key" data-llm-key autocomplete="off"
+                     placeholder="{% if llm_current %}已保存 {{ llm_current_masked }}，留空表示不修改{% else %}sk-...{% endif %}">
+              {% if llm_current %}
+                <button class="button secondary small" type="button" data-llm-key-reveal aria-label="显示已保存的 API Key">显示</button>
+                <button class="button secondary small" type="button" data-llm-key-copy aria-label="复制已保存的 API Key">复制</button>
+              {% endif %}
+            </div>
           </label>
+          <p class="tip">点击输入框、选中或复制 Key 都不会关闭弹窗；按 Enter 也不会误提交，保存请点击“保存配置”按钮。</p>
           <p class="tip">当前用哪家的模型由你决定：支持任何 OpenAI 兼容端点。Key 只用于你自己的调用，页面只回显打码后的值。</p>
           <div class="actions space-top">
             <button class="button">保存配置</button>
@@ -134,7 +142,7 @@
         {% endif %}
       </dialog>
       <script>
-        // 大模型配置弹窗逻辑内联在页面里（不依赖静态 JS 的浏览器缓存，避免旧缓存导致点击无反应）
+        // 模型配置弹窗逻辑内联在页面里（不依赖静态 JS 的浏览器缓存，避免旧缓存导致点击无反应）
         (function () {
           const dialog = document.getElementById('llm-config-dialog');
           if (!dialog) return;
@@ -166,9 +174,72 @@
             if (baseInput && preset[0]) baseInput.value = preset[0];
             if (modelInput && preset[1]) modelInput.value = preset[1];
           });
+
+          // 关闭只来自三个明确入口：取消按钮、点击遮罩空白、Esc。
+          // 点击输入框等内部控件时 event.target 一定是弹窗内元素，
+          // 不会命中下面的 target === dialog 判断，因此不会误关闭。
           dialog.querySelector('[data-llm-config-close]')?.addEventListener('click', () => dialog.close());
           dialog.addEventListener('click', (event) => {
             if (event.target === dialog) dialog.close();
+          });
+
+          // 输入框内按 Enter 会触发浏览器隐式提交 → 整页 POST 跳转，
+          // 弹窗随之消失。这里统一拦截：保存只通过“保存配置”按钮触发。
+          dialog.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && event.target.tagName === 'INPUT') event.preventDefault();
+          });
+
+          // 查看 / 复制已保存的 Key：点击、选中、复制都不引起关闭或跳转。
+          // keyInput 复用上方已声明的 api_key 输入框引用。
+          const revealButton = dialog.querySelector('[data-llm-key-reveal]');
+          const copyButton = dialog.querySelector('[data-llm-key-copy]');
+          const csrfToken = dialog.querySelector('[name="csrfmiddlewaretoken"]')?.value || '';
+          const revealUrl = dialog.dataset.revealUrl;
+
+          const fetchSavedKey = async () => {
+            const response = await fetch(revealUrl, {
+              method: 'POST',
+              headers: { 'X-CSRFToken': csrfToken },
+              credentials: 'same-origin',
+            });
+            if (!response.ok) throw new Error('reveal failed');
+            const payload = await response.json();
+            return payload.api_key || '';
+          };
+
+          revealButton?.addEventListener('click', async () => {
+            try {
+              const key = await fetchSavedKey();
+              if (!key) return;
+              if (keyInput.type === 'password') {
+                keyInput.value = key;
+                keyInput.type = 'text';
+                revealButton.textContent = '隐藏';
+                keyInput.select();
+              } else {
+                keyInput.type = 'password';
+                keyInput.value = '';
+                revealButton.textContent = '显示';
+              }
+            } catch { /* 静默失败，不打断操作 */ }
+          });
+
+          copyButton?.addEventListener('click', async () => {
+            const original = copyButton.textContent;
+            try {
+              const key = await fetchSavedKey();
+              if (!key) return;
+              if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(key);
+              } else {
+                keyInput.value = key;
+                keyInput.type = 'text';
+                keyInput.select();
+                document.execCommand('copy');
+              }
+              copyButton.textContent = '已复制';
+            } catch { /* 剪贴板不可用时静默失败 */ }
+            window.setTimeout(() => { copyButton.textContent = original; }, 1500);
           });
 
           document.querySelectorAll('[data-llm-config-open], [data-llm-required]').forEach((button) => {

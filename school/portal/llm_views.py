@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import redirect, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
@@ -26,7 +27,7 @@ def _next_url(request) -> str:
 @login_required
 @require_http_methods(['POST'])
 def llm_config(request):
-    """保存当前用户的大模型配置（个人 Key 只写入自己的账号）。"""
+    """保存当前用户的模型配置（个人 Key 只写入自己的账号）。"""
     try:
         config = llm_client.save_config(
             request.user,
@@ -36,11 +37,11 @@ def llm_config(request):
             request.POST.get('api_key', ''),
         )
     except llm_client.LLMConfigError as exc:
-        messages.error(request, f'大模型配置未保存：{exc}')
+        messages.error(request, f'模型配置未保存：{exc}')
     else:
         messages.success(
             request,
-            f'已保存你的大模型配置：{config.model} @ {llm_client.host_of(config.base_url)}'
+            f'已保存你的模型配置：{config.model} @ {llm_client.host_of(config.base_url)}'
             f'（Key {llm_client.mask_key(config.api_key)}），仅对当前账号生效。',
         )
     return redirect(_next_url(request))
@@ -48,8 +49,19 @@ def llm_config(request):
 
 @login_required
 @require_http_methods(['POST'])
+def llm_config_reveal(request):
+    """返回当前用户已保存的 API Key（JSON），供弹窗“显示 / 复制”使用。
+
+    仅响应本人请求；接口要求 POST + CSRF Token，Key 不会出现在 URL 或日志里。
+    """
+    config = llm_client.get_config(request.user)
+    return JsonResponse({'api_key': (config.api_key or '') if config else ''})
+
+
+@login_required
+@require_http_methods(['POST'])
 def llm_config_clear(request):
     """删除当前用户的配置；之后点“调用大模型”会先要求重新填写。"""
     llm_client.clear_config(request.user)
-    messages.info(request, '已删除你的大模型配置，再次调用大模型前需要重新填写。')
+    messages.info(request, '已删除你的模型配置，再次调用大模型前需要重新填写。')
     return redirect(_next_url(request))

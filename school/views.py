@@ -16,7 +16,7 @@ from django.db import transaction, IntegrityError
 from django.db.models import Q, Max, Avg, Count, F
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from .models import *
@@ -68,7 +68,7 @@ def logout_view(request):
 
 @login_required
 def password_view(request):
-    form = PasswordChangeForm(request.user, request.POST or None)
+    form = CleanPasswordChangeForm(request.user, request.POST or None)
     if request.method == 'POST' and form.is_valid():
         user = form.save()
         user.must_change_password = False
@@ -77,11 +77,22 @@ def password_view(request):
         audit(user, 'auth.password_change', 'self')
         messages.success(request, '密码已更新。')
         return redirect('dashboard')
-    return form_page(
+    # 与“个人中心”统一版式（大标题 + 白色圆角卡片 + 卡片底部弱提示）。
+    # 该版式的侧边栏依赖现行 URL 结构的路由；旧版 URL 结构（legacy_urls，
+    # 供回归测试）沿用原版式，避免路由名缺失报错。
+    try:
+        reverse('knowledge_map')
+    except NoReverseMatch:
+        return form_page(
+            request,
+            '修改密码',
+            form,
+            description='首次使用需要设置新密码。忘记密码时请联系管理员核验身份后重置。',
+        )
+    return render(
         request,
-        '修改密码',
-        form,
-        description='首次使用需要设置新密码。忘记密码时请联系管理员核验身份后重置。',
+        'portal/password.html',
+        {'title': '修改密码', 'form': form, 'back_url': reverse('dashboard')},
     )
 
 

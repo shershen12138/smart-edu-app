@@ -14,16 +14,24 @@
   <section class="card space-bottom">
     <div class="kg-wrap" data-kg>
       <div class="kg-toolbar">
-        <input type="search" class="kg-search" data-kg-search
-               placeholder="搜索知识点，如：切片、递归…" aria-label="搜索知识点">
-        <div class="kg-seg" data-kg-layout-group role="group" aria-label="布局切换">
-          <button type="button" data-kg-layout="radial">放射布局</button>
-          <button type="button" data-kg-layout="force">力导向</button>
+        <div class="kg-toolbar-row" role="group" aria-label="图谱显示控制">
+          <div class="kg-seg" data-kg-layout-group role="group" aria-label="布局切换">
+            <button type="button" data-kg-layout="radial">放射布局</button>
+            <button type="button" data-kg-layout="force">力导向</button>
+          </div>
+          <label class="kg-edge-toggle"><input type="checkbox" data-kg-edge-labels> 关系标签</label>
+          <label class="kg-edge-toggle"><input type="checkbox" data-kg-edge-arrows> 依赖箭头</label>
         </div>
-        <label><input type="checkbox" data-kg-edge-labels> 关系标签</label>
-        <label><input type="checkbox" data-kg-edge-arrows> 依赖箭头</label>
-        <button type="button" class="button secondary small" data-kg-reset>重置视图</button>
-        <span class="kg-stats" data-kg-stats aria-live="polite"></span>
+        <div class="kg-toolbar-row">
+          <input type="search" class="kg-search" data-kg-search
+                 placeholder="搜索知识点，如：切片、递归…" aria-label="搜索知识点">
+          <button type="button" class="button secondary small" data-kg-reset>重置视图</button>
+          <div class="kg-zoom" role="group" aria-label="缩放控制">
+            <button type="button" class="kg-zoom-btn" data-kg-zoom-in aria-label="放大">＋</button>
+            <button type="button" class="kg-zoom-btn" data-kg-zoom-out aria-label="缩小">−</button>
+          </div>
+          <span class="kg-stats" data-kg-stats aria-live="polite"></span>
+        </div>
       </div>
       <div class="kg-levels" data-kg-levels role="group" aria-label="层级筛选">
         <label><input type="checkbox" value="1" checked> 根节点</label>
