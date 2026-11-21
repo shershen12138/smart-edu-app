@@ -28,12 +28,17 @@
             <a href="{% url 'knowledge_map' %}">知识图谱</a>
             <a href="{% url 'capability' %}">综合能力分析</a>
           {% endif %}
-          {% if portal_role == "admin" %}
+          {% if portal_role == "admin" or portal_role == "security_admin" %}
             <a href="{% url 'teachers' %}">教师用户与授权</a>
             <a href="{% url 'classes' %}">教学班管理</a>
             <a href="{% url 'students' %}">教学班名单管理</a>
             <a href="{% url 'dictionaries' %}">数据字典配置</a>
             <a href="{% url 'archives' %}">归档管理</a>
+            {% if portal_role == "admin" %}
+              <a href="{% url 'audit_logs' %}">审计日志</a>
+            {% endif %}
+          {% elif portal_role == "audit_admin" %}
+            <a href="{% url 'audit_logs' %}">审计日志</a>
           {% elif portal_role == "teacher" %}
             <a href="{% url 'works' %}">作业管理</a>
             <a href="{% url 'classes' %}">班级清单</a>
@@ -46,7 +51,7 @@
           <div class="avatar">{{ user.full_name|first|default:'U' }}</div>
           <strong>{{ user.full_name|default:user.username }}</strong>
           <small>
-            {% if portal_role == "admin" %}管理员{% elif portal_role == "teacher" %}教师{% elif portal_role == "student" %}学生{% else %}待授权{% endif %}
+            {% if portal_role == "admin" %}系统管理员{% elif portal_role == "security_admin" %}安全管理员{% elif portal_role == "audit_admin" %}审计管理员{% elif portal_role == "teacher" %}教师{% elif portal_role == "student" %}学生{% else %}待授权{% endif %}
           </small>
           <div class="sidebar-actions" role="navigation" aria-label="账号操作">
             <a class="sidebar-action" href="{% url 'profile' %}">个人中心</a>

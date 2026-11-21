@@ -28,12 +28,12 @@ from tools.code_quality_agent import models as agent_models
 from tools.code_quality_agent import static_analysis
 from tools.taglib import loader as taglib
 
-from . import llm_client
+from . import capability_rules, llm_client
 from .llm_client import LLMConfigError, LLMError, LLMNotConfigured  # noqa: F401  (兼容旧导入)
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = 'v2'
+PROMPT_VERSION = 'v3'
 
 DIMENSION_POOL: dict[str, str] = {
     'knowledge': '知识点覆盖',
@@ -144,6 +144,13 @@ JSON_SCHEMA_HINT = """{
   "knowledge_points": [
     {"name": "列表切片", "detail": "1 起始计数换算为 0 起始下标", "tasks": ["func301"]}
   ],
+  "bloom_map": {
+    "func301": ["apply", "analyze"],
+    "func302": ["understand"]
+  },
+  "bloom_basis": {
+    "func301": "要把区间换算成下标并处理越界，属于应用与分析"
+  },
   "abilities": [
     {"label": "数据组织与容器操作", "detail": "列表、切片与排序等容器操作",
      "dimension": "knowledge", "points": ["列表切片"]}
@@ -158,13 +165,19 @@ JSON_SCHEMA_HINT = """{
 
 
 def _tag_vocabulary() -> str:
-    """Tag 库词表的紧凑视图（按模块分组），注入 prompt 供大模型选词。"""
-    modules = taglib.tag_modules()
-    if not modules:
+    """词表视图（按知识图谱节点分组），注入 prompt 供大模型选词。
+
+    每组以图谱节点名开头——该名称本身就是该节点的首选 tag；
+    其后是该节点下的细化 tag。提示词因此与知识图谱同构，
+    模型选词天然落在节点名或它的子分支上。
+    """
+    nodes = taglib.tag_nodes()
+    if not nodes:
         return ''
     lines = []
-    for _unit, module, tags in modules:
-        lines.append(f'- {module}：{"、".join(tags)}')
+    for node in nodes:
+        prefix = node['name'] if node['id'] else f"{node['name']}（图谱未覆盖）"
+        lines.append(f'- {prefix}：{"、".join(node["tags"])}')
     return '\n'.join(lines)
 
 
@@ -213,6 +226,9 @@ def coursework_context(coursework) -> dict[str, Any]:
 
 def build_messages(context: dict[str, Any]) -> list[dict[str, str]]:
     dimension_lines = '、'.join(f'{key}（{label}）' for key, label in DIMENSION_POOL.items())
+    bloom_lines = '；'.join(
+        f'{key}（{label}：{note}）' for key, label, note in capability_rules.BLOOM_DIMENSIONS
+    )
     vocabulary = _tag_vocabulary()
     vocabulary_block = (
         f'\n知识点必须从下面的 Tag 库词表中选取（原样使用，不要自造同义词）：\n{vocabulary}\n'
@@ -244,6 +260,9 @@ def build_messages(context: dict[str, Any]) -> list[dict[str, str]]:
    ## 二、考察重点（雷达图维度）
    （表格列：考察重点 | 权重 | 5 分 | 4 分 | 3 分 | 2 分 | 1 分 | 涉及题目）
    五分制量表就是雷达图每根轴的评价标准，不再另设量表章节；
+7. 逐题判断布鲁姆认知层次，key 只能取：{bloom_lines}；
+   每题 1~3 个，按主次排序（首个为最主要层次），函数名必须与题目信息中的 items.function 一致；
+   bloom_basis 用一句话说明该题为什么考这些层次，不能只抄层次名；
 
 输出 JSON，结构如下：
 {JSON_SCHEMA_HINT}
@@ -336,6 +355,78 @@ def normalize_points(raw: Any) -> list[dict[str, Any]]:
             }
         )
     return points[:20]
+
+
+def _point_labels_for(points: list[dict[str, Any]], function: str) -> list[str]:
+    """某个函数题关联的知识点名称（评分标准里 knowledge_points[].tasks）。"""
+    labels: list[str] = []
+    for point in points:
+        if not isinstance(point, dict):
+            continue
+        tasks = [str(task).strip() for task in point.get('tasks') or []]
+        name = str(point.get('name', '')).strip()
+        if name and function in tasks:
+            labels.append(name)
+    return labels
+
+
+def rule_bloom_map(context: dict[str, Any], points: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """没有大模型/未标注时的规则兜底：用知识点 → 模块映射推断每题认知层次。
+
+    与 ``capability_rules.classify_labels`` 同口径，取权重最高的前两层，
+    保证每题至少有一个层次，且不会凭空出现六维之外的键。
+    """
+    mapping: dict[str, list[str]] = {}
+    for item in context.get('items') or []:
+        function = str(item.get('function', '')).strip()
+        if not function:
+            continue
+        labels = _point_labels_for(points, function)
+        bloom, _thinking = capability_rules.classify_labels(labels, str(item.get('title', '')))
+        ranked = sorted(bloom.items(), key=lambda pair: (-pair[1], pair[0]))
+        keys = [key for key, _weight in ranked if _weight > 0][:2]
+        mapping[function] = keys or ['apply']
+    return mapping
+
+
+def normalize_bloom_map(
+    raw: Any, context: dict[str, Any], points: list[dict[str, Any]]
+) -> dict[str, list[str]]:
+    """校验模型给出的每题认知层次；缺失或非法时该题退回规则推断。"""
+    fallback = rule_bloom_map(context, points)
+    if not isinstance(raw, dict):
+        return fallback
+    expected = {str(item.get('function', '')).strip() for item in context.get('items') or []}
+    result: dict[str, list[str]] = {}
+    for function, value in raw.items():
+        name = str(function).strip()
+        if name not in expected:
+            logger.warning('认知层次标注的函数 %s 不在题目清单内，已忽略', name)
+            continue
+        keys = capability_rules.normalize_bloom_list(value)
+        if keys:
+            result[name] = keys
+    for function, keys in fallback.items():
+        result.setdefault(function, keys)
+    return result
+
+
+def bloom_section(context: dict[str, Any], bloom_map: dict[str, list[str]]) -> str:
+    """评分标准 Markdown 末尾的「每题认知层次」表格（教师可见）。"""
+    labels = capability_rules.BLOOM_LABELS
+    notes = {key: note for key, _label, note in capability_rules.BLOOM_DIMENSIONS}
+    lines = ['## 三、每题认知层次（布鲁姆）', '', '| 题目 | 认知层次 | 判定说明 |', '|:--|:--|:--|']
+    titles = {
+        str(item.get('function', '')).strip(): str(item.get('title', '')).strip()
+        for item in context.get('items') or []
+    }
+    for function, keys in bloom_map.items():
+        if not keys:
+            continue
+        names = '、'.join(labels.get(key, key) for key in keys)
+        detail = '；'.join(notes.get(key, '') for key in keys)
+        lines.append(f'| {titles.get(function) or function}（{function}） | {names} | {detail} |')
+    return '\n'.join(lines) + '\n'
 
 
 def rule_abilities(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -563,15 +654,18 @@ def parse_response(text: str, context: dict[str, Any]) -> dict[str, Any]:
         raise RubricParseError('模型没有给出任何知识点。')
     dimensions = normalize_dimensions(data.get('dimensions'))
     abilities = normalize_abilities(data.get('abilities'), points)
+    bloom_map = normalize_bloom_map(data.get('bloom_map'), context, points)
     markdown = str(data.get('markdown', '')).strip()
     if '考察重点' not in markdown or '知识点' not in markdown:
         markdown = render_markdown(context, points, dimensions, abilities)
     # 统一重写为带五分制量表的“考察重点”一节，保证与报告页雷达图六轴一致
     markdown = with_axes_section(markdown, context, points, dimensions, abilities)
+    markdown = markdown.rstrip() + '\n\n' + bloom_section(context, bloom_map)
     return {
         'points': points,
         'abilities': abilities,
         'dimensions': dimensions,
+        'bloom_map': bloom_map,
         'markdown': markdown,
     }
 
@@ -679,11 +773,15 @@ def rule_based(context: dict[str, Any], reference_code: str = '') -> dict[str, A
             }
         )
     abilities = rule_abilities(points)
+    bloom_map = rule_bloom_map(context, points)
+    markdown = render_markdown(context, points, dimensions, abilities)
+    markdown = markdown.rstrip() + '\n\n' + bloom_section(context, bloom_map)
     return {
         'points': points,
         'abilities': abilities,
         'dimensions': dimensions,
-        'markdown': render_markdown(context, points, dimensions, abilities),
+        'bloom_map': bloom_map,
+        'markdown': markdown,
     }
 
 
@@ -887,6 +985,7 @@ def generate_for(coursework, offline: bool = False, force: bool = True, user=Non
         defaults={
             'markdown': ensure_heading(result['markdown'], context),
             'knowledge_points': result['points'],
+            'bloom_map': result['bloom_map'],
             'dimensions': result['dimensions'],
             'abilities': result['abilities'],
             'source': source,
@@ -926,3 +1025,135 @@ def schedule_regeneration(coursework_id) -> None:
             target=_regenerate_coursework_job, args=(coursework_id,), daemon=True
         ).start()
     )
+
+
+BLOOM_ONLY_SCHEMA = """{
+  "bloom_map": {"func301": ["apply", "analyze"]},
+  "bloom_basis": {"func301": "需要把区间换算成下标并处理越界，属于应用与分析"}
+}"""
+
+
+def build_bloom_messages(
+    context: dict[str, Any], points: list[dict[str, Any]]
+) -> list[dict[str, str]]:
+    """只为已有评分标准补标认知层次时的紧凑提示词（不重新生成量表）。"""
+    bloom_lines = '；'.join(
+        f'{key}（{label}：{note}）' for key, label, note in capability_rules.BLOOM_DIMENSIONS
+    )
+    system = (
+        '你是高校 Python 课程的助教，负责判断每道题考察的认知层次。'
+        '只输出 JSON，不要输出解释性文字。'
+    )
+    user = f"""题目信息（JSON）：
+{json.dumps(context, ensure_ascii=False, indent=2)}
+
+该作业已确定的知识点：
+{json.dumps(points, ensure_ascii=False, indent=2)}
+
+任务：为每道函数题标注 1~3 个布鲁姆认知层次，key 只能取：
+{bloom_lines}
+按主次排序（首个为最主要层次）；既要考虑题目本身的步骤复杂度，也要考虑它依赖的知识点；
+bloom_basis 用一句话说明理由，不能只抄层次名。
+
+输出 JSON，结构如下：
+{BLOOM_ONLY_SCHEMA}
+"""
+    return [
+        {'role': 'system', 'content': system},
+        {'role': 'user', 'content': user},
+    ]
+
+
+def _rubric_functions(coursework) -> set[str]:
+    return {
+        str(item.function_name).strip()
+        for item in coursework.items.all()
+        if str(item.function_name).strip()
+    }
+
+
+def needs_bloom(coursework) -> bool:
+    """评分标准是否存在还没标注认知层次的函数题。"""
+    rubric = getattr(coursework, 'rubric', None)
+    if rubric is None:
+        return False
+    functions = _rubric_functions(coursework)
+    if not functions:
+        return False
+    return bool(functions - set((rubric.bloom_map or {}).keys()))
+
+
+def fill_bloom(coursework, user=None, offline: bool = False):
+    """给已有评分标准补每题认知层次：大模型优先，未配置/失败时用规则。
+
+    只更新 bloom_map 与 Markdown 的认知层次一节，不改动知识点与量表，
+    因此对教师已确认的评分标准是增量操作。
+    """
+    rubric = getattr(coursework, 'rubric', None)
+    if rubric is None or not needs_bloom(coursework):
+        return rubric
+    context = coursework_context(coursework)
+    points = [item for item in rubric.knowledge_points or [] if isinstance(item, dict)]
+    actor = user or coursework.owner
+    bloom_map = None
+    if not offline and llm_configured(actor):
+        try:
+            text = chat(build_bloom_messages(context, points), user=actor)
+            bloom_map = normalize_bloom_map(
+                json.loads(_extract_json(text)).get('bloom_map'), context, points
+            )
+        except (LLMError, LLMNotConfigured, ValueError) as exc:
+            logger.info('认知层次大模型标注失败 coursework=%s：%s', coursework.pk, exc)
+    if bloom_map is None:
+        bloom_map = rule_bloom_map(context, points)
+    blank = chr(10) * 2
+    markdown = (rubric.markdown or '').rstrip()
+    if '每题认知层次' not in markdown:
+        markdown = markdown + blank + bloom_section(context, bloom_map)
+    CourseworkRubric.objects.filter(pk=rubric.pk).update(
+        bloom_map=bloom_map, markdown=markdown
+    )
+    rubric.bloom_map = bloom_map
+    rubric.markdown = markdown
+    return rubric
+
+
+_BLOOM_PENDING: set[int] = set()
+_BLOOM_LOCK = threading.Lock()
+
+
+def _fill_bloom_job(coursework_id: int, user_id: int | None) -> None:
+    try:
+        work = (
+            Coursework.objects.select_related('owner')
+            .filter(pk=coursework_id, deleted_at__isnull=True)
+            .first()
+        )
+        if work is None:
+            return
+        actor = work.owner
+        if user_id:
+            from school.models import User
+
+            actor = User.objects.filter(pk=user_id).first() or work.owner
+        fill_bloom(work, user=actor)
+    except Exception:
+        logger.warning('后台补标认知层次失败 coursework=%s', coursework_id, exc_info=True)
+    finally:
+        close_old_connections()
+        with _BLOOM_LOCK:
+            _BLOOM_PENDING.discard(coursework_id)
+
+
+def schedule_bloom_fill(coursework_id: int, user_id: int | None = None) -> bool:
+    """事务提交后在后台补标认知层次；同一作业只排一次。"""
+    with _BLOOM_LOCK:
+        if coursework_id in _BLOOM_PENDING:
+            return False
+        _BLOOM_PENDING.add(coursework_id)
+    transaction.on_commit(
+        lambda: threading.Thread(
+            target=_fill_bloom_job, args=(coursework_id, user_id), daemon=True
+        ).start()
+    )
+    return True

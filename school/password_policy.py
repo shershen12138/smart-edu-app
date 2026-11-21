@@ -77,6 +77,34 @@ class PasswordComplexityValidator:
         )
 
 
+def ensure_not_reused(user, raw_password: str) -> None:
+    """拒绝与最近 N 次使用过的口令重复（8.1.4.1 a)）。"""
+    from django.conf import settings
+
+    from .models import PasswordHistory
+
+    if user and user.pk and PasswordHistory.reused(user, raw_password):
+        limit = getattr(settings, 'PASSWORD_HISTORY_COUNT', 5)
+        raise ValidationError(
+            f'新密码不能与最近 {limit} 次使用过的密码相同。',
+            code='password_reused',
+        )
+
+
+def password_expired(user) -> bool:
+    """口令是否超过有效期；未知修改时间的旧账号先不强制。"""
+    from datetime import timedelta
+
+    from django.conf import settings
+    from django.utils import timezone
+
+    changed = getattr(user, 'password_changed_at', None)
+    if not changed:
+        return False
+    days = getattr(settings, 'PASSWORD_MAX_AGE_DAYS', 90)
+    return timezone.now() - changed > timedelta(days=days)
+
+
 def needs_upgrade(password: str, user=None) -> bool:
     """登录成功后判断已有口令是否仍满足当前策略。
 

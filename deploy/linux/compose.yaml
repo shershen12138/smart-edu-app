@@ -10,7 +10,9 @@ x-app: &app
   PRIVATE_STORAGE: /storage
   JUDGE_HOST_STORAGE: ${JUDGE_HOST_STORAGE:?Initialize first}
   JUDGE_IMAGE: python:3.12-slim
-  STORE_RECOVERY_PASSWORDS: "1"
+  # 8.1.4.7：不再保存明文口令副本；如确需开启，字段本身已按密钥加密
+  STORE_RECOVERY_PASSWORDS: "0"
+  FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:-}
   TRUST_PROXY: "false"
 x-logging: &logging
   driver: json-file
@@ -25,7 +27,15 @@ services:
       MYSQL_USER: coursejudge
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    # 8.1.4.3：慢查询日志写入 mysql.slow_log 表，供 db_security_check 巡检；
+    # 不开启 general_log，避免全量语句（含个人信息）落盘。
+    command:
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+      - "--slow-query-log=1"
+      - "--long-query-time=2"
+      - "--log-output=TABLE"
+      - "--general-log=0"
     volumes: ["mysql_data:/var/lib/mysql"]
     healthcheck:
       test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -ucoursejudge -e 'SELECT 1' coursejudge"]

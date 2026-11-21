@@ -328,6 +328,8 @@ class CourseworkRubric(models.Model):
     )
     markdown = models.TextField('评分标准 Markdown')
     knowledge_points = models.JSONField('考察知识点', default=list)
+    # 每道题的布鲁姆认知层次（一题可多层）：{"func301": ["apply", "analyze"]}
+    bloom_map = models.JSONField('每题认知层次', default=dict, blank=True)
     dimensions = models.JSONField('评分维度', default=list)
     abilities = models.JSONField('主能力维度', default=list)
     source = models.CharField('来源', max_length=8, choices=SOURCES, default='llm')
@@ -389,6 +391,8 @@ class PracticeProblem(models.Model):
     reference_code = models.TextField('参考答案（学生不可见）', blank=True)
     explanation = models.TextField('解析（学生不可见）', blank=True)
     difficulty = models.CharField('难度', max_length=8, choices=DIFFICULTIES, default='基础')
+    # 该题考察的布鲁姆认知层次（一题可多层），与作业题目的 bloom_map 同口径
+    bloom = models.JSONField('认知层次', default=list, blank=True)
     # 函数式题（分层题库文档）：批阅调用该函数比对返回值，为空时走 stdin/stdout 判题。
     function_name = models.CharField('判定函数名', max_length=60, blank=True)
     function_argc = models.PositiveSmallIntegerField('函数参数个数', null=True, blank=True)

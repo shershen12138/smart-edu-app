@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
 
-from school.models import Coursework, DataDictionary, User
+from school.models import AuditLog, Coursework, DataDictionary, User
 
 from . import navigation
 from .access import allowed, classes_for, role
@@ -105,7 +105,18 @@ def profile(request):
 @login_required
 def dashboard(request):
     current = role(request.user)
-    if current == 'admin':
+    if current == 'audit_admin':
+        return page(
+            request,
+            'dashboard',
+            '审计工作台',
+            stats=[
+                ('审计记录总数', AuditLog.objects.count()),
+                ('近期失败操作', AuditLog.objects.filter(result='failure').count()),
+            ],
+            shortcuts=[link('审计日志', 'audit_logs')],
+        )
+    if current in ('admin', 'security_admin'):
         stats = [
             (
                 '教师账号',
@@ -118,18 +129,21 @@ def dashboard(request):
             ('教学班', classes_for(request.user).count()),
             ('数据字典', DataDictionary.objects.count()),
         ]
+        shortcuts = [
+            link('教师用户与授权', 'teachers'),
+            link('教学班管理', 'classes'),
+            link('教学班名单管理', 'students'),
+            link('数据字典配置', 'dictionaries'),
+            link('归档管理', 'archives'),
+        ]
+        if current == 'admin':
+            shortcuts.append(link('审计日志', 'audit_logs'))
         return page(
             request,
             'dashboard',
             '管理工作台',
             stats=stats,
-            shortcuts=[
-                link('教师用户与授权', 'teachers'),
-                link('教学班管理', 'classes'),
-                link('教学班名单管理', 'students'),
-                link('数据字典配置', 'dictionaries'),
-                link('归档管理', 'archives'),
-            ],
+            shortcuts=shortcuts,
         )
     if current not in ('teacher', 'student'):
         return page(

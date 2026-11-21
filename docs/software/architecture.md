@@ -175,7 +175,7 @@ START → resolve_specs → prepare ─┬─(整文件可解析)→ lint ─┐
 
 | 项 | 现状 | 影响 |
 | --- | --- | --- |
-| `STORE_RECOVERY_PASSWORDS` 明文密码副本 | `settings.py:110`，DEBUG 默认开启 | 违反口令存储基本准则，上线前必须关闭并清理历史副本（`README.md:53` 已标注为临时设计） |
+| ~~`STORE_RECOVERY_PASSWORDS` 明文密码副本~~ | 已整改：默认关闭，开启时按 `school/crypto.py` 字段级加密，查看写审计 | 部署保持 `STORE_RECOVERY_PASSWORDS=0`；历史明文副本建议一次性清理 |
 | 无限流 | 仅 `DATA_UPLOAD_MAX_MEMORY_SIZE=3MB` 的体积限制 | 截止前集中提交缺少保护，存在刷接口风险 |
 | 无可观测性 | 无 Prometheus/ELK/结构化日志采集，仅容器日志轮转 | 线上判题堆积、任务失败无法主动发现 |
 | `docker.sock` 暴露给 worker | `compose.yaml:50` | 沙箱隔离的潜在绕过路径 |

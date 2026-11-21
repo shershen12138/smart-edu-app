@@ -62,7 +62,8 @@ class AuthViewTests(TestCase):
         import hashlib
 
         key = 'login:user:' + hashlib.sha256(b'stu').hexdigest()
-        cache.set(key, 5, 600)
+        # 未达到失败阈值（默认 5 次）时仍允许登录，并在成功后清零计数
+        cache.set(key, 4, 600)
         self.client.post(
             reverse('login'), {'username': 'stu', 'password': 'SafePassword_2026'}
         )

@@ -13,6 +13,7 @@
 | 了解上一轮改了什么、怎么对接 | [A_HANDOFF.md](A_HANDOFF.md) | 开发交接：前后端边界、批阅对接 6 个环节（解析 → 验证 → 绑定 → 提交 → 快照 → 计分）、私有数据约定 |
 | 看做到哪一步、验证了什么 | [VALIDATION.md](VALIDATION.md) | 按日期倒序的验证记录：测试项数、真实 Docker 结果、迁移演练、浏览器实测，以及**未验证的边界**（学校现场、跨网段、并发压测） |
 | 了解系统设计与取舍 | [software/architecture.md](software/architecture.md) | 技术方案调研：架构分层、Docker 沙箱、数据模型与替代方案对比 |
+| 做三级等保自查、SQL 注入复核与巡检 | [security/README.md](security/README.md) | 条款对照、检查证据、防护链路、每周巡检 SOP 与应急流程 |
 | 看一次第三方代码评审记录 | [software/CodeReview.md](software/CodeReview.md) | 历史评审报告；其中个别结论已被后续提交修复，只作过程记录 |
 | 看产品原型测试与评估结论 | [PRODUCT_EVALUATION.md](PRODUCT_EVALUATION.md) | 针对当前原型的测试范围、通过项与遗留问题，可作为交叉测试的对照材料 |
 | 看需求/软件工程作业材料 | [requirements/](requirements/) | 问题定义、功能规格、非功能规格、管理员与教师用户故事 |

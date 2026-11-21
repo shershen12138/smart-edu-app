@@ -307,7 +307,8 @@ def radar_geometry(
             {
                 'label': str(item.get('label', '')),
                 'score': round(score, 1),
-                'level': levels.get(str(item.get('key', '')), 0),
+                # 没有五分制量表的轴留空，模板与 tooltip 会省略「N 级」
+                'level': levels.get(str(item.get('key', '')), ''),
                 'weight': item.get('weight', 0),
                 'x': round(center_x + distance * cos_v, 1),
                 'y': round(center_y + distance * sin_v, 1),

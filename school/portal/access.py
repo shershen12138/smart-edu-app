@@ -6,23 +6,26 @@ from school.models import Classroom
 
 
 def role(user):
+    """返回主角色；三员按“系统 > 安全 > 审计”排序，避免权限叠加造成混权。"""
     if not user.is_authenticated or not user.is_active:
         return ''
-    for value in ('admin', 'teacher', 'student'):
+    for value in ('admin', 'security_admin', 'audit_admin', 'teacher', 'student'):
         if user.has_role(value):
             return value
     return ''
 
 
 def require_role(user, expected):
-    if role(user) != expected:
+    """expected 可以是单个角色或角色元组，便于让管理员页面同时授权安全管理员。"""
+    allowed = (expected,) if isinstance(expected, str) else tuple(expected)
+    if role(user) not in allowed:
         raise PermissionDenied
 
 
 def classes_for(user, action=None):
     qs = Classroom.objects.filter(deleted_at__isnull=True, archived=False)
     current = role(user)
-    if current == 'admin':
+    if current in ('admin', 'security_admin'):
         return qs
     if current == 'student':
         return (

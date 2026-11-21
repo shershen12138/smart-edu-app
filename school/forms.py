@@ -6,6 +6,7 @@ from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.core.exceptions import ValidationError
 from .models import User, UserRole, Classroom, ProblemVersion, SubmissionRuleVersion, Announcement
 from .password_policy import HELP_TEXT as PASSWORD_HELP_TEXT
+from .password_policy import ensure_not_reused
 from .widgets import TogglePasswordInput
 
 
@@ -34,6 +35,11 @@ class CleanPasswordChangeForm(PasswordChangeForm):
             )
         self.fields['new_password1'].help_text = PASSWORD_HELP_TEXT
         self.fields['new_password2'].help_text = ''
+
+    def clean_new_password1(self):
+        password = self.cleaned_data['new_password1']
+        ensure_not_reused(self.user, password)
+        return password
 
 
 class AccountForm(forms.Form):

@@ -100,3 +100,28 @@ def dispatch_coursework():
                     '评测任务投递失败 submission=%s，已回退为待评测', pk, exc_info=True
                 )
                 CourseworkSubmission.objects.filter(pk=pk, status='queued').update(status='pending')
+
+
+@shared_task
+def deactivate_stale_accounts():
+    """停用长期未登录的普通账号（8.1.4.2 a)）；管理员账号不自动停用。"""
+    from django.conf import settings
+    from django.db.models import Q
+
+    from .models import User
+    from .services import audit
+
+    days = getattr(settings, 'INACTIVE_ACCOUNT_DAYS', 90)
+    cutoff = timezone.now() - timedelta(days=days)
+    stale_ids = list(
+        User.objects.filter(is_active=True, is_superuser=False, deleted_at__isnull=True)
+        .exclude(roles__role__in=['admin', 'security_admin', 'audit_admin'])
+        .filter(Q(last_login__lt=cutoff) | Q(last_login__isnull=True, date_joined__lt=cutoff))
+        .values_list('pk', flat=True)
+        .distinct()
+    )
+    if not stale_ids:
+        return 0
+    User.objects.filter(pk__in=stale_ids).update(is_active=False)
+    audit(None, 'account.auto_disable', 'users', {'count': len(stale_ids), 'days': days})
+    return len(stale_ids)

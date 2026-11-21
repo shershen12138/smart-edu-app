@@ -176,6 +176,8 @@ def _parse_question(lines: list[str]) -> dict[str, Any] | None:
         'statement': statement,
         'tags': tags,
         'thinking_abilities': [label for _key, label, _basis in taglib.thinking_abilities_for_question(code)],
+        # 题库打标里的布鲁姆层次（键），供训练题继承与能力画像统计
+        'bloom': [key for key, _label, _basis in taglib.bloom_levels_for_question(code)],
         'function_name': function_name,
         'function_argc': function_argc,
         'template_code': framework,
@@ -289,6 +291,21 @@ def find_questions_by_abilities(
     return _bank_hits(entries, limit, exclude, role_first=True)
 
 
+def find_questions_by_bloom(
+    names: list[str] | tuple[str, ...] | set[str],
+    limit: int = 2,
+    exclude: set[str] | None = None,
+    require_all: bool = False,
+) -> list[dict[str, Any]]:
+    """按布鲁姆认知层次（键如 ``analyze`` 或中文名如「分析」）选题。
+
+    主要认知层次（题目首项标注）排在前面，同层内按难度递增；
+    ``require_all`` 为真时只取同时覆盖这些层次的题。
+    """
+    entries = taglib.questions_for_blooms(names, require_all=require_all)
+    return _bank_hits(entries, limit, exclude, role_first=True)
+
+
 def find_questions(
     name: str, limit: int = 2, exclude: set[str] | None = None
 ) -> list[dict[str, Any]]:
@@ -296,8 +313,10 @@ def find_questions(
     excluded = exclude or set()
     if taglib.normalize_thinking_ability(name):
         return find_questions_by_ability(name, limit=limit, exclude=excluded)
-    if str(name or '').strip() in taglib.tag_names():
-        tagged = find_questions_by_tag(name, limit=limit, exclude=excluded)
+    if taglib.is_known_tag(name):
+        tagged = find_questions_by_tag(
+            taglib.normalize_tag(name) or name, limit=limit, exclude=excluded
+        )
         if len(tagged) >= limit:
             return tagged
         excluded |= {question['code'] for question in tagged}

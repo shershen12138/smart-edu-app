@@ -83,3 +83,24 @@ sudo docker compose --env-file .env -f compose.yaml run --rm --no-deps web pytho
 ```
 
 `--apply` 才真正清理。仅在 Web、worker、beat 全部停止并完成备份后，才可加 `--offline` 清理不满 24 小时的无引用文件，避免与新上传同时发生。
+
+## SQL 注入与数据库权限巡检（维护人员）
+
+本次更新后，MySQL 只记录执行时间超过 2 秒的语句（`mysql.slow_log` 表），不开启全量 general log。应用账号默认无权读取 `mysql` 库，因此日志由维护人员用 root 取出后交给巡检命令扫描：
+
+```bash
+cd /opt/coursejudge
+sudo docker compose --env-file .env -f compose.yaml exec -T db \
+  sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -N -B -e "SELECT sql_text FROM mysql.slow_log ORDER BY start_time DESC LIMIT 500"' \
+  | sudo docker compose --env-file .env -f compose.yaml exec -T web \
+      python manage.py db_security_check --slow-log - --skip-privileges --fail-on-risk
+```
+
+单独核对应用账号权限（不加 `--slow-log` 时只做权限检查）：
+
+```bash
+sudo docker compose --env-file .env -f compose.yaml exec -T web \
+  python manage.py db_security_check --fail-on-risk
+```
+
+命令是只读的：发现 `FILE`、`PROCESS`、`SUPER`、`GRANT OPTION` 等全局高危权限或日志中出现注入特征时，以非 0 状态退出，可直接接入定时巡检。`mysql.slow_log` 过大时用 root 执行 `TRUNCATE TABLE mysql.slow_log`，不要删除 `mysql_data` 卷。

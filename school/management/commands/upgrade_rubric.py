@@ -44,6 +44,10 @@ class Command(BaseCommand):
                 rubric.dimensions or [],
                 rubric.abilities or [],
             )
+            if rubric.bloom_map:
+                markdown = markdown.rstrip() + chr(10) * 2 + rubric_agent.bloom_section(
+                    context, rubric.bloom_map
+                )
             if markdown.strip() == (rubric.markdown or '').strip():
                 continue
             changed += 1

@@ -3,7 +3,7 @@
   <div class="page-heading split">
     <div>
       <h1>综合能力分析</h1>
-      <p class="subtle">按布鲁姆认知水平与计算思维水平汇总你所有机器批阅任务的表现</p>
+      <p class="subtle">汇总机器批阅作业与个性化训练的表现，按布鲁姆认知水平、计算思维水平与知识模块给出等级</p>
     </div>
   </div>
 
@@ -19,7 +19,8 @@
           {% endif %}
         </div>
         <p class="subtle capability-lead">
-          未被考察的维度只标注样本不足，不记 0 分。
+          未被考察的维度只标注样本不足，不记 0 分；某维度涉及的题目全部得分即视为满级，
+          有失分则按题目分值比例折算等级。
         </p>
       </div>
     </div>
@@ -29,8 +30,12 @@
         <p class="tip space-top">检测到新的评测数据，正在后台重新分析；下面是上一次的结果，稍后刷新即可看到更新。</p>
       {% endif %}
       <div class="capability-grid space-top">
-        <div>
-          <h3>布鲁姆认知水平</h3>
+        <section class="capability-module capability-module--bloom"
+                 aria-labelledby="capability-bloom-title">
+          <h3 id="capability-bloom-title">
+            布鲁姆认知水平
+            <span class="capability-module-badge">{{ capability.bloom|length }} 个维度</span>
+          </h3>
           {% if capability.radar.width %}
             <div class="radar-figure" data-radar>
               <svg viewBox="0 0 {{ capability.radar.width }} {{ capability.radar.height }}"
@@ -71,21 +76,32 @@
           {% endif %}
           <ul class="capability-legend">
             {% for row in capability.bloom %}
-              <li>
+              <li class="capability-dim{% if not row.covered %} is-empty{% endif %}">
                 <span class="tag">{{ row.label }}</span>
-                {% if row.covered %}
-                  <strong>{{ row.score|floatformat:"-1" }}</strong> 分 · {{ row.level }} {{ row.level_label }}
-                {% else %}
-                  暂无数据
-                {% endif %}
-                <span class="subtle">{{ row.coverage_text }}</span>
+                <span class="capability-dim-meter" aria-hidden="true">
+                  <span style="width: {% if row.covered %}{{ row.score|floatformat:0 }}{% else %}0{% endif %}%"></span>
+                </span>
+                <span class="capability-dim-score">
+                  {% if row.covered %}<strong>{{ row.score|floatformat:"-1" }}</strong> 分{% else %}暂无数据{% endif %}
+                </span>
+                <span class="capability-dim-meta subtle">
+                  {% if row.covered %}
+                    {{ row.level }} {{ row.level_label }} · 涉及 {{ row.task_count }} 题{% if row.lost_tasks %}，失分 {{ row.lost_tasks }} 题{% endif %} · {{ row.coverage_text }}
+                  {% else %}
+                    {{ row.coverage_text }}
+                  {% endif %}
+                </span>
               </li>
             {% endfor %}
           </ul>
-        </div>
+        </section>
 
-        <div>
-          <h3>计算思维水平</h3>
+        <section class="capability-module capability-module--thinking"
+                 aria-labelledby="capability-thinking-title">
+          <h3 id="capability-thinking-title">
+            计算思维水平
+            <span class="capability-module-badge">{{ capability.thinking|length }} 个维度</span>
+          </h3>
           <div class="capability-cards">
             {% for card in capability.thinking %}
               <article class="capability-card">
@@ -110,8 +126,40 @@
               </article>
             {% endfor %}
           </div>
-        </div>
+        </section>
       </div>
+
+      {% if capability.modules %}
+        <div class="capability-diagnosis space-top">
+          <h3>知识模块掌握度</h3>
+          <div class="capability-modules-scroll" role="region" tabindex="0"
+               aria-label="知识模块掌握度，固定显示 5 行，可上下滚动查看全部模块">
+            <table class="capability-modules">
+              <thead>
+                <tr>
+                  <th scope="col">模块</th>
+                  <th scope="col">掌握度</th>
+                  <th scope="col">等级</th>
+                  <th scope="col">涉及题数</th>
+                  <th scope="col">失分题</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in capability.modules %}
+                  <tr>
+                    <td>{{ row.label }} <span class="subtle">{{ row.code }}</span></td>
+                    <td>{{ row.score|floatformat:"-1" }} 分</td>
+                    <td>{{ row.level }} {{ row.level_label }}</td>
+                    <td>{{ row.task_count }}</td>
+                    <td>{% if row.lost_tasks %}{{ row.lost_tasks }}{% else %}0{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="subtle">模块掌握度与维度同口径：该模块涉及题目全部得分即满级，有失分按分值比例折算。</p>
+        </div>
+      {% endif %}
 
       {% if capability.summary %}
         <div class="capability-diagnosis space-top">
@@ -139,10 +187,30 @@
         </details>
       {% endif %}
 
+      {% if capability.unscored %}
+        <div class="capability-diagnosis space-top">
+          <h3>未纳入统计的作业</h3>
+          <ul>
+            {% for item in capability.unscored %}
+              <li>{{ item.title }}：{{ item.reason }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
       <footer class="capability-foot">
         <div class="capability-foot-stats">
-          <span><strong>{{ capability.works }}</strong> 个任务</span>
-          <span><strong>{{ capability.graded_tasks }}</strong> 题有判题记录</span>
+          <span><strong>{{ capability.works }}</strong> 次作业</span>
+          {% if capability.practice_plans %}
+            <span><strong>{{ capability.practice_plans }}</strong> 份个性化训练</span>
+          {% endif %}
+          <span>
+            <strong>{{ capability.graded_tasks }}</strong> 题有判题记录
+            （作业 {{ capability.coursework_tasks }} / 训练 {{ capability.practice_tasks }}）
+          </span>
+          {% if capability.ungraded_tasks %}
+            <span>{{ capability.ungraded_tasks }} 题缺逐题判分，未计入</span>
+          {% endif %}
           {% if capability.updated_at %}<span>更新于 {{ capability.updated_at|date:"m-d H:i" }}</span>{% endif %}
         </div>
         {% if capability.code_facts.files %}

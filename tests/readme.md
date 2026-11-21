@@ -33,6 +33,7 @@
 | 旧路由回归 | `test_legacy_views`、`test_teaching`、`test_workflows` | 用 `@override_settings(ROOT_URLCONF='config.legacy_urls')` 跑旧门户全流程 |
 | 批阅与沙箱 | `test_judge_unit`、`test_judge_sandbox`、`test_grading_unit`、`test_docker` | 执行器状态机、Docker 命令（mock）；`test_docker` 是唯一需要真实容器的模块 |
 | 解析与命令 | `test_parsers`、`test_imports_and_commands` | 上传材料解析与校验、名单导入、管理命令 |
+| 注入与巡检 | `test_sql_injection` | ORM 参数化回归、GET 参数拦截与审计、数据库权限与慢日志扫描 |
 | 纯函数 | `test_taglib`、`test_quality_rules`、`test_quality_agent_internals` | Tag 加载与归一、题库反查、题意规则、评测图内部 |
 | 基础设施 | `test_exception_logging` | ERROR 及以上落盘到轮转 `exception.log` |
 

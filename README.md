@@ -131,7 +131,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 
 该命令会停用所有现有账号并移出清单，再创建以上三账号及测试班级关系。因此不能用于学校更新、日常启动或已有同学数据的环境。正式新部署使用 `bootstrap_admin` 创建自定密码的管理员。旧 `seed_demo` 仅用于历史开发，不用于当前版本。
 
-用户明确要求本阶段保留可读密码：`User.recovery_password` 保存明文副本，只有管理员的账号编辑页可查看（响应禁止缓存），登录校验仍使用 Django 哈希。首次改密和管理员重置同步更新该副本；密码不进报表或审计日志。`STORE_RECOVERY_PASSWORDS` 在 DEBUG 模式默认开启、非 DEBUG 默认关闭。后续上线前关闭该开关并清除历史明文副本；这项临时设计不能视为已完成生产安全处理。
+口令恢复副本默认关闭（`STORE_RECOVERY_PASSWORDS=0`）。确需开启时，`User.recovery_password` 按字段级加密（`FIELD_ENCRYPTION_KEY`，未配置时由 `SECRET_KEY` 派生）存储，只有管理员账号编辑页可查看且查看行为写入审计，响应禁止缓存；登录校验始终使用 Django 哈希。密码不进报表或审计日志。
 
 ## 章节批阅配置
 
@@ -274,6 +274,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 | `refresh_abilities` | 按各作业知识点重新归纳雷达图六大主能力 |
 | `upgrade_rubric` | 用已存知识点与维度重渲染评分标准 Markdown（不调大模型），默认预览 |
 | `purge_deleted_data` | 清理逻辑删除记录与无引用私有文件，默认预览，`--apply` 才执行 |
+| `db_security_check` | 只读巡检：数据库账号高危权限与慢查询日志注入特征；`--slow-log -` 读标准输入，`--fail-on-risk` 有风险时非 0 退出 |
 | `seed_demo` | 仅 `DEBUG=true`：创建演示班、四角色账号与两道题；当前版本不使用 |
 
 ### 测试
@@ -286,6 +287,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 | 旧路由回归 | `test_legacy_views`、`test_teaching`、`test_workflows` | 用 `override_settings(ROOT_URLCONF='config.legacy_urls')` 跑旧门户全流程 |
 | 批阅与沙箱 | `test_judge_unit`、`test_judge_sandbox`、`test_grading_unit`、`test_docker` | 执行器状态机与 Docker 命令（mock）；`test_docker` 是唯一需要 `RUN_DOCKER_TESTS=1` 的真实容器验收 |
 | 解析与命令 | `test_parsers`、`test_imports_and_commands` | 上传材料解析/校验、名单导入、管理命令 |
+| 注入与巡检 | `test_sql_injection` | ORM 参数化回归、GET 参数拦截与审计、数据库权限与慢日志扫描 |
 | 纯函数 | `test_taglib`、`test_quality_rules`、`test_quality_agent_internals` | Tag 加载归一、题库反查、题意规则、评测图内部 |
 | 基础设施 | `test_exception_logging` | ERROR 及以上落盘到轮转 `exception.log` |
 

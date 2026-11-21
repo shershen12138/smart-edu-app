@@ -1,4 +1,5 @@
 {% extends "portal/base.html" %}
+{% load portal_tags %}
 {% block content %}
   <div class="page-heading split">
     <div>
@@ -55,7 +56,7 @@
       <tbody>
         {% for row in rows %}
           <tr>
-            <td>{{ row.student.student_no }}</td>
+            <td>{{ row.student.student_no|mask_student_no }}</td>
             <td>
               <a href="{% url 'student_results' work.classroom_id row.student.pk %}">{{ row.student.full_name }}</a>
             </td>

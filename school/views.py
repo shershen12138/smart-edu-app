@@ -27,11 +27,39 @@ from .storage import read_private, save_private
 from .imports import preview_import, commit_import, HEADERS
 from .teaching import latest_drafts
 from .portal import navigation
-from .password_policy import needs_upgrade
+from .password_policy import ensure_not_reused, needs_upgrade, password_expired
+from .portal.access import role as current_role
+from . import totp
 
 
 def form_page(request, title, form, **context):
     return render(request, 'school/form.html', {'title': title, 'form': form, **context})
+
+
+def _finish_login(request, user, raw_password):
+    """口令（及动态口令）验证通过后的统一收尾。"""
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    audit(user, 'auth.login', 'session', request=request)
+    if password_expired(user):
+        # 口令超过有效期：标记后由中间件统一引导到修改密码页
+        user.must_change_password = True
+        user.save(update_fields=['must_change_password'])
+        messages.warning(
+            request,
+            f'密码已超过 {settings.PASSWORD_MAX_AGE_DAYS} 天未更换，请先修改密码。',
+        )
+    elif not user.must_change_password and needs_upgrade(raw_password, user):
+        # 用会话标记交给工作台弹出一次提醒，确认后不再出现
+        request.session['weak_password_warning'] = True
+    device = getattr(user, 'totp_device', None)
+    if (
+        settings.TOTP_ENFORCE
+        and current_role(user) in settings.TOTP_REQUIRED_ROLES
+        and not (device and device.confirmed)
+    ):
+        messages.warning(request, '该角色需要绑定动态口令后才能继续使用，请先完成绑定。')
+        return redirect('totp_setup')
+    return redirect('dashboard')
 
 
 def login_view(request):
@@ -47,25 +75,148 @@ def login_view(request):
             'login:ip:' + hashlib.sha256(ip.encode()).hexdigest(),
             'login:user:' + hashlib.sha256(name.encode()).hexdigest(),
         ]
-        if any(cache.get(key, 0) >= 10 for key in keys):
-            form.add_error(None, '失败次数过多，请 10 分钟后重试。')
+        if any(cache.get(key, 0) >= settings.LOGIN_FAIL_LIMIT for key in keys):
+            minutes = max(1, settings.LOGIN_FAIL_WINDOW // 60)
+            form.add_error(None, f'失败次数过多，请 {minutes} 分钟后重试。')
+            audit(
+                None,
+                'auth.login_blocked',
+                name,
+                {'username': name},
+                request=request,
+                result='failure',
+            )
         elif form.is_valid():
-            login(request, form.get_user())
+            user = form.get_user()
             for key in keys:
                 cache.delete(key)
-            audit(request.user, 'auth.login', 'session', request=request)
-            # 强制改密的账号会直接跳到修改密码页，那里已有完整规则说明，无需重复提示
-            if not request.user.must_change_password and needs_upgrade(
-                request.POST.get('password', ''), request.user
-            ):
-                # 用会话标记交给工作台弹出一次提醒，确认后不再出现
-                request.session['weak_password_warning'] = True
-            return redirect('dashboard')
+            device = getattr(user, 'totp_device', None)
+            if device and device.confirmed:
+                # 第一步口令通过，先不建立登录会话，等待动态口令
+                request.session['totp_pending_user'] = user.pk
+                request.session['totp_pending_pwd'] = request.POST.get('password', '')
+                audit(user, 'auth.password_ok', 'session', request=request)
+                return redirect('totp_verify')
+            return _finish_login(request, user, request.POST.get('password', ''))
         else:
             for key in keys:
-                cache.set(key, cache.get(key, 0) + 1, 600)
+                cache.set(key, cache.get(key, 0) + 1, settings.LOGIN_FAIL_WINDOW)
+            audit(
+                None,
+                'auth.login_failed',
+                name,
+                {'username': name},
+                request=request,
+                result='failure',
+            )
             audit(None, 'auth.failed', 'session', request=request)
     return render(request, 'school/login.html', {'form': form, 'title': '登录'})
+
+
+def totp_verify(request):
+    """登录第二步：校验动态口令或一次性恢复码。"""
+    user_id = request.session.get('totp_pending_user')
+    if not user_id:
+        return redirect('login')
+    user = User.objects.filter(pk=user_id, is_active=True).first()
+    device = getattr(user, 'totp_device', None) if user else None
+    if not user or not device or not device.confirmed:
+        request.session.pop('totp_pending_user', None)
+        return redirect('login')
+    if request.method == 'POST':
+        code = request.POST.get('code', '').strip()
+        if totp.verify_code(device.secret, code) or totp.consume_backup_code(device, code):
+            device.failed_attempts = 0
+            device.save(update_fields=['failed_attempts'])
+            audit(user, 'auth.totp_ok', 'session', request=request)
+            raw_password = request.session.pop('totp_pending_pwd', '')
+            request.session.pop('totp_pending_user', None)
+            return _finish_login(request, user, raw_password)
+        device.failed_attempts += 1
+        device.save(update_fields=['failed_attempts'])
+        audit(user, 'auth.totp_failed', 'session', request=request, result='failure')
+        if device.failed_attempts >= totp.MAX_FAILED_ATTEMPTS:
+            request.session.pop('totp_pending_user', None)
+            request.session.pop('totp_pending_pwd', None)
+            messages.error(request, '动态口令连续错误次数过多，请重新登录。')
+            return redirect('login')
+        messages.error(request, '动态口令不正确或已过期，请重试。')
+    return render(
+        request,
+        'school/totp_verify.html',
+        {'title': '动态口令验证', 'shell_template': 'portal/base.html'},
+    )
+
+
+@login_required
+def totp_setup(request):
+    """绑定 / 关闭动态口令（8.1.4.1 b)）。"""
+    device = getattr(request.user, 'totp_device', None)
+    backup_codes = []
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'enable':
+            secret = request.session.get('totp_setup_secret', '')
+            if not secret:
+                messages.error(request, '绑定会话已过期，请刷新页面重新获取密钥。')
+            elif not totp.verify_code(secret, request.POST.get('code', '')):
+                messages.error(request, '动态口令不正确，请确认验证器时间后重试。')
+            else:
+                TOTPDevice.objects.update_or_create(
+                    user=request.user,
+                    defaults={
+                        'secret': secret,
+                        'confirmed': True,
+                        'confirmed_at': timezone.now(),
+                        'failed_attempts': 0,
+                    },
+                )
+                request.session.pop('totp_setup_secret', None)
+                backup_codes = totp.issue_backup_codes(request.user)
+                audit(
+                    request.user,
+                    'auth.totp_enable',
+                    'user',
+                    {'user_id': request.user.pk},
+                    request=request,
+                )
+                messages.success(request, '双因素认证已启用，请妥善保存恢复码。')
+        elif action == 'disable':
+            if not request.user.check_password(request.POST.get('password', '')):
+                messages.error(request, '密码不正确，无法关闭双因素认证。')
+            else:
+                TOTPDevice.objects.filter(user=request.user).delete()
+                audit(
+                    request.user,
+                    'auth.totp_disable',
+                    'user',
+                    {'user_id': request.user.pk},
+                    request=request,
+                )
+                messages.success(request, '双因素认证已关闭。')
+                return redirect('totp_setup')
+    device = getattr(request.user, 'totp_device', None)
+    enabled = bool(device and device.confirmed)
+    secret = ''
+    uri = ''
+    if not enabled and not backup_codes:
+        secret = request.session.get('totp_setup_secret')
+        if not secret:
+            secret = totp.generate_secret()
+            request.session['totp_setup_secret'] = secret
+        uri = totp.provisioning_uri(request.user.username, secret)
+    return render(
+        request,
+        'portal/totp_setup.html',
+        {
+            'title': '双因素认证',
+            'enabled': enabled,
+            'secret': secret,
+            'uri': uri,
+            'backup_codes': backup_codes,
+            'remaining': len(device.backup_codes or []) if device else 0,
+        },
+    )
 
 
 @require_POST
@@ -323,6 +474,7 @@ def user_detail(request, pk):
                 elif action == 'reset':
                     password = request.POST.get('password', '')
                     validate_password(password, user)
+                    ensure_not_reused(user, password)
                     user.set_password(password)
                     user.must_change_password = True
                     user.save(update_fields=['password', 'must_change_password'])

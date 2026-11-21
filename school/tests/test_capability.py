@@ -16,6 +16,9 @@ from school.course_models import (
     CourseworkQuestionResult,
     CourseworkRubric,
     CourseworkSubmission,
+    PracticeAttempt,
+    PracticePlan,
+    PracticeProblem,
     QualityReport,
     StudentCapabilityProfile,
 )
@@ -133,6 +136,62 @@ class CapabilityScoringTests(SimpleTestCase):
         self.assertFalse(by_key['create']['covered'])
         self.assertEqual(by_key['create']['coverage_text'], '暂无该维度的判题记录')
 
+    def test_full_marks_reach_top_level(self):
+        """某维度涉及题目全部得分 → 100 分、A 级（用户确认的「未失分满级」）。"""
+        rows = capability_service._score_dimensions(
+            [_task(rate=1.0)], 'bloom', capability_rules.BLOOM_DIMENSIONS
+        )
+        row = {item['key']: item for item in rows}['apply']
+        self.assertEqual(row['score'], 100.0)
+        self.assertEqual(row['level'], 'A')
+        self.assertEqual(row['task_count'], 1)
+        self.assertEqual(row['lost_tasks'], 0)
+
+    def test_partial_loss_measured_by_task_ratio(self):
+        """有失分按分值比例：两题各占一半权重，一题满分一题半分 → 75 分 B 级。"""
+        tasks = [
+            _task(weight=10.0, rate=1.0, bloom={'apply': 0.5, 'analyze': 0.5}),
+            _task(
+                task_id='func302',
+                weight=10.0,
+                rate=0.5,
+                bloom={'apply': 0.5, 'analyze': 0.5},
+            ),
+        ]
+        rows = capability_service._score_dimensions(
+            tasks, 'bloom', capability_rules.BLOOM_DIMENSIONS
+        )
+        row = {item['key']: item for item in rows}['apply']
+        self.assertEqual(row['score'], 75.0)
+        self.assertEqual(row['level'], 'B')
+        self.assertEqual(row['task_count'], 2)
+        self.assertEqual(row['lost_tasks'], 1)
+        self.assertAlmostEqual(row['pass_ratio'], 0.5)
+
+    def test_multi_label_bloom_splits_weight(self):
+        """一题多维度按个数均分，避免同一题给多个维度都记满分。"""
+        weights = capability_rules.bloom_weights(['apply', 'analyze', 'create'])
+        self.assertEqual(set(weights), {'apply', 'analyze', 'create'})
+        self.assertAlmostEqual(sum(weights.values()), 1.0)
+        self.assertAlmostEqual(weights['apply'], 1 / 3)
+        self.assertEqual(capability_rules.bloom_weights(['量子纠缠']), {})
+        self.assertEqual(
+            capability_rules.normalize_bloom_list(['apply', 'apply', 'create', 'bogus', 'understand']),
+            ['apply', 'create', 'understand'],
+        )
+
+    def test_module_mastery_uses_same_rule(self):
+        """模块掌握度：全部得分满级，有失分按比例，且落到教学模块编号。"""
+        rows = capability_service._module_rows(
+            [_task(rate=1.0), _task(task_id='func302', rate=0.5)]
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0]['code'].startswith('U05'))
+        self.assertEqual(rows[0]['score'], 75.0)
+        self.assertEqual(rows[0]['level'], 'B')
+        self.assertEqual(rows[0]['task_count'], 2)
+        self.assertEqual(rows[0]['lost_tasks'], 1)
+
     def test_coded_rate_missing_is_excluded(self):
         tasks = [_task(rate=None)]
         rows = capability_service._score_dimensions(
@@ -176,6 +235,11 @@ class CapabilityScoringTests(SimpleTestCase):
         self.assertEqual(len(payload['bloom']), 6)
         self.assertEqual(len(payload['thinking']), 4)
         self.assertEqual(len(payload['radar']['axes']), 6)
+        # 雷达轴要带能力等级字母（未覆盖的维度留空），不能退化成数字 0
+        axis_levels = [axis['level'] for axis in payload['radar']['axes']]
+        self.assertEqual(axis_levels, [row['level'] for row in payload['bloom']])
+        self.assertTrue({level for level in axis_levels if level} <= {'A', 'B', 'C', 'D'})
+        self.assertIn('D', axis_levels)  # apply 维度 50 分 → D 级
         self.assertEqual(payload['thinking'][0]['key'], 'abstraction')
         self.assertTrue(payload['summary'])
         self.assertEqual(payload['meta']['diagnosis'], 'rule')
@@ -185,6 +249,246 @@ class CapabilityScoringTests(SimpleTestCase):
         second = capability_service._signature([_task(rate=0.6)], '')
         self.assertNotEqual(first, second)
         self.assertEqual(first, capability_service._signature([_task(rate=0.5)], ''))
+
+
+class RubricBloomTests(SimpleTestCase):
+    """评分标准里的每题认知层次：白名单校验与规则兜底。"""
+
+    CONTEXT = {
+        'title': '列表作业',
+        'items': [
+            {'function': 'func301', 'title': '合并并截取', 'points': 10},
+            {'function': 'func302', 'title': '递归求和', 'points': 10},
+        ],
+    }
+    POINTS = [
+        {'name': '列表切片', 'detail': '', 'tasks': ['func301']},
+        {'name': '递归', 'detail': '', 'tasks': ['func302']},
+    ]
+
+    def test_rule_fallback_covers_every_item(self):
+        from school.portal import rubric_agent
+
+        mapping = rubric_agent.rule_bloom_map(self.CONTEXT, self.POINTS)
+        self.assertEqual(set(mapping), {'func301', 'func302'})
+        self.assertEqual(mapping['func301'], ['apply'])
+        for keys in mapping.values():
+            self.assertTrue(set(keys) <= set(capability_rules.BLOOM_KEYS))
+
+    def test_invalid_output_falls_back_per_item(self):
+        from school.portal import rubric_agent
+
+        mapping = rubric_agent.normalize_bloom_map(
+            {'func301': ['analyze', 'bogus'], 'func999': ['apply']},
+            self.CONTEXT,
+            self.POINTS,
+        )
+        self.assertEqual(mapping['func301'], ['analyze'])
+        self.assertNotIn('func999', mapping)
+        self.assertIn('func302', mapping)  # 模型漏标的题用规则补齐
+
+    def test_markdown_section_lists_levels(self):
+        from school.portal import rubric_agent
+
+        text = rubric_agent.bloom_section(self.CONTEXT, {'func301': ['apply', 'analyze']})
+        self.assertIn('每题认知层次', text)
+        self.assertIn('合并并截取', text)
+        self.assertIn('应用、分析', text)
+
+
+@override_settings(**TEST_OVERRIDES)
+class PracticeEvidenceTests(TestCase):
+    """个性化训练成果并入综合能力分析。"""
+
+    def setUp(self):
+        self.student = make_user('pstudent', 'student')
+        self.teacher = make_user('pteacher', 'teacher')
+        self.classroom = Classroom.objects.create(code='PC1', name='训练班', term='2026 秋季')
+        ClassStudent.objects.create(classroom=self.classroom, student=self.student)
+        plan = PracticePlan.objects.create(
+            student=self.student, profile_snapshot={'work_title': '列表作业'}
+        )
+        self.problem = PracticeProblem.objects.create(
+            plan=plan,
+            knowledge_point='列表切片',
+            title='区间裁剪',
+            statement='输出切片结果',
+            difficulty='基础',
+            bloom=['apply', 'analyze'],
+        )
+        PracticeAttempt.objects.create(
+            problem=self.problem, student=self.student, code_path='a.py',
+            score=80, passed_cases=4, total_cases=5, verdict='WA',
+        )
+        PracticeAttempt.objects.create(
+            problem=self.problem, student=self.student, code_path='b.py',
+            score=40, passed_cases=2, total_cases=5, verdict='WA',
+        )
+
+    def test_practice_evidence_uses_best_attempt(self):
+        tasks, stats = capability_service.collect_evidence(self.student)
+        practice = [task for task in tasks if task.get('source') == 'practice']
+        self.assertEqual(len(practice), 1)
+        task = practice[0]
+        self.assertEqual(task['rate'], 0.8)  # 取最高分那次提交
+        self.assertEqual(task['bloom_keys'], ['apply', 'analyze'])
+        self.assertAlmostEqual(sum(task['bloom'].values()), 1.0)
+        self.assertEqual(stats['practice_tasks'], 1)
+        self.assertEqual(stats['practice_plans'], 1)
+
+    def test_payload_reports_practice_sources(self):
+        tasks, stats = capability_service.collect_evidence(self.student)
+        payload = capability_service.build_payload(
+            self.student, tasks, capability_service.code_facts(tasks), stats=stats
+        )
+        meta = payload['meta']
+        self.assertEqual(meta['practice_tasks'], 1)
+        self.assertEqual(meta['coursework_tasks'], 0)
+        self.assertEqual(meta['bloom_sources'].get('practice'), 1)
+        by_key = {row['key']: row for row in payload['bloom']}
+        self.assertEqual(by_key['apply']['score'], 80.0)
+        self.assertEqual(by_key['apply']['level'], 'B')
+
+    def test_page_shows_modules_and_practice_counts(self):
+        """页面展示了模块级掌握度和训练来源统计。"""
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('capability'))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode('utf-8')
+        self.assertIn('知识模块掌握度', body)
+        self.assertIn('份个性化训练', body)
+        self.assertIn('训练 1', body)
+
+    def test_manual_coursework_is_reported_not_counted(self):
+        """非机器批阅作业不进入维度统计，只在提示里出现。"""
+        work = Coursework.objects.create(
+            classroom=self.classroom,
+            owner=self.teacher,
+            title='手工评分作业',
+            description='教师评分',
+            grading_mode='manual',
+            opens_at=timezone.now(),
+            deadline=timezone.now() + timezone.timedelta(days=1),
+            status='open',
+        )
+        CourseworkItem.objects.create(
+            coursework=work, function_name='func901', title='手工题', points=10, order=1
+        )
+        CourseworkSubmission.objects.create(
+            coursework=work,
+            student=self.student,
+            sequence=1,
+            source_path=save_private('print(1)\n', '.py'),
+            source_hash=hashlib.sha256(b'print(1)\n').hexdigest(),
+            status='done',
+        )
+        tasks, stats = capability_service.collect_evidence(self.student)
+        self.assertFalse([task for task in tasks if task.get('source') == 'coursework'])
+        self.assertEqual(len(stats['unscored']), 1)
+        self.assertIn('教师评分', stats['unscored'][0]['reason'])
+        payload = capability_service.build_payload(
+            self.student, tasks, capability_service.code_facts(tasks), stats=stats
+        )
+        self.assertEqual(payload['meta']['coursework_tasks'], 0)
+        self.assertEqual(len(payload['meta']['unscored']), 1)
+
+
+@override_settings(**TEST_OVERRIDES)
+class RetakeScoringTests(TestCase):
+    """同一作业多次提交：画像取历史最好成绩，而不是首次失败的 0 分。"""
+
+    def setUp(self):
+        self.teacher = make_user('rteacher', 'teacher')
+        self.student = make_user('rstudent', 'student')
+        classroom = Classroom.objects.create(code='RC1', name='重交班', term='2026 秋季')
+        ClassStudent.objects.create(classroom=classroom, student=self.student)
+        self.work = Coursework.objects.create(
+            classroom=classroom,
+            owner=self.teacher,
+            title='条件分支作业',
+            description='实现 func301',
+            grading_mode='automatic',
+            opens_at=timezone.now(),
+            deadline=timezone.now() + timezone.timedelta(days=1),
+            status='open',
+        )
+        CourseworkItem.objects.create(
+            coursework=self.work, function_name='func301', title='分支判断', points=10, order=1
+        )
+        CourseworkRubric.objects.create(
+            coursework=self.work,
+            markdown='# 标准',
+            knowledge_points=[{'name': 'if-else 双分支', 'detail': '', 'tasks': ['func301']}],
+            bloom_map={'func301': ['apply']},
+            dimensions=[],
+            source='rule',
+        )
+
+    def _submit(self, sequence, score, verdict, code):
+        entry = CourseworkSubmission.objects.create(
+            coursework=self.work,
+            student=self.student,
+            sequence=sequence,
+            source_path=save_private(code, '.py'),
+            source_hash=hashlib.sha256(code.encode()).hexdigest(),
+            status='done',
+            total=score,
+            finished_at=timezone.now(),
+        )
+        CourseworkQuestionResult.objects.create(
+            submission=entry,
+            function_name='func301',
+            title='分支判断',
+            order=1,
+            points=10,
+            score=score,
+            passed_cases=score,
+            total_cases=10,
+            verdict=verdict,
+        )
+        QualityReport.objects.create(
+            submission=entry,
+            source_sha256=entry.source_hash,
+            payload={
+                'tasks': [
+                    {
+                        'task_id': 'func301',
+                        'points': [{'label': 'if-else 双分支'}],
+                        'issues': [],
+                    }
+                ]
+            },
+        )
+        return entry
+
+    def test_best_retake_used(self):
+        """首次编译失败、重交通过 → 该题按 100 分计入，不再算 0 分。"""
+        self._submit(1, 0, 'CE', 'def func301(x):\n    pass\n')
+        self._submit(2, 10, 'AC', 'def func301(x):\n    return 1 if x else 0\n')
+        tasks, stats = capability_service.collect_evidence(self.student)
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0]['rate'], 1.0)
+        payload = capability_service.build_payload(
+            self.student, tasks, capability_service.code_facts(tasks), stats=stats
+        )
+        row = {item['key']: item for item in payload['bloom']}['apply']
+        self.assertEqual(row['score'], 100.0)
+        self.assertEqual(row['level'], 'A')
+        self.assertEqual(row['lost_tasks'], 0)
+
+    def test_stale_profile_is_refreshed_instead_of_shown(self):
+        """新提交后打开页面应同步刷新规则分，而不是继续展示旧的 0 分画像。"""
+        self._submit(1, 0, 'CE', 'def func301(x):\n    pass\n')
+        capability_service.ensure_profile(self.student)
+        stale = StudentCapabilityProfile.objects.get(student=self.student)
+        stale_row = {item['key']: item for item in stale.payload['bloom']}['apply']
+        self.assertEqual(stale_row['score'], 0.0)
+
+        self._submit(2, 10, 'AC', 'def func301(x):\n    return 1 if x else 0\n')
+        profile, _refreshing = capability_service.ensure_profile(self.student)
+        row = {item['key']: item for item in profile.payload['bloom']}['apply']
+        self.assertEqual(row['score'], 100.0)
+        self.assertEqual(row['level'], 'A')
 
 
 class DiagnosisNormalizeTests(SimpleTestCase):

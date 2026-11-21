@@ -80,6 +80,25 @@ docker compose start web worker beat
 恢复必须在隔离验收环境执行：先停止写入，将备份导入空数据库，解压存储目录并恢复 UID 10001 的访问权，运行 `manage.py check`，登录核对一份历史提交、正式成绩和隐藏用例，再开放服务。
 实际恢复演练、磁盘容量报警和备份调度需要在目标服务器部署时配置，首版代码不会声称已完成这些运维验证。
 
+## 数据库审计与注入巡检
+
+`compose.yaml` 为 MySQL 打开慢查询日志（超过 2 秒写入 `mysql.slow_log`，`general_log` 保持关闭，避免全量语句和个人信息落盘）。应用账号只有业务库权限，读不到 `mysql` 库，日志由维护人员取出后交给巡检命令：
+
+```bash
+docker compose exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -N -B -e "SELECT sql_text FROM mysql.slow_log ORDER BY start_time DESC LIMIT 500"' \
+  | docker compose exec -T web python manage.py db_security_check --slow-log - --skip-privileges
+```
+
+只检查应用账号权限：
+
+```bash
+docker compose exec -T web python manage.py db_security_check
+```
+
+两条命令都只读，不会修改数据或权限。加上 `--fail-on-risk` 后，出现全局高危权限（`FILE`、`PROCESS`、`SUPER`、`GRANT OPTION` 等）或日志命中注入特征时返回非 0，可挂到定时任务。输出中的语句已把字符串常量替换为 `?`，不会打印姓名、口令等业务数据。
+
+业务查询本身全部使用 ORM 参数绑定；应用入口另有 GET 参数检测（`school/sql_guard.py`），高风险特征直接返回 400 并写审计，`UNION SELECT` 等低风险关键字只记日志，避免误伤题库检索。`mysql.slow_log` 过大时用 root 执行 `TRUNCATE TABLE mysql.slow_log`。
+
 ## 上线前验收
 
 1. 运行业务测试和 Docker 测试，包括正确、错误、语法、超时、输出超限、禁止联网。

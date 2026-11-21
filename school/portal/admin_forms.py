@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 
 from school.models import Classroom, ClassStaff, DataDictionary, DictionaryItem, User
 from school.password_policy import HELP_TEXT as PASSWORD_HELP_TEXT
+from school.password_policy import ensure_not_reused
 from school.widgets import TogglePasswordInput
 
 
@@ -52,6 +53,7 @@ class PersonForm(forms.ModelForm):
         if data.get('password') and data['password'] != '123456':
             try:
                 validate_password(data['password'], self.instance)
+                ensure_not_reused(self.instance, data['password'])
             except ValidationError as exc:
                 # 挂到密码字段，管理员能在输入框下直接看到不符合哪一条规则
                 self.add_error('password', exc)

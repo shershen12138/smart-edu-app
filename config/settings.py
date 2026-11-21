@@ -36,6 +36,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'school.sql_guard.SqlInjectionGuardMiddleware',
     'school.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -80,6 +81,12 @@ AUTH_PASSWORD_VALIDATORS = [
         'OPTIONS': {'min_length': 8, 'min_character_classes': 3},
     },
 ]
+# 三级等保 8.1.4.1 a)b)：口令有效期、历史口令、登录失败阈值与长期未登录停用。
+PASSWORD_MAX_AGE_DAYS = int(os.getenv('PASSWORD_MAX_AGE_DAYS', '90'))
+PASSWORD_HISTORY_COUNT = int(os.getenv('PASSWORD_HISTORY_COUNT', '5'))
+LOGIN_FAIL_LIMIT = int(os.getenv('LOGIN_FAIL_LIMIT', '5'))
+LOGIN_FAIL_WINDOW = int(os.getenv('LOGIN_FAIL_WINDOW', '600'))
+INACTIVE_ACCOUNT_DAYS = int(os.getenv('INACTIVE_ACCOUNT_DAYS', '90'))
 LANGUAGE_CODE = 'zh-hans'
 TIME_ZONE = 'Asia/Shanghai'
 USE_I18N = True
@@ -93,6 +100,12 @@ LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
+# 会话空闲 30 分钟自动失效（每次请求刷新有效期），关闭浏览器即失效。
+SESSION_COOKIE_AGE = int(os.getenv('SESSION_COOKIE_AGE', '1800'))
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = (
+    os.getenv('SESSION_EXPIRE_AT_BROWSER_CLOSE', 'true').lower() == 'true'
+)
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
@@ -104,6 +117,9 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 if os.getenv('TRUST_PROXY', 'false') == 'true':
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 X_FRAME_OPTIONS = 'DENY'
+# 三级等保 8.1.4.4：GET 查询串中的 SQL 注入特征检测；排障时可临时设为 false。
+# 表单与代码内容不参与判断，正常的 SQL 关键字检索不会被拦截。
+SQL_GUARD_ENABLED = os.getenv('SQL_GUARD_ENABLED', 'true').lower() == 'true'
 DATA_UPLOAD_MAX_MEMORY_SIZE = 3 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024
 PRIVATE_STORAGE = Path(os.getenv('PRIVATE_STORAGE', str(RUNTIME / 'private'))).resolve()
@@ -126,7 +142,21 @@ LLM_VERIFY_ON_SAVE = os.getenv('LLM_VERIFY_ON_SAVE', 'true').lower() == 'true'
 LLM_VERIFY_TIMEOUT = float(os.getenv('LLM_VERIFY_TIMEOUT', '20'))
 # 个性化训练：知识点得分率低于该阈值视为弱项，触发训练题智能体出题。
 PRACTICE_WEAK_THRESHOLD = float(os.getenv('PRACTICE_WEAK_THRESHOLD', '0.6'))
-STORE_RECOVERY_PASSWORDS = os.getenv('STORE_RECOVERY_PASSWORDS', '1' if DEBUG else '0') == '1'
+# 口令恢复副本默认不保存（8.1.4.7 鉴别数据保密性）；确需开启时按字段加密落库。
+STORE_RECOVERY_PASSWORDS = os.getenv('STORE_RECOVERY_PASSWORDS', '0') == '1'
+# 字段级加密密钥；留空则由 SECRET_KEY 派生，生产建议独立配置并纳入密钥管理。
+FIELD_ENCRYPTION_KEY = os.getenv('FIELD_ENCRYPTION_KEY', '')
+# 审计日志外发文件（JSON Lines，供日志平台集中收集）；留空表示只写数据库。
+AUDIT_LOG_FILE = os.getenv('AUDIT_LOG_FILE', '')
+# 双因素：开启后管理员/教师未绑定动态口令将被引导到绑定页（8.1.4.1 b)）。
+TOTP_ENFORCE = os.getenv('TOTP_ENFORCE', '0') == '1'
+TOTP_REQUIRED_ROLES = tuple(
+    role.strip()
+    for role in os.getenv(
+        'TOTP_REQUIRED_ROLES', 'admin,security_admin,audit_admin,teacher'
+    ).split(',')
+    if role.strip()
+)
 REDIS_URL = os.getenv('REDIS_URL', '')
 CELERY_BROKER_URL = REDIS_URL or 'redis://127.0.0.1:6379/0'
 CELERY_TASK_IGNORE_RESULT = True
@@ -134,7 +164,12 @@ CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_BEAT_SCHEDULE = {
-    'dispatch-pending': {'task': 'school.tasks.dispatch_pending', 'schedule': 15.0}
+    'dispatch-pending': {'task': 'school.tasks.dispatch_pending', 'schedule': 15.0},
+    # 每日停用长期未登录的普通账号（8.1.4.2 a)）
+    'deactivate-stale-accounts': {
+        'task': 'school.tasks.deactivate_stale_accounts',
+        'schedule': 86400.0,
+    },
 }
 if REDIS_URL:
     CACHES = {

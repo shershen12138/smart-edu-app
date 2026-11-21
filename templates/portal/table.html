@@ -20,9 +20,9 @@
     <form method="get" class="search">
       {% if search %}
         <input name="q"
-               aria-label="搜索登录名、姓名、学工号"
+               aria-label="{{ search_placeholder|default:'搜索登录名、姓名、学工号' }}"
                value="{{ request.GET.q }}"
-               placeholder="搜索登录名、姓名、学工号">
+               placeholder="{{ search_placeholder|default:'搜索登录名、姓名、学工号' }}">
       {% endif %}
       {% if classrooms %}
         <select name="classroom" aria-label="筛选教学班">

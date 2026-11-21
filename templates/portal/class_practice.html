@@ -1,4 +1,5 @@
 {% extends "portal/base.html" %}
+{% load portal_tags %}
 {% block content %}
   <div class="page-heading split">
     <div>
@@ -42,7 +43,7 @@
         <tbody>
           {% for row in students %}
             <tr>
-              <td>{{ row.student.full_name }}（{{ row.student.student_no|default:row.student.username }}）</td>
+              <td>{{ row.student.full_name }}（{{ row.student.student_no|default:row.student.username|mask_student_no }}）</td>
               <td>
                 {% if row.plan %}
                   {{ row.plan.problems.count }} 道训练题

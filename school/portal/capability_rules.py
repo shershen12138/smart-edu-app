@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
+from typing import Any
 
 from tools.taglib import loader as taglib
 
 # 映射口径调整后递增，令学生画像签名失效并自动重算。
-VERSION = 'cap-1'
+VERSION = 'cap-2'
 
 # (键, 中文名, 判定说明)
 BLOOM_DIMENSIONS: tuple[tuple[str, str, str], ...] = (
@@ -184,6 +185,57 @@ _THINKING_KEYWORDS: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 _MODULE_CODE_RE = re.compile(r'^(U\d+-M\d+)')
+
+
+BLOOM_KEYS: tuple[str, ...] = tuple(key for key, _label, _note in BLOOM_DIMENSIONS)
+
+# 单题最多承认的认知层次数：再多就说明标注没有取舍，反而失去区分度
+MAX_BLOOM_PER_TASK = 3
+
+
+def normalize_bloom_list(raw: Any, limit: int = MAX_BLOOM_PER_TASK) -> list[str]:
+    """把模型/人工给出的认知层次清洗成白名单内的去重列表（保序、限量）。"""
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, (list, tuple)):
+        return []
+    keys: list[str] = []
+    for item in raw:
+        key = str(item or '').strip()
+        if key in BLOOM_LABELS and key not in keys:
+            keys.append(key)
+        if len(keys) >= limit:
+            break
+    return keys
+
+
+def bloom_weights(keys: list[str] | tuple[str, ...]) -> dict[str, float]:
+    """一题多维度时把该题分值均分给各维度（维度之间不重复计分）。"""
+    valid = [key for key in keys if key in BLOOM_LABELS]
+    if not valid:
+        return {}
+    share = 1.0 / len(valid)
+    return {key: share for key in valid}
+
+
+@lru_cache(maxsize=1)
+def module_names() -> dict[str, str]:
+    """模块编号 → 中文模块名（取自 Tag 库的模块对照表，未入图的模块也有）。"""
+    names: dict[str, str] = {}
+    for _unit, module, _tags in taglib.tag_modules():
+        match = _MODULE_CODE_RE.match(module)
+        if not match:
+            continue
+        rest = module[match.end():].strip()
+        if rest:
+            names[match.group(1)] = rest
+    return names
+
+
+def module_label(code: str) -> str:
+    """模块编号 → 展示名；没有中文名时退回编号本身。"""
+    text = str(code or '').strip()
+    return module_names().get(text, text)
 
 
 @lru_cache(maxsize=1)

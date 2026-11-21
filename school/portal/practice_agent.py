@@ -30,10 +30,10 @@ from school.judge import CaseOutcome, InfrastructureError, run_case
 from school.models import ProblemVersion, User
 from school.storage import read_private, save_private
 
-from . import grading, knowledge_profile, llm_client, question_bank
+from . import capability_rules, grading, knowledge_profile, llm_client, question_bank
 from .llm_client import LLMError, LLMNotConfigured, chat  # noqa: F401
 
-PROMPT_VERSION = 'v1'
+PROMPT_VERSION = 'v2'
 
 MAX_QUESTIONS_PER_POINT = 2
 MAX_CASES_PER_QUESTION = 5
@@ -44,6 +44,7 @@ PRACTICE_SCHEMA_HINT = """{
      "title": "区间裁剪",
      "statement": "题面正文，必须写清输入格式、输出格式与样例说明",
      "difficulty": "基础",
+     "bloom": ["apply", "analyze"],
      "template_code": "def main():\\n    ...",
      "reference_code": "完整可运行的参考答案",
      "explanation": "针对该知识点的解题思路（学生批阅后不可见）",
@@ -115,7 +116,11 @@ def build_messages(weak: list[dict], mastered: list[dict], titles: list[str]) ->
 3. 每题给 3-5 组测试用例，至少 1 组 is_sample=true 的样例（会展示给学生），其余隐藏；
 4. test_cases 中的 input/output 必须是普通文本（\\n 表示换行），expected 输出要与题意严格一致；
 5. template_code 给出完整可运行的初始框架（含读取输入的代码）；
-6. reference_code 必须是自己可以独立运行并全部通过上述用例的完整程序。
+6. reference_code 必须是自己可以独立运行并全部通过上述用例的完整程序；
+7. bloom 标注该题考察的布鲁姆认知层次（1~3 个，按主次排序），key 只能取：
+   remember（记忆）、understand（理解）、apply（应用）、analyze（分析）、
+   evaluate（评估）、create（创造）；基础题通常以 apply 为主，
+   综合变式应体现 analyze / evaluate。
 
 输出 JSON，结构如下：
 {PRACTICE_SCHEMA_HINT}
@@ -189,6 +194,9 @@ def parse_practice(text: str, weak_names: list[str]) -> list[dict[str, Any]]:
         difficulty = _clean_text(item.get('difficulty'))
         if difficulty not in ('基础', '进阶'):
             difficulty = '进阶'
+        bloom = capability_rules.normalize_bloom_list(item.get('bloom'))
+        if not bloom:
+            bloom = _bloom_for_point(point, title)
         questions.append(
             {
                 'knowledge_point': point,
@@ -198,6 +206,7 @@ def parse_practice(text: str, weak_names: list[str]) -> list[dict[str, Any]]:
                 'reference_code': _clean_text(item.get('reference_code')),
                 'explanation': _clean_text(item.get('explanation')),
                 'difficulty': difficulty,
+                'bloom': bloom,
                 'cases': cases,
             }
         )
@@ -207,6 +216,14 @@ def parse_practice(text: str, weak_names: list[str]) -> list[dict[str, Any]]:
 
 
 from .knowledge_profile import weak_keywords
+
+
+def _bloom_for_point(name: str, title: str = '') -> list[str]:
+    """规则推断某知识点的认知层次：取权重最高的前两层，至少给一个。"""
+    bloom, _thinking = capability_rules.classify_labels([name], title)
+    ranked = [key for key, weight in bloom.items() if weight > 0]
+    ranked.sort(key=lambda key: -bloom[key])
+    return ranked[:2] or ['apply']
 
 
 def _match_versions(name: str) -> list[tuple[int, ProblemVersion]]:
@@ -270,6 +287,7 @@ def rule_based(weak: list[dict]) -> list[dict[str, Any]]:
                     'reference_code': '',
                     'explanation': version.explanation,
                     'difficulty': '基础' if version.difficulty == '基础' else '进阶',
+                    'bloom': _bloom_for_point(item['name'], version.title),
                     'cases': [
                         {
                             'input': _read_case(case.input_path),
@@ -296,6 +314,8 @@ def rule_based(weak: list[dict]) -> list[dict[str, Any]]:
                         'reference_code': bank_question['reference_code'],
                         'explanation': bank_question['explanation'],
                         'difficulty': bank_question['difficulty'],
+                        'bloom': bank_question.get('bloom')
+                        or _bloom_for_point(item['name'], bank_question['title']),
                         'function_name': bank_question['function_name'],
                         'function_argc': bank_question['function_argc'],
                         'cases': bank_question['cases'],
@@ -343,6 +363,7 @@ def _store_plan(student: User, weak: list[dict], profile: dict, questions: list[
             reference_code=question.get('reference_code', ''),
             explanation=question.get('explanation', ''),
             difficulty=question.get('difficulty', '基础'),
+            bloom=capability_rules.normalize_bloom_list(question.get('bloom')),
             function_name=question.get('function_name', ''),
             function_argc=question.get('function_argc'),
             order=order,

@@ -3,6 +3,8 @@ from django.urls import path
 from . import administration_views as views
 
 urlpatterns = [
+    path('audit/', views.audit_logs, name='audit_logs'),
+    path('audit/export/', views.audit_export, name='audit_export'),
     path('archives/', views.archives, name='archives'),
     path('teachers/', views.people, {'kind': 'teacher'}, name='teachers'),
     path('students/', views.people, {'kind': 'student'}, name='students'),

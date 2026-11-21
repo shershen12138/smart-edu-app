@@ -1,8 +1,14 @@
 """Tag 库加载器与知识点归一的测试。"""
 
+import json
+from pathlib import Path
+
 from django.test import TestCase
 
+from school.portal import capability_rules
 from tools.taglib import loader
+
+GRAPH_FILE = Path(__file__).resolve().parents[2] / 'school' / 'portal' / 'data' / 'python_graph.json'
 
 
 class TaglibLoaderTests(TestCase):
@@ -22,12 +28,79 @@ class TaglibLoaderTests(TestCase):
         self.assertIsNone(loader.normalize_tag('量子计算'))
         self.assertIsNone(loader.normalize_tag(''))
 
+    def test_outline_follows_knowledge_graph(self):
+        """大纲按图谱节点组织：节点 id 真实存在，且首选 tag 就是节点名。"""
+        graph = json.loads(GRAPH_FILE.read_text(encoding='utf-8'))
+        by_id = {node['id']: node['name'] for node in graph['nodes']}
+        nodes = loader.graph_nodes()
+        self.assertTrue(nodes)
+        for node in nodes:
+            self.assertIn(node['id'], by_id)
+            self.assertEqual(node['name'], by_id[node['id']])
+            self.assertEqual(node['tags'][0], node['name'])
+            self.assertTrue(node['codes'], node['id'])
+
+    def test_every_tag_maps_to_module_and_graph(self):
+        """每个 tag 都能落到原教学模块；挂上图谱的 tag 必须指向真实节点。"""
+        graph = json.loads(GRAPH_FILE.read_text(encoding='utf-8'))
+        node_ids = {node['id'] for node in graph['nodes']}
+        codes = loader.tag_module_codes()
+        graph_index = loader.tag_graph_index()
+        self.assertTrue(graph_index)
+        for tag in loader.tag_names():
+            self.assertIn(tag, codes)
+            self.assertIn(codes[tag], capability_rules.MODULE_CAPABILITY, tag)
+            if tag in graph_index:
+                self.assertIn(graph_index[tag], node_ids, tag)
+
+    def test_aliases_survive_merge(self):
+        """近义合并后旧写法仍可归一，题库打标与选题不会断链。"""
+        self.assertEqual(loader.normalize_tag('位或 |'), '位或')
+        self.assertEqual(loader.normalize_tag('并集 |'), '并集')
+        self.assertEqual(loader.normalize_tag('字符串索引'), '字符串索引切片')
+        self.assertTrue(loader.is_known_tag('属性访问'))
+        self.assertFalse(loader.is_known_tag('量子计算'))
+
     def test_qbank_by_tag(self):
         """题库打标文件可按 tag 反查题目，主要考点排在前面。"""
         questions = loader.questions_for_tag('算术运算符')
         self.assertTrue(questions)
         self.assertEqual(questions[0]['qid'], 'Q1-01')
         self.assertEqual(questions[0]['role'], 'primary')
+
+    def test_qbank_tags_align_with_library(self):
+        """题库里的每个 tag 都已是词表标准名，且都能反查到题目。"""
+        qbank = json.loads((Path(__file__).resolve().parents[2] / 'data/qbank-tags-v2.json')
+                           .read_text(encoding='utf-8'))
+        for question in qbank['questions']:
+            for entry in question['tags']:
+                name = entry['tag']
+                self.assertEqual(loader.normalize_tag(name), name, name)
+                self.assertTrue(loader.questions_for_tag(name), name)
+
+    def test_qbank_bloom_levels(self):
+        """每道题都有合法的布鲁姆标签，且能按层次反查题目。"""
+        self.assertEqual(tuple(loader.BLOOM_LABELS), tuple(capability_rules.BLOOM_LABELS))
+        questions = loader.qbank_questions()
+        self.assertTrue(questions)
+        for question in questions:
+            levels = question.get('bloom') or []
+            self.assertTrue(levels, question['qid'])
+            self.assertTrue(set(levels) <= set(loader.BLOOM_KEYS), question['qid'])
+            self.assertEqual(len(levels), len(set(levels)), question['qid'])
+            self.assertTrue(question.get('bloom_basis'), question['qid'])
+        # 中文名也能归一，主要层次排在前面
+        analysis = loader.questions_for_bloom('分析')
+        self.assertTrue(analysis)
+        self.assertEqual(analysis[0]['role'], 'primary')
+        primary = loader.questions_for_bloom('analyze', primary_only=True)
+        self.assertTrue(primary)
+        self.assertTrue(all(item['role'] == 'primary' for item in primary))
+        self.assertEqual(loader.questions_for_bloom('量子计算'), ())
+        entries = loader.bloom_levels_for_question('Q4-04')
+        self.assertEqual([key for key, _label, _basis in entries], ['analyze', 'create'])
+        self.assertEqual(entries[0][1], '分析')
+        self.assertEqual(loader.bloom_levels_for_question('未知题'), ())
 
     def test_thinking_abilities_declared(self):
         """题库 meta 声明计算思维四维，键与中文名一一对应。"""

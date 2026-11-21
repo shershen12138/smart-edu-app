@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 
 from school.imports import HEADERS, commit_import, preview_import
 from school.models import (
+    AuditLog,
     Classroom,
     ClassStaff,
     ClassStudent,
@@ -33,7 +34,7 @@ from .rosters import students_in, visible_students, with_student_counts
 
 @login_required
 def people(request, kind):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     qs = (
         visible_students()
         if kind == 'student'
@@ -127,7 +128,7 @@ def managed_person(kind, pk):
 
 @login_required
 def person_edit(request, kind, pk=None):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     if kind not in ('teacher', 'student'):
         raise PermissionDenied
     user = managed_person(kind, pk) if pk else None
@@ -145,6 +146,9 @@ def person_edit(request, kind, pk=None):
                 request, '账号已保存。临时密码由管理员直接交给本人，首次登录需修改，无需邮箱。'
             )
             return redirect(back)
+    if user and settings.STORE_RECOVERY_PASSWORDS:
+        # 查看口令恢复副本属于敏感操作，留痕以便审计（8.1.4.4）
+        audit(request.user, 'user.password_view', 'user', {'user_id': user.pk}, request=request)
     response = form_page(
         request,
         ('编辑' if pk else '新建') + ('教师账号' if kind == 'teacher' else '学生账号'),
@@ -161,7 +165,7 @@ def person_edit(request, kind, pk=None):
 
 @login_required
 def person_delete(request, kind, pk):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     user = managed_person(kind, pk)
     if user.pk == request.user.pk or user.is_superuser or user.roles.exclude(role=kind).exists():
         raise PermissionDenied
@@ -184,7 +188,7 @@ def person_delete(request, kind, pk):
 
 @login_required
 def teacher_grants(request, pk):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     user = managed_person('teacher', pk)
     form = forms.GrantForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
@@ -222,7 +226,7 @@ def teacher_grants(request, pk):
 @login_required
 @require_POST
 def students_batch(request):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     ids = request.POST.getlist('selected')
     if not ids or len(ids) > 500 or not all(v.isdigit() for v in ids):
         messages.error(request, '请勾选 1～500 名学生。')
@@ -265,7 +269,7 @@ def students_batch(request):
 
 @login_required
 def students_import(request):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     error = ''
     if request.method == 'POST':
         try:
@@ -313,7 +317,7 @@ def students_import(request):
 
 @login_required
 def students_template(request):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     output = io.StringIO()
     csv.writer(output).writerow(HEADERS)
     return csv_response(output.getvalue(), 'students-template.csv')
@@ -344,7 +348,7 @@ def classes(request):
 
 @login_required
 def class_edit(request, pk=None):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     classroom = (
         get_object_or_404(Classroom, pk=pk, deleted_at__isnull=True, archived=False) if pk else None
     )
@@ -363,7 +367,7 @@ def class_edit(request, pk=None):
 
 @login_required
 def class_delete(request, pk):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     classroom = get_object_or_404(Classroom, pk=pk, deleted_at__isnull=True, archived=False)
     if request.method == 'POST':
         with transaction.atomic():
@@ -408,7 +412,7 @@ def class_detail(request, pk):
 
 @login_required
 def archives(request):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     if request.method == 'POST':
         identifier = request.POST.get('classroom', '')
         if not identifier.isdigit():
@@ -445,7 +449,7 @@ def archives(request):
 
 @login_required
 def dictionaries(request):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     return table(
         request,
         '基本数据字典配置',
@@ -467,7 +471,7 @@ def dictionaries(request):
 
 @login_required
 def dictionary_edit(request, pk=None):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     instance = get_object_or_404(DataDictionary, pk=pk) if pk else None
     form = forms.DictionaryForm(request.POST or None, instance=instance)
     if request.method == 'POST' and form.is_valid():
@@ -493,7 +497,7 @@ def dictionary_in_use(dictionary, values):
 
 @login_required
 def dictionary_delete(request, pk, item_id=None):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     dictionary = get_object_or_404(DataDictionary, pk=pk)
     target = (
         get_object_or_404(DictionaryItem, pk=item_id, dictionary=dictionary)
@@ -521,7 +525,7 @@ def dictionary_delete(request, pk, item_id=None):
 
 @login_required
 def dictionary_items(request, pk):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     dictionary = get_object_or_404(DataDictionary, pk=pk)
     return table(
         request,
@@ -544,7 +548,7 @@ def dictionary_items(request, pk):
 
 @login_required
 def dictionary_item_edit(request, pk, item_id=None):
-    require_role(request.user, 'admin')
+    require_role(request.user, ('admin', 'security_admin'))
     dictionary = get_object_or_404(DataDictionary, pk=pk)
     instance = (
         get_object_or_404(DictionaryItem, pk=item_id, dictionary=dictionary)
@@ -568,3 +572,81 @@ def dictionary_item_edit(request, pk, item_id=None):
         form,
         back_target(request, reverse('dictionary_items', args=[pk])),
     )
+
+
+def _audit_queryset(keyword='', action='', result=''):
+    qs = AuditLog.objects.select_related('actor').order_by('-pk')
+    if keyword:
+        qs = qs.filter(
+            Q(action__icontains=keyword)
+            | Q(target__icontains=keyword)
+            | Q(actor__username__icontains=keyword)
+        )
+    if action:
+        qs = qs.filter(action__startswith=action)
+    if result in ('success', 'failure'):
+        qs = qs.filter(result=result)
+    return qs
+
+
+@login_required
+def audit_logs(request):
+    """审计日志只读查看（8.1.4.4/8.1.4.5）：不提供修改和删除入口。"""
+    require_role(request.user, ('admin', 'audit_admin'))
+    keyword = request.GET.get('q', '').strip()
+    entries = list(_audit_queryset(keyword)[:2000])
+    rows = [
+        {
+            'pk': entry.pk,
+            'cells': [
+                timezone.localtime(entry.created_at).strftime('%Y-%m-%d %H:%M:%S'),
+                entry.actor.username if entry.actor else '系统 / 匿名',
+                entry.role or '—',
+                entry.action,
+                entry.target,
+                '成功' if entry.result == 'success' else '失败',
+                entry.ip or '—',
+                (entry.record_hash or '')[:12] or '—',
+            ],
+            'actions': [],
+        }
+        for entry in entries
+    ]
+    return table(
+        request,
+        '审计日志',
+        ['时间', '操作者', '角色', '动作', '对象', '结果', 'IP', '校验码'],
+        rows,
+        search=True,
+        search_placeholder='搜索动作、对象或操作者',
+        description='审计记录只追加、不可删除；每条记录与上一条哈希串联，可用于核验是否被篡改。',
+        extras=[{'label': '导出 CSV', 'url': reverse('audit_export')}],
+    )
+
+
+@login_required
+def audit_export(request):
+    require_role(request.user, ('admin', 'audit_admin'))
+    keyword = request.GET.get('q', '').strip()
+    entries = list(_audit_queryset(keyword)[:5000])
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ['时间', '操作者', '角色', '动作', '对象', '结果', 'IP', '上一条哈希', '本条哈希']
+    )
+    for entry in entries:
+        writer.writerow(
+            [
+                timezone.localtime(entry.created_at).strftime('%Y-%m-%d %H:%M:%S'),
+                entry.actor.username if entry.actor else '',
+                entry.role,
+                entry.action,
+                entry.target,
+                '成功' if entry.result == 'success' else '失败',
+                entry.ip or '',
+                entry.prev_hash,
+                entry.record_hash,
+            ]
+        )
+    audit(request.user, 'audit.export', 'audit_logs', {'count': len(entries)}, request=request)
+    return csv_response(buffer.getvalue(), 'audit-logs.csv')

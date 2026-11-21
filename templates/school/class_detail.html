@@ -1,4 +1,5 @@
 {% extends "school/base.html" %}
+{% load portal_tags %}
 {% block content %}
   <div class="page-heading">
     <div class="eyebrow">{{ classroom.term }} / {{ classroom.code }}</div>
@@ -74,7 +75,7 @@
         <tbody>
           {% for m in members %}
             <tr>
-              <td>{{ m.student.student_no }}</td>
+              <td>{{ m.student.student_no|mask_student_no }}</td>
               <td>{{ m.student.full_name }}</td>
               <td>
                 {% if m.active %}

@@ -4,6 +4,27 @@ register = template.Library()
 
 
 @register.filter
+def mask_student_no(value):
+    """学号脱敏：保留前 2 位与后 2 位（8.1.4.8 个人信息保护）。"""
+    text = str(value or '')
+    if len(text) <= 4:
+        return text
+    return f'{text[:2]}{"*" * (len(text) - 4)}{text[-2:]}'
+
+
+@register.filter
+def mask_email(value):
+    """邮箱脱敏：只保留首字母与域名。"""
+    text = str(value or '')
+    if '@' not in text:
+        return text
+    name, _, domain = text.partition('@')
+    if len(name) <= 1:
+        return f'*@{domain}'
+    return f'{name[0]}{"*" * (len(name) - 1)}@{domain}'
+
+
+@register.filter
 def verdict_label(value):
     return {
         'AC': '通过',

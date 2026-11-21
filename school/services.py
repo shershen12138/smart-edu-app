@@ -1,6 +1,8 @@
+import json
 import logging
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
+from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.db import transaction
@@ -32,14 +34,55 @@ from .storage import save_private, code_digest
 logger = logging.getLogger(__name__)
 
 
-def audit(user, action, target, detail=None, request=None):
-    return AuditLog.objects.create(
-        actor=user if user and user.is_authenticated else None,
+def audit(user, action, target, detail=None, request=None, result='success'):
+    """写入可校验的审计记录，并按配置同步外发。
+
+    每条记录的 record_hash 串联上一条的哈希，事后修改任意字段都会断链（8.1.4.4）。
+    """
+    actor = user if user and getattr(user, 'is_authenticated', False) else None
+    previous = AuditLog.objects.order_by('-id').values_list('record_hash', flat=True).first() or ''
+    role_name = ','.join(actor.roles.values_list('role', flat=True)[:3]) if actor else ''
+    entry = AuditLog(
+        actor=actor,
         action=action,
         target=str(target),
         detail=detail or {},
         ip=request.META.get('REMOTE_ADDR') if request else None,
+        result=result,
+        role=role_name,
+        user_agent=(request.META.get('HTTP_USER_AGENT', '')[:255] if request else ''),
+        prev_hash=previous,
     )
+    entry.record_hash = entry.compute_hash()
+    entry.save()
+    _export_audit(entry)
+    return entry
+
+
+def _export_audit(entry):
+    """把审计记录追加到独立文件，供日志平台集中收集（8.1.4.5）。"""
+    path = getattr(settings, 'AUDIT_LOG_FILE', '')
+    if not path:
+        return
+    payload = {
+        'id': entry.pk,
+        'created_at': entry.created_at.isoformat(),
+        'actor': entry.actor_id,
+        'role': entry.role,
+        'action': entry.action,
+        'target': entry.target,
+        'result': entry.result,
+        'ip': entry.ip,
+        'detail': entry.detail,
+        'prev_hash': entry.prev_hash,
+        'record_hash': entry.record_hash,
+    }
+    try:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'a', encoding='utf-8') as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False, default=str) + '\n')
+    except OSError:
+        logger.warning('审计日志外发失败', exc_info=True)
 
 
 def notify(user, event, object_id, message, key):

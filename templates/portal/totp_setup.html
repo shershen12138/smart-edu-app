@@ -1,0 +1,57 @@
+{% extends "portal/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <h1>{{ title }}</h1>
+    <p>绑定验证器后，登录需要“密码 + 动态口令”两步验证；管理员与教师建议强制启用。</p>
+  </div>
+  <section class="card form-card">
+    {% if backup_codes %}
+      <p class="message warning">以下恢复码只显示一次，请离线保存；每个恢复码只能使用一次。</p>
+      <ul class="backup-codes">
+        {% for code in backup_codes %}<li><code>{{ code }}</code></li>{% endfor %}
+      </ul>
+    {% endif %}
+    {% if enabled %}
+      <p>
+        已启用双因素认证，剩余恢复码 <strong>{{ remaining }}</strong> 个。
+      </p>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="disable">
+        <label>
+          当前密码
+          <input type="password"
+                 name="password"
+                 required
+                 autocomplete="current-password">
+        </label>
+        <div class="actions">
+          <button class="button secondary">关闭双因素认证</button>
+        </div>
+      </form>
+    {% else %}
+      <p>1. 在验证器应用（Google Authenticator、Microsoft Authenticator 等）中选择“手动输入密钥”。</p>
+      <p>
+        密钥：<code>{{ secret }}</code>
+      </p>
+      <p class="help">
+        otpauth 链接（可复制到支持导入的验证器）：<code>{{ uri }}</code>
+      </p>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="enable">
+        <label>
+          验证器中的 6 位动态口令
+          <input name="code"
+                 inputmode="numeric"
+                 pattern="[0-9]{6}"
+                 maxlength="6"
+                 required>
+        </label>
+        <div class="actions">
+          <button class="button">启用双因素认证</button>
+        </div>
+      </form>
+    {% endif %}
+  </section>
+{% endblock %}

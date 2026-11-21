@@ -6,6 +6,8 @@ urlpatterns = [
     path('login/', auth.login_view, name='login'),
     path('logout/', auth.logout_view, name='logout'),
     path('password/', auth.password_view, name='password'),
+    path('totp/', auth.totp_verify, name='totp_verify'),
+    path('account/totp/', auth.totp_setup, name='totp_setup'),
     path('health/', auth.health, name='health'),
     path('', include('school.portal.urls_common')),
     path('', include('school.portal.urls_administration')),

@@ -1,9 +1,13 @@
+import hashlib
+import json
+
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
 from .accounts import AccountManager
+from .crypto import EncryptedCharField, EncryptedTextField
 
 
 class User(AbstractUser):
@@ -12,13 +16,25 @@ class User(AbstractUser):
     student_no = models.CharField('学工号', max_length=40, unique=True, null=True, blank=True)
     must_change_password = models.BooleanField(default=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
-    recovery_password = models.TextField(blank=True, editable=False)
+    # 口令恢复副本按字段级加密保存（默认不开启存储，见 STORE_RECOVERY_PASSWORDS）
+    recovery_password = EncryptedTextField(blank=True, editable=False)
+    # 三级等保 8.1.4.1 a)：口令定期更换，登录时据此判断是否已过期。
+    password_changed_at = models.DateTimeField(null=True, blank=True)
 
     def set_password(self, raw_password):
         from django.conf import settings
         super().set_password(raw_password)
+        self.password_changed_at = timezone.now()
+        self._password_changed = True
         # Temporary, explicitly requested local password recovery. Login still uses Django hashes.
         self.recovery_password = (raw_password or '') if getattr(settings, 'STORE_RECOVERY_PASSWORDS', False) else ''
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # 口令变更后记录历史，供“不得与最近 N 次重复”校验；历史在保存成功后写入。
+        if getattr(self, '_password_changed', False):
+            self._password_changed = False
+            PasswordHistory.record(self)
 
     class Meta:
         db_table = 'users'
@@ -32,21 +48,69 @@ class User(AbstractUser):
         return self.is_active and (self.is_superuser or self.roles.filter(role=role).exists())
 
 
+class PasswordHistory(models.Model):
+    """最近若干次口令哈希，用于阻止重复使用旧口令（8.1.4.1 a)）。"""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_history')
+    password_hash = models.CharField(max_length=256)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'password_history'
+        ordering = ['-created_at']
+
+    @classmethod
+    def record(cls, user, keep=None) -> None:
+        from django.conf import settings
+
+        cls.objects.create(user=user, password_hash=user.password)
+        limit = keep or getattr(settings, 'PASSWORD_HISTORY_COUNT', 5)
+        stale_ids = list(cls.objects.filter(user=user).values_list('pk', flat=True)[limit:])
+        if stale_ids:
+            cls.objects.filter(pk__in=stale_ids).delete()
+
+    @classmethod
+    def reused(cls, user, raw_password) -> bool:
+        from django.conf import settings
+        from django.contrib.auth.hashers import check_password
+
+        limit = getattr(settings, 'PASSWORD_HISTORY_COUNT', 5)
+        hashes = cls.objects.filter(user=user).values_list('password_hash', flat=True)[:limit]
+        return any(check_password(raw_password, encoded) for encoded in hashes)
+
+
 class UserRole(models.Model):
     ROLE_CHOICES = [
         ('student', '学生'),
         ('teacher', '教师'),
         ('assistant', '助教'),
-        ('admin', '管理员'),
+        ('admin', '系统管理员'),
+        ('security_admin', '安全管理员'),
+        ('audit_admin', '审计管理员'),
     ]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='roles')
-    role = models.CharField(max_length=12, choices=ROLE_CHOICES)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     granted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='+')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'user_roles'
         constraints = [models.UniqueConstraint(fields=['user', 'role'], name='unique_user_role')]
+
+
+class TOTPDevice(models.Model):
+    """动态口令设备（8.1.4.1 b) 口令 + 密码技术双因素鉴别）。"""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='totp_device')
+    secret = EncryptedCharField(max_length=255)
+    confirmed = models.BooleanField(default=False)
+    backup_codes = models.JSONField(default=list, blank=True)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'totp_devices'
 
 
 class UserLLMConfig(models.Model):
@@ -61,7 +125,8 @@ class UserLLMConfig(models.Model):
     provider = models.CharField('服务商', max_length=24, default='deepseek')
     base_url = models.CharField('接口地址', max_length=200)
     model = models.CharField('模型名', max_length=80)
-    api_key = models.CharField('API Key', max_length=200)
+    # 加密存储，长度需容纳密文；代码读写仍是明文 Key
+    api_key = EncryptedCharField('API Key', max_length=512)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -121,16 +186,39 @@ class ClassStaff(models.Model):
 
 
 class AuditLog(models.Model):
+    """安全审计记录（8.1.4.4）：只追加，逐条哈希串联防篡改。"""
+
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     action = models.CharField(max_length=80)
     target = models.CharField(max_length=160)
     detail = models.JSONField(default=dict)
     ip = models.GenericIPAddressField(null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    result = models.CharField(max_length=16, default='success')
+    role = models.CharField(max_length=40, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    prev_hash = models.CharField(max_length=64, blank=True)
+    record_hash = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
 
     class Meta:
         db_table = 'audit_logs'
         ordering = ['-created_at']
+
+    def compute_hash(self) -> str:
+        payload = '|'.join(
+            [
+                self.prev_hash or '',
+                self.created_at.isoformat() if self.created_at else '',
+                str(self.actor_id or ''),
+                self.action,
+                self.target,
+                json.dumps(self.detail or {}, ensure_ascii=False, sort_keys=True, default=str),
+                self.ip or '',
+                self.result,
+                self.role,
+            ]
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()
 
 
 class Problem(models.Model):

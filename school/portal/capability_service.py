@@ -1,16 +1,22 @@
-"""学生综合能力画像：布鲁姆六维 + 计算思维四维，供弱项分析页顶部展示。
+"""学生综合能力画像：布鲁姆六维 + 计算思维四维 + 知识模块掌握度。
 
-分层设计（对应用户确认的方案）：
+证据来源（两类，合并统计）：
+- **机器批阅作业**：每份作业首次带评测报告的提交，逐题取「得分 / 满分」；
+- **个性化训练**：学生做过的训练题，每题取最高分那次提交（百分制或用例通过率）。
 
-1. **规则层（确定性）**：从每份评测报告的逐题明细与判题结果取「题目 → 得分率」，
-   题目能力维度由知识点 Tag → 模块映射得到（``capability_rules``），
-   按任务分值加权聚合出六维 / 四维分数。没有覆盖的维度不记 0 分，返回 None。
-2. **代码层（确定性）**：解析全部提交源码的 AST，统计函数、嵌套、推导式、
-   魔法数字等结构事实，作为证据展示并送入大模型，不直接改分。
-3. **诊断层（大模型，可选）**：把错误点、逐题得分与代码片段交给学生自己配置的
-   模型，产出诊断摘要与带出处的观察；校验失败或未配置时退回规则诊断。
+每题的能力维度（布鲁姆六维，一题可多层）按以下优先级确定：
+1. 评分标准里由大模型逐题标注的 ``CourseworkRubric.bloom_map``；
+2. 训练题自身或题库打标里的 ``bloom``；
+3. 知识点 Tag → 教学模块 → ``MODULE_CAPABILITY`` 规则兜底。
 
-分数永远来自 1、2 两层，大模型只解释「为什么」和「怎么改」，保证可复现。
+计分口径（用户确认）：
+- 某维度 / 模块涉及的题目全部得分 → 100 分（A 级，满级）；
+- 有失分 → ``Σ(分值×题目得分率) / Σ分值 × 100``，按 A/B/C/D 分级；
+- 一题多层时该题分值按层数均分，维度之间不重复计分；
+- 没有题目覆盖的维度返回 None（不记 0 分），只标注样本不足。
+
+确定性优先：AST 结构事实与逐题得分率都不依赖模型，大模型只负责“每题考什么”
+和“为什么失分”，失败时全部退回规则，保证可复现、可解释。
 """
 
 from __future__ import annotations
@@ -27,10 +33,16 @@ from django.db import close_old_connections, transaction
 from django.utils import timezone
 
 from school import storage
-from school.course_models import Coursework, StudentCapabilityProfile
+from school.course_models import (
+    Coursework,
+    PracticeAttempt,
+    StudentCapabilityProfile,
+)
 from school.models import User
 
-from . import capability_rules, llm_client, quality_service
+from tools.taglib import loader as taglib
+
+from . import capability_rules, llm_client, quality_service, rubric_agent
 from .access import classes_for
 from .llm_client import LLMError, LLMNotConfigured, chat
 
@@ -38,6 +50,9 @@ logger = logging.getLogger(__name__)
 
 # 诊断提示词版本：调整口径后递增，旧画像自动重算。
 PROMPT_VERSION = 'cap-llm-1'
+
+# 训练题没有分值字段，按「一道约等于 10 分作业题」参与加权，与作业题同一量纲。
+PRACTICE_TASK_WEIGHT = 10.0
 
 # 送给大模型的代码上限，避免一次请求过大：单题 80 行、全部 400 行。
 MAX_CODE_LINES = 80
@@ -70,15 +85,41 @@ def _read_code(key: str) -> str:
         return ''
 
 
-def _reported_entry(work, student_id):
-    """该学生在本任务第一次带评测报告的提交（与弱项分析同口径）。"""
-    return (
-        work.entries.filter(
-            student_id=student_id, status='done', quality_report__isnull=False
-        )
-        .order_by('sequence', 'pk')
-        .first()
+def _best_submission(work, student_id):
+    """该学生在此作业里成绩最好的一次提交（有评测报告者优先）。
+
+    同一作业允许多次提交，能力画像反映的是**最终掌握程度**：
+    首次提交编译失败、重交后通过，不能仍然算 0 分。
+    这与弱项分析「看第一次暴露的缺陷」的口径不同，两者各取所需。
+    """
+    entries = list(
+        work.entries.filter(student_id=student_id, status='done')
+        .select_related('quality_report')
+        .prefetch_related('questions')
     )
+    if not entries:
+        return None
+    with_report = [entry for entry in entries if getattr(entry, 'quality_report', None)]
+    pool = with_report or entries
+    pool.sort(key=lambda entry: (float(entry.total or 0), entry.sequence or 0, entry.pk))
+    return pool[-1]
+
+
+def _best_rates(work, student_id) -> dict[str, float]:
+    """每道题在该作业全部提交里的最高得分率（重交通过后不再被首次失败拖累）。"""
+    best: dict[str, float] = {}
+    entries = work.entries.filter(student_id=student_id, status='done').prefetch_related(
+        'questions'
+    )
+    for entry in entries:
+        for question in entry.questions.all():
+            rate = _task_rate(question)
+            if rate is None:
+                continue
+            current = best.get(question.function_name)
+            if current is None or rate > current:
+                best[question.function_name] = rate
+    return best
 
 
 def _rubric_labels(work) -> dict[str, list[str]]:
@@ -125,8 +166,99 @@ def _task_rate(question) -> float | None:
     return None
 
 
-def collect_tasks(student) -> list[dict[str, Any]]:
-    """收集该学生所有任务里可用的判题证据（每题一条）。"""
+def _bloom_for_labels(labels: list[str], title: str = '') -> list[str]:
+    """规则推断认知层次：取权重最高的前两层（无标注时的兜底）。"""
+    bloom, _thinking = capability_rules.classify_labels(labels, title)
+    ranked = [key for key, weight in bloom.items() if weight > 0]
+    ranked.sort(key=lambda key: -bloom[key])
+    return ranked[:2] or ['apply']
+
+
+def _attempt_rate(attempt) -> float | None:
+    """训练题得分率：优先百分制得分，其次用例通过比例。"""
+    score = attempt.score
+    if score is not None:
+        return min(max(float(score) / 100.0, 0.0), 1.0)
+    total = int(attempt.total_cases or 0)
+    if total > 0:
+        return min(max(int(attempt.passed_cases or 0) / total, 0.0), 1.0)
+    return None
+
+
+def _practice_tasks(student) -> list[dict[str, Any]]:
+    """个性化训练成果：每题取最高分那次提交，换算成与作业同构的证据。"""
+    attempts = (
+        PracticeAttempt.objects.filter(student=student, problem__plan__student=student)
+        .select_related('problem', 'problem__plan')
+        .order_by('problem_id', '-score', '-pk')
+    )
+    best: dict[int, Any] = {}
+    for attempt in attempts:
+        best.setdefault(attempt.problem_id, attempt)
+    tasks: list[dict[str, Any]] = []
+    for problem_id, attempt in best.items():
+        rate = _attempt_rate(attempt)
+        if rate is None:
+            continue
+        problem = attempt.problem
+        bloom_keys = capability_rules.normalize_bloom_list(problem.bloom)
+        bloom_source = 'practice' if bloom_keys else ''
+        if not bloom_keys:
+            bloom_keys = list(taglib.bloom_for_tag(problem.knowledge_point))[:3]
+            bloom_source = 'qbank' if bloom_keys else ''
+        if not bloom_keys:
+            bloom_keys = _bloom_for_labels([problem.knowledge_point], problem.title)
+            bloom_source = 'rule'
+        bloom, thinking = capability_rules.classify_labels(
+            [problem.knowledge_point], problem.title
+        )
+        plan = problem.plan
+        snapshot = plan.profile_snapshot or {}
+        tasks.append(
+            {
+                'source': 'practice',
+                'work_id': -int(problem_id),
+                'work_title': snapshot.get('work_title') or '个性化训练',
+                'task_id': problem.function_name or f'p{problem.order}',
+                'title': problem.title,
+                'weight': PRACTICE_TASK_WEIGHT,
+                'rate': rate,
+                'labels': [problem.knowledge_point],
+                'issues': [],
+                'code': '',
+                'code_hash': f'{attempt.pk}',
+                'report_stamp': (
+                    attempt.finished_at.isoformat()
+                    if attempt.finished_at
+                    else attempt.created_at.isoformat()
+                ),
+                'bloom': capability_rules.bloom_weights(bloom_keys),
+                'bloom_keys': bloom_keys,
+                'bloom_source': bloom_source,
+                'thinking': thinking,
+            }
+        )
+    return tasks
+
+
+def _unscored_reason(work, graded: int) -> str:
+    if graded:
+        return ''
+    if getattr(work, 'grading_mode', '') != 'automatic':
+        return '教师评分作业，没有逐题判分'
+    return '尚未生成逐题判分'
+
+
+def collect_evidence(student) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """收集作业与个性化训练里可用的判题证据，以及未纳入统计的说明。
+
+    返回 ``(证据列表, 统计信息)``；每道题一条证据，``bloom`` 是
+    「认知层次 → 该题分值占比」的字典，一题多层次时按个数均分。
+    """
+    tasks: list[dict[str, Any]] = []
+    unscored: list[dict[str, Any]] = []
+    works_scored = 0
+    ungraded = 0
     works = (
         Coursework.objects.filter(
             classroom__in=classes_for(student),
@@ -137,37 +269,67 @@ def collect_tasks(student) -> list[dict[str, Any]]:
         .prefetch_related('items', 'entries')
         .order_by('-pk')
     )
-    tasks: list[dict[str, Any]] = []
     for work in works:
-        entry = _reported_entry(work, student.pk)
+        entry = _best_submission(work, student.pk)
         if entry is None:
+            if work.entries.filter(student_id=student.pk).exists():
+                reason = _unscored_reason(work, 0)
+                if reason:
+                    unscored.append({'title': work.title, 'reason': reason})
             continue
         report = getattr(entry, 'quality_report', None)
-        if report is None:
-            continue
-        payload = report.payload or {}
+        payload = (report.payload if report is not None else {}) or {}
         by_task = {
             _clean(item.get('task_id')): item
             for item in payload.get('tasks') or []
             if isinstance(item, dict)
         }
-        questions = {
-            question.function_name: question for question in entry.questions.all()
-        }
+        items = list(work.items.all())
+        rates = _best_rates(work, student.pk)
+        # 只有整卷总分、没有逐题分时（机器批阅），用整卷得分率近似每道题
+        full_points = sum(float(item.points or 0) for item in items)
+        whole_rate = None
+        if (
+            entry.total is not None
+            and full_points > 0
+            and getattr(work, 'grading_mode', '') == 'automatic'
+        ):
+            whole_rate = min(max(float(entry.total) / full_points, 0.0), 1.0)
         rubric_labels = _rubric_labels(work)
+        rubric = getattr(work, 'rubric', None)
+        bloom_map = dict(getattr(rubric, 'bloom_map', None) or {})
+        if rubric is not None and rubric_agent.needs_bloom(work) and llm_client.configured(student):
+            # 老评分标准缺少每题认知层次：后台补标，本次先用规则兜底
+            rubric_agent.schedule_bloom_fill(work.pk, student.pk)
         code = _read_code(entry.source_path)
-        for item in work.items.all():
+        graded = 0
+        for item in items:
             detail = by_task.get(item.function_name, {})
             labels = _task_labels(detail, rubric_labels.get(item.function_name))
+            rate = rates.get(item.function_name)
+            if rate is None:
+                rate = whole_rate
+            if rate is None:
+                ungraded += 1
+                continue
+            graded += 1
+            bloom_keys = capability_rules.normalize_bloom_list(
+                bloom_map.get(item.function_name)
+            )
+            bloom_source = 'rubric' if bloom_keys else ''
+            if not bloom_keys:
+                bloom_keys = _bloom_for_labels(labels, item.title)
+                bloom_source = 'rule'
             bloom, thinking = capability_rules.classify_labels(labels, item.title)
             tasks.append(
                 {
+                    'source': 'coursework',
                     'work_id': work.pk,
                     'work_title': work.title,
                     'task_id': item.function_name,
                     'title': item.title,
                     'weight': float(item.points or 1),
-                    'rate': _task_rate(questions.get(item.function_name)),
+                    'rate': rate,
                     'labels': labels,
                     'issues': [
                         {
@@ -181,14 +343,43 @@ def collect_tasks(student) -> list[dict[str, Any]]:
                     ],
                     'code': code,
                     'code_hash': entry.source_hash,
-                    'report_stamp': report.generated_at.isoformat()
-                    if report.generated_at
-                    else '',
-                    'bloom': bloom,
+                    'report_stamp': (
+                        f'{entry.pk}@'
+                        + (
+                            report.generated_at.isoformat()
+                            if report is not None and report.generated_at
+                            else (entry.finished_at or entry.submitted_at).isoformat()
+                        )
+                    ),
+                    'bloom': capability_rules.bloom_weights(bloom_keys),
+                    'bloom_keys': bloom_keys,
+                    'bloom_source': bloom_source,
                     'thinking': thinking,
                 }
             )
-    return tasks
+        if graded:
+            works_scored += 1
+        else:
+            reason = _unscored_reason(work, graded)
+            if reason:
+                unscored.append({'title': work.title, 'reason': reason})
+
+    practice = _practice_tasks(student)
+    tasks.extend(practice)
+    stats = {
+        'works': len({task['work_id'] for task in tasks if task['source'] == 'coursework'}),
+        'practice_plans': len({-task['work_id'] for task in tasks if task['source'] == 'practice'}),
+        'coursework_tasks': sum(1 for task in tasks if task['source'] == 'coursework'),
+        'practice_tasks': len(practice),
+        'ungraded_tasks': ungraded,
+        'unscored': unscored,
+    }
+    return tasks, stats
+
+
+def collect_tasks(student) -> list[dict[str, Any]]:
+    """兼容旧调用：只要证据列表，不要统计信息。"""
+    return collect_evidence(student)[0]
 
 
 def _walk_depth(node: ast.AST, depth: int = 0) -> int:
@@ -302,11 +493,18 @@ def _score_dimensions(
     attr: str,
     dimensions: tuple[tuple[str, str, str], ...],
 ) -> list[dict[str, Any]]:
-    """按任务分值加权聚合某一维度体系；无证据的维度 score=None。"""
-    total_weight = sum(task['weight'] for task in tasks) or 0.0
+    """按任务分值加权聚合某一维度体系；无证据的维度 score=None。
+
+    口径（与用户确认一致）：
+    - 该维度涉及题目全部满分 → 100 分（满级 A）；
+    - 有失分 → 得分率 = Σ(分值×题目得分率) / Σ分值，再折算百分制；
+    - 一题多维度时分值按维度个数均分（``bloom_weights`` 已归一）。
+    """
+    total_weight = sum(task['weight'] for task in tasks if task['rate'] is not None) or 0.0
     rows: list[dict[str, Any]] = []
     for key, label, note in dimensions:
         numerator = denominator = 0.0
+        involved = lost = 0
         for task in tasks:
             share = float(task[attr].get(key, 0) or 0)
             rate = task['rate']
@@ -315,6 +513,9 @@ def _score_dimensions(
             weight = task['weight'] * share
             numerator += weight * rate
             denominator += weight
+            involved += 1
+            if rate < 0.999:
+                lost += 1
         score = round(numerator / denominator * 100, 1) if denominator else None
         coverage = denominator / total_weight if total_weight else 0.0
         letter, level_label = capability_rules.level_of(score if score is not None else 0)
@@ -330,9 +531,61 @@ def _score_dimensions(
                 'coverage_percent': round(coverage * 100, 1),
                 'coverage_text': capability_rules.coverage_text(coverage),
                 'covered': score is not None,
+                'task_count': involved,
+                'lost_tasks': lost,
+                'pass_ratio': round((involved - lost) / involved, 4) if involved else 0.0,
                 'evidence': _axis_evidence(tasks, attr, key, score),
             }
         )
+    return rows
+
+
+def _module_rows(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """按教学模块聚合掌握度：口径与维度相同，未失分即满级。"""
+    index = capability_rules.tag_module_index()
+    total_weight = sum(task['weight'] for task in tasks if task['rate'] is not None) or 0.0
+    buckets: dict[str, dict[str, Any]] = {}
+    for task in tasks:
+        if task['rate'] is None:
+            continue
+        codes: list[str] = []
+        for label in task['labels']:
+            code = index.get(_clean(label))
+            if code and code not in codes:
+                codes.append(code)
+        if not codes:
+            continue
+        share = 1.0 / len(codes)
+        for code in codes:
+            bucket = buckets.setdefault(
+                code, {'weight': 0.0, 'numerator': 0.0, 'involved': 0, 'lost': 0}
+            )
+            weight = task['weight'] * share
+            bucket['weight'] += weight
+            bucket['numerator'] += weight * task['rate']
+            bucket['involved'] += 1
+            if task['rate'] < 0.999:
+                bucket['lost'] += 1
+    rows: list[dict[str, Any]] = []
+    for code, bucket in buckets.items():
+        denominator = bucket['weight']
+        if not denominator:
+            continue
+        score = round(bucket['numerator'] / denominator * 100, 1)
+        letter, level_label = capability_rules.level_of(score)
+        rows.append(
+            {
+                'code': code,
+                'label': capability_rules.module_label(code),
+                'score': score,
+                'level': letter,
+                'level_label': level_label,
+                'task_count': bucket['involved'],
+                'lost_tasks': bucket['lost'],
+                'coverage': round(denominator / total_weight, 4) if total_weight else 0.0,
+            }
+        )
+    rows.sort(key=lambda row: (row['score'], row['code']))
     return rows
 
 
@@ -427,6 +680,8 @@ def _radar(bloom: list[dict[str, Any]]) -> dict[str, Any]:
     ]
     geometry = quality_service.radar_geometry(scores)
     for axis, row in zip(geometry['axes'], bloom):
+        # radar_geometry 只认五分制量表等级，这里换成能力等级字母（A–D）
+        axis['level'] = row['level']
         axis['coverage'] = row['coverage']
         axis['coverage_text'] = row['coverage_text']
         axis['covered'] = row['covered']
@@ -438,25 +693,47 @@ def build_payload(
     tasks: list[dict[str, Any]],
     facts: dict[str, Any],
     diagnosis: dict[str, Any] | None = None,
+    stats: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """组装画像 payload：分数、雷达几何、能力卡、诊断与元信息。"""
+    """组装画像 payload：分数、雷达几何、能力卡、模块掌握度、诊断与元信息。"""
     bloom = _score_dimensions(tasks, 'bloom', capability_rules.BLOOM_DIMENSIONS)
     thinking = _score_dimensions(
         tasks, 'thinking', capability_rules.THINKING_DIMENSIONS
     )
     cards = _thinking_cards(thinking, facts)
-    works = {task['work_id'] for task in tasks}
+    modules = _module_rows(tasks)
+    stats = dict(stats or {})
+    works = len(
+        {task['work_id'] for task in tasks if task.get('source', 'coursework') == 'coursework'}
+    )
+    bloom_sources: dict[str, int] = {}
+    for task in tasks:
+        key = task.get('bloom_source') or 'rule'
+        bloom_sources[key] = bloom_sources.get(key, 0) + 1
     payload: dict[str, Any] = {
         'version': capability_rules.VERSION,
         'bloom': bloom,
         'thinking': cards,
+        'modules': modules,
         'radar': _radar(bloom),
         'summary': _rule_summary(bloom, thinking, tasks),
         'observations': [],
         'suggestion': '',
         'code_facts': facts,
         'meta': {
-            'works': len(works),
+            'works': works,
+            'practice_plans': stats.get('practice_plans', 0),
+            'coursework_tasks': stats.get(
+                'coursework_tasks',
+                sum(1 for task in tasks if task.get('source', 'coursework') == 'coursework'),
+            ),
+            'practice_tasks': stats.get(
+                'practice_tasks',
+                sum(1 for task in tasks if task.get('source') == 'practice'),
+            ),
+            'ungraded_tasks': stats.get('ungraded_tasks', 0),
+            'unscored': stats.get('unscored', []),
+            'bloom_sources': bloom_sources,
             'tasks': len(tasks),
             'graded_tasks': sum(1 for task in tasks if task['rate'] is not None),
             'diagnosis': 'rule',
@@ -484,8 +761,9 @@ def _signature(tasks: list[dict[str, Any]], model_stamp: str) -> str:
     parts = [capability_rules.VERSION, PROMPT_VERSION, _clean(model_stamp)]
     for task in sorted(tasks, key=lambda row: (row['work_id'], row['task_id'])):
         parts.append(
-            f"{task['work_id']}:{task['task_id']}:{task['code_hash']}:"
-            f"{task['report_stamp']}:{task['rate']}"
+            f"{task.get('source', '')}:{task['work_id']}:{task['task_id']}:"
+            f"{task['code_hash']}:{task['report_stamp']}:{task['rate']}:"
+            f"{'/'.join(task.get('bloom_keys') or [])}"
         )
     return hashlib.sha256('|'.join(parts).encode('utf-8')).hexdigest()
 
@@ -700,11 +978,11 @@ def diagnose(
 
 
 def _refresh(student) -> StudentCapabilityProfile | None:
-    tasks = collect_tasks(student)
+    tasks, stats = collect_evidence(student)
     if not tasks:
         return None
     facts = code_facts(tasks)
-    payload = build_payload(student, tasks, facts)
+    payload = build_payload(student, tasks, facts, stats=stats)
     source, model = 'rule', ''
     config = llm_client.get_config(student)
     if llm_client.configured(student):
@@ -713,7 +991,7 @@ def _refresh(student) -> StudentCapabilityProfile | None:
         except (LLMError, LLMNotConfigured, DiagnosisError) as exc:
             logger.info('综合能力大模型诊断失败，保留规则诊断 student=%s：%s', student.pk, exc)
         else:
-            payload = build_payload(student, tasks, facts, diagnosis=diagnosis)
+            payload = build_payload(student, tasks, facts, diagnosis=diagnosis, stats=stats)
             source, model = 'llm', config.model if config else ''
     return _save_profile(
         student, payload, source, model, _signature(tasks, _model_stamp(config))
@@ -754,7 +1032,7 @@ def ensure_profile(student) -> tuple[StudentCapabilityProfile | None, bool]:
     - 没有画像时先同步生成规则画像，保证页面立刻有分数；
     - 画像过期且已配置大模型时后台重算，期间继续展示旧画像。
     """
-    tasks = collect_tasks(student)
+    tasks, stats = collect_evidence(student)
     if not tasks:
         return None, False
     config = llm_client.get_config(student)
@@ -764,18 +1042,20 @@ def ensure_profile(student) -> tuple[StudentCapabilityProfile | None, bool]:
         return profile, False
     if profile is None:
         # 首次进入先同步给出规则分，页面立刻可用；已配置大模型时再排后台诊断。
-        payload = build_payload(student, tasks, code_facts(tasks))
+        payload = build_payload(student, tasks, code_facts(tasks), stats=stats)
         saved = _save_profile(student, payload, 'rule', '', signature)
         if llm_client.configured(student):
             schedule_refresh(student.pk)
             return saved, True
         return saved, False
-    if not llm_client.configured(student):
-        # 未配置大模型时后台重算没有额外信息，直接同步更新规则画像。
-        payload = build_payload(student, tasks, code_facts(tasks))
-        return _save_profile(student, payload, 'rule', '', signature), False
-    schedule_refresh(student.pk)
-    return profile, True
+    # 数据或口径已变化：先同步写出规则画像，避免页面继续展示过期的旧分数
+    # （例如首次提交编译失败算出的 0 分），再后台补大模型诊断。
+    payload = build_payload(student, tasks, code_facts(tasks), stats=stats)
+    saved = _save_profile(student, payload, 'rule', '', signature)
+    if llm_client.configured(student):
+        schedule_refresh(student.pk)
+        return saved, True
+    return saved, False
 
 
 def view_model(student) -> dict[str, Any]:
@@ -814,6 +1094,7 @@ def view_model(student) -> dict[str, Any]:
         else None,
         'bloom': payload.get('bloom') or [],
         'thinking': payload.get('thinking') or [],
+        'modules': payload.get('modules') or [],
         'radar': payload.get('radar') or {},
         'summary': payload.get('summary') or [],
         'observations': payload.get('observations') or [],
@@ -821,6 +1102,12 @@ def view_model(student) -> dict[str, Any]:
         'code_facts': payload.get('code_facts') or {},
         'meta': meta,
         'works': meta.get('works', 0),
+        'practice_plans': meta.get('practice_plans', 0),
+        'coursework_tasks': meta.get('coursework_tasks', 0),
+        'practice_tasks': meta.get('practice_tasks', 0),
+        'ungraded_tasks': meta.get('ungraded_tasks', 0),
+        'unscored': meta.get('unscored') or [],
+        'bloom_sources': meta.get('bloom_sources') or {},
         'tasks': meta.get('tasks', 0),
         'graded_tasks': meta.get('graded_tasks', 0),
     }
