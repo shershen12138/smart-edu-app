@@ -22,11 +22,16 @@ from typing import Any
 from tools.taglib import loader as taglib
 
 # 映射口径调整后递增，令学生画像签名失效并自动重算。
-VERSION = 'cap-2'
+VERSION = 'cap-3'
 
 # (键, 中文名, 判定说明)
 BLOOM_DIMENSIONS: tuple[tuple[str, str, str], ...] = (
-    ('remember', '记忆', '语法、关键字、内置函数与常用写法能否准确回忆'),
+    (
+        'remember',
+        '记忆',
+        '基础层：任何题目能得分都说明语法与写法能准确回忆，按全部已判题折算，'
+        '不依赖单独标注的记忆题',
+    ),
     ('understand', '理解', '能否解释语义规则，如类型转换、取模整除、作用域'),
     ('apply', '应用', '能否把学过的模板与写法套用到新题目并跑通用例'),
     ('analyze', '分析', '能否拆解多步任务、定位缺陷并说明错误原因'),

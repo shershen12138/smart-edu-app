@@ -147,6 +147,44 @@ class CapabilityScoringTests(SimpleTestCase):
         self.assertEqual(row['task_count'], 1)
         self.assertEqual(row['lost_tasks'], 0)
 
+    def test_remember_is_derived_from_all_graded_tasks(self):
+        """记忆层是基础层：题目能得分就说明语法与写法能回忆，按全部已判题折算。"""
+        tasks = [
+            _task(weight=10.0, rate=1.0),
+            _task(task_id='func302', weight=10.0, rate=0.3),
+        ]
+        rows = capability_service._score_dimensions(
+            tasks, 'bloom', capability_rules.BLOOM_DIMENSIONS
+        )
+        row = {item['key']: item for item in rows}['remember']
+        self.assertTrue(row['covered'])
+        self.assertTrue(row['derived'])
+        self.assertEqual(row['score'], 65.0)
+        self.assertEqual(row['level'], 'C')
+        self.assertEqual(row['coverage_percent'], 100.0)
+        self.assertEqual(row['coverage_text'], '按全部已判题折算')
+        self.assertEqual(row['task_count'], 2)
+        self.assertEqual(row['lost_tasks'], 1)
+        self.assertAlmostEqual(row['pass_ratio'], 0.5)
+
+    def test_remember_all_passed_reaches_full_marks(self):
+        rows = capability_service._score_dimensions(
+            [_task(rate=1.0)], 'bloom', capability_rules.BLOOM_DIMENSIONS
+        )
+        row = {item['key']: item for item in rows}['remember']
+        self.assertEqual(row['score'], 100.0)
+        self.assertEqual(row['level'], 'A')
+        self.assertIn('基础写法稳定', row['evidence'][0])
+
+    def test_derived_remember_does_not_hide_weakest_dimension(self):
+        """记忆层由全部题目折算，不应抢占「最弱维度」的诊断结论。"""
+        tasks = [_task(rate=0.5)]
+        bloom = capability_service._score_dimensions(
+            tasks, 'bloom', capability_rules.BLOOM_DIMENSIONS
+        )
+        summary = capability_service._rule_summary(bloom, [], tasks)
+        self.assertIn('「应用」最弱', summary[0])
+
     def test_partial_loss_measured_by_task_ratio(self):
         """有失分按分值比例：两题各占一半权重，一题满分一题半分 → 75 分 B 级。"""
         tasks = [
@@ -727,6 +765,8 @@ class CapabilityProfileTests(TestCase):
         self.assertIn('计算思维水平', body)
         self.assertIn('规则诊断（未使用大模型）', body)
         self.assertIn('覆盖 100% 分值', body)
+        # 记忆层由全部已判题折算，页面上要能看出这个口径
+        self.assertIn('按全部已判题折算', body)
         self.assertIn('data-radar', body)
         # 来源做成标题旁的状态徽标，任务数/更新时间放在底部信息条
         self.assertIn('capability-source', body)

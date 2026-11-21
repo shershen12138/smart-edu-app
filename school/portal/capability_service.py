@@ -503,6 +503,9 @@ def _score_dimensions(
     total_weight = sum(task['weight'] for task in tasks if task['rate'] is not None) or 0.0
     rows: list[dict[str, Any]] = []
     for key, label, note in dimensions:
+        if attr == 'bloom' and key == 'remember':
+            rows.append(_remember_row(tasks, total_weight, label, note))
+            continue
         numerator = denominator = 0.0
         involved = lost = 0
         for task in tasks:
@@ -538,6 +541,66 @@ def _score_dimensions(
             }
         )
     return rows
+
+
+def _remember_row(
+    tasks: list[dict[str, Any]], total_weight: float, label: str, note: str
+) -> dict[str, Any]:
+    """记忆层：基础语法、关键字与常用写法。
+
+    任何一道题能得分，都说明相关语法与写法已经能够准确回忆，所以在没有单独
+    标注「记忆」题目的情况下也不留空：取全部已判题的分值加权得分率作为基础
+    层的下界。该值同时用于判断基础写法是否成为瓶颈。
+    """
+    graded = [task for task in tasks if task['rate'] is not None]
+    denominator = sum(task['weight'] for task in graded)
+    if denominator:
+        score = round(
+            sum(task['weight'] * task['rate'] for task in graded) / denominator * 100, 1
+        )
+        coverage = denominator / total_weight if total_weight else 0.0
+    else:
+        score = None
+        coverage = 0.0
+    lost = sum(1 for task in graded if task['rate'] < 0.999)
+    letter, level_label = capability_rules.level_of(score if score is not None else 0)
+    return {
+        'key': 'remember',
+        'label': label,
+        'note': note,
+        'score': score,
+        'level': letter if score is not None else '',
+        'level_label': level_label if score is not None else '',
+        'coverage': round(coverage, 4),
+        'coverage_percent': round(coverage * 100, 1),
+        'coverage_text': (
+            '按全部已判题折算' if score is not None else capability_rules.coverage_text(0)
+        ),
+        'covered': score is not None,
+        'derived': True,
+        'task_count': len(graded),
+        'lost_tasks': lost,
+        'pass_ratio': round((len(graded) - lost) / len(graded), 4) if graded else 0.0,
+        'evidence': _remember_evidence(graded),
+    }
+
+
+def _remember_evidence(tasks: list[dict[str, Any]], limit: int = 2) -> list[str]:
+    """记忆层证据：先列失分最重的题，全部满分时说明基础写法稳定。"""
+    weak = sorted(
+        (task for task in tasks if task['rate'] < 0.999),
+        key=lambda task: (-(task['weight'] * (1 - task['rate'])), task['task_id']),
+    )
+    evidence = []
+    for task in weak[:limit]:
+        reason = '；'.join(issue['message'] for issue in task['issues'][:1])
+        suffix = f'，主要问题：{reason}' if reason else ''
+        evidence.append(
+            f"{task['task_id']}（{task['title']}）得分率 {round(task['rate'] * 100)}%{suffix}"
+        )
+    if not evidence:
+        evidence.append('已判题全部用例通过，基础写法稳定')
+    return evidence
 
 
 def _module_rows(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -627,6 +690,9 @@ def _rule_summary(
     summary: list[str] = []
     for rows, name in ((bloom, '布鲁姆认知'), (thinking, '计算思维')):
         covered = [row for row in rows if row['covered']]
+        # 记忆层由其它维度折算，作为下界通常不会真正最弱，避免抢占诊断结论
+        direct = [row for row in covered if not row.get('derived')]
+        covered = direct or covered
         if not covered:
             continue
         weakest = min(covered, key=lambda row: row['score'])
