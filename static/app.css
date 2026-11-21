@@ -1600,6 +1600,53 @@ td small {
   word-break: break-all
 }
 
+/* 密码输入行：右侧“显示 / 隐藏”按钮，校验失败时保留已输入内容 */
+.password-field {
+  position: relative;
+  display: block;
+  margin-top: 6px
+}
+
+.password-field input:not([type=checkbox]):not([type=radio]) {
+  margin-top: 0;
+  padding-right: 62px
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4
+}
+
+.password-toggle:hover {
+  background: var(--green-light)
+}
+
+.password-toggle svg {
+  display: block
+}
+
+.password-toggle .eye-off {
+  display: none
+}
+
+.password-toggle.is-revealed .eye-open {
+  display: none
+}
+
+.password-toggle.is-revealed .eye-off {
+  display: block
+}
+
 /* 修改密码：卡片底部弱提示（与个人中心同一卡片尺寸） */
 .password-hint {
   margin: 0;
@@ -1689,6 +1736,13 @@ label.check {
   background: #fff0ed;
   border-color: #e6c3ba;
   color: #a64334
+}
+
+/* 弱口令提醒：琥珀色，与成功提示区分开 */
+.message.warning {
+  background: #fcf1dd;
+  border-color: #ecd6ac;
+  color: #8a5a12
 }
 
 .table-card {
@@ -2308,6 +2362,80 @@ button[aria-busy="true"] {
 .modal .tip {
   font-size: 12px;
   margin-top: 12px;
+}
+
+/* 密码安全提醒：宽高 650:402≈1.618，内边距 55:34≈1.618，纵向节奏取斐波那契 13/21/34/55 */
+#weak-password-dialog {
+  width: min(650px, 92vw);
+  min-height: 402px;
+  padding: 34px 55px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#weak-password-dialog[open] {
+  animation: weak-password-rise .2s ease-out;
+}
+
+@keyframes weak-password-rise {
+  from {
+    opacity: 0;
+    transform: translateY(13px)
+  }
+
+  to {
+    opacity: 1;
+    transform: none
+  }
+}
+
+.weak-password-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 21px;
+  border-radius: 50%;
+  background: #fcf1dd;
+  color: #b0741b
+}
+
+#weak-password-dialog h2 {
+  margin: 0 0 13px;
+  font-size: 21px;
+  line-height: 1.618
+}
+
+#weak-password-dialog .subtle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.618;
+  color: #475569
+}
+
+#weak-password-dialog .actions {
+  gap: 13px;
+  margin-top: 34px
+}
+
+#weak-password-dialog .actions .button {
+  padding: 12px 21px
+}
+
+@media (max-width: 640px) {
+  #weak-password-dialog {
+    min-height: 0;
+    padding: 26px 21px
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #weak-password-dialog[open] {
+    animation: none
+  }
 }
 
 /* 知识图谱：ECharts 力导向图，含工具栏、分类筛选与详情面板 */

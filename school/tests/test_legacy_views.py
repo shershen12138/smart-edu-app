@@ -230,7 +230,7 @@ class LegacyViewTests(TestCase):
                 'full_name': '新同学',
                 'student_no': '2026999',
                 'roles': ['student'],
-                'password': 'InitPass_2026x',
+                'password': 'InitPass_2026x!',
             },
         )
         self.assertRedirects(response, reverse('users'))
@@ -248,14 +248,14 @@ class LegacyViewTests(TestCase):
         self.client.force_login(self.admin)
         self.client.post(
             reverse('user_detail', args=[self.student.pk]),
-            {'action': 'reset', 'password': 'ResetPass_2026'},
+            {'action': 'reset', 'password': 'ResetPass_2026!'},
         )
         self.student.refresh_from_db()
         self.assertTrue(self.student.must_change_password)
-        self.assertTrue(self.student.check_password('ResetPass_2026'))
+        self.assertTrue(self.student.check_password('ResetPass_2026!'))
 
     def test_user_detail_reset_weak_password_rejected(self):
-        # 项目默认关闭密码验证器，这里临时启用以验证重置路径的校验分支
+        # 用最小长度验证器覆盖默认策略，单独验证重置路径的校验分支
         validators = [
             {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
         ]
@@ -322,7 +322,7 @@ class LegacyViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'imp1')
         response = self.client.post(
-            reverse('users_import'), {'action': 'commit', 'password': 'Import_2026pw'}
+            reverse('users_import'), {'action': 'commit', 'password': 'Import_2026pw!'}
         )
         self.assertRedirects(response, reverse('users'))
         self.assertTrue(User.objects.filter(username='imp1').exists())
@@ -330,7 +330,7 @@ class LegacyViewTests(TestCase):
     def test_users_import_commit_without_preview_rejected(self):
         self.client.force_login(self.admin)
         response = self.client.post(
-            reverse('users_import'), {'action': 'commit', 'password': 'Import_2026pw'}
+            reverse('users_import'), {'action': 'commit', 'password': 'Import_2026pw!'}
         )
         self.assertContains(response, '请先预览导入文件')
 

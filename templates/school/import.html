@@ -56,13 +56,34 @@
           <input type="hidden" name="action" value="commit">
           <label>
             新账号初始密码
-            <input type="password"
-                   name="password"
-                   minlength="10"
-                   required
-                   autocomplete="new-password">
+            <span class="password-field">
+              <input type="password"
+                     name="password"
+                     value="{{ request.POST.password|default:'' }}"
+                     minlength="8"
+                     required
+                     autocomplete="new-password">
+              <button type="button"
+                      class="password-toggle"
+                      data-password-toggle
+                      aria-label="显示密码"
+                      aria-pressed="false"
+                      title="显示密码">
+                <svg class="eye-open" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="eye-off" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="m3 3 18 18"/>
+                </svg>
+              </button>
+            </span>
           </label>
-          <p class="help">仅用于本批新建账号，首次登录强制改密。请通过约定渠道分别发给学生。</p>
+          <p class="help">密码至少 8 位，且必须包含大写字母、小写字母、数字和特殊字符（如 _ ! @ #）中的至少三类，不能包含空格。仅用于本批新建账号，首次登录强制改密，请通过约定渠道分别发给学生。</p>
           <button class="button">确认导入</button>
         </form>
       </section>

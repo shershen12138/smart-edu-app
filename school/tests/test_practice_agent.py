@@ -777,9 +777,9 @@ class PracticeViewTests(TestCase):
         # 看板主体只剩作业列表，没有并列入口卡片
         self.assertNotIn('按任务补短板', body)
         self.assertNotIn('做题 · 提交 · 看反馈', body)
-        # 侧边栏仍保留弱项练习导航
+        # 侧边栏仍保留个性化训练导航
         self.assertIn(f'href="{reverse("practice")}"', body)
-        self.assertIn('弱项练习', body)
+        self.assertIn('个性化训练', body)
 
     def test_home_explains_disabled_reasons(self):
         self._seed_weak_record()

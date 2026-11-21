@@ -5,8 +5,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{{ title|default:'工作台' }} · 课码</title>
-    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261121-14">
-    <script src="{% static 'portal.js' %}?v=20261121-1" defer></script>
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261121-18">
+    <script src="{% static 'portal.js' %}?v=20261121-3" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
   <body>
@@ -39,7 +39,7 @@
             <a href="{% url 'classes' %}">班级清单</a>
             <a href="{% url 'results' %}">统计汇总与报表</a>
           {% else %}
-            <a href="{% url 'practice' %}">弱项练习</a>
+            <a href="{% url 'practice' %}">个性化训练</a>
           {% endif %}
         </nav>
         <div class="sidebar-bottom">
@@ -149,6 +149,40 @@
           <button class="button" type="button" data-llm-error-close>返回修改</button>
         </div>
       </dialog>
+      {% if weak_password_warning %}
+        <dialog class="modal" id="weak-password-dialog" aria-labelledby="weak-password-title">
+          <div class="weak-password-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="10" width="16" height="10" rx="2"/>
+              <path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+            </svg>
+          </div>
+          <h2 id="weak-password-title">密码安全提醒</h2>
+          <p class="subtle">
+            检测到当前密码不符合安全要求：至少 8 位，且包含大写字母、小写字母、数字、特殊字符中的至少三类。
+            为保护账号安全，请尽快修改密码。
+          </p>
+          <div class="actions space-top">
+            <a class="button secondary" href="{% url 'password' %}">去修改密码</a>
+            <button class="button" type="button" data-weak-password-close>确认</button>
+          </div>
+        </dialog>
+        <script>
+          (function () {
+            const dialog = document.getElementById('weak-password-dialog');
+            if (!dialog) return;
+            if (typeof dialog.showModal !== 'function') {
+              dialog.setAttribute('open', 'open');
+            } else {
+              dialog.showModal();
+            }
+            dialog.querySelector('[data-weak-password-close]')?.addEventListener('click', () => {
+              dialog.close();
+            });
+          })();
+        </script>
+      {% endif %}
       <script>
         // 模型配置弹窗逻辑内联在页面里（不依赖静态 JS 的浏览器缓存，避免旧缓存导致点击无反应）
         (function () {

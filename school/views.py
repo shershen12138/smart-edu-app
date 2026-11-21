@@ -27,6 +27,7 @@ from .storage import read_private, save_private
 from .imports import preview_import, commit_import, HEADERS
 from .teaching import latest_drafts
 from .portal import navigation
+from .password_policy import needs_upgrade
 
 
 def form_page(request, title, form, **context):
@@ -53,6 +54,12 @@ def login_view(request):
             for key in keys:
                 cache.delete(key)
             audit(request.user, 'auth.login', 'session', request=request)
+            # 强制改密的账号会直接跳到修改密码页，那里已有完整规则说明，无需重复提示
+            if not request.user.must_change_password and needs_upgrade(
+                request.POST.get('password', ''), request.user
+            ):
+                # 用会话标记交给工作台弹出一次提醒，确认后不再出现
+                request.session['weak_password_warning'] = True
             return redirect('dashboard')
         else:
             for key in keys:
@@ -91,8 +98,8 @@ def password_view(request):
             request,
             '修改密码',
             form,
-            back_url,
             description='首次使用需要设置新密码。忘记密码时请联系管理员核验身份后重置。',
+            back_url=back_url,
         )
     return render(
         request,

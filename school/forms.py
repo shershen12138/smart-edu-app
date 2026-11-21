@@ -5,6 +5,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.core.exceptions import ValidationError
 from .models import User, UserRole, Classroom, ProblemVersion, SubmissionRuleVersion, Announcement
+from .password_policy import HELP_TEXT as PASSWORD_HELP_TEXT
+from .widgets import TogglePasswordInput
 
 
 class LoginForm(AuthenticationForm):
@@ -18,10 +20,19 @@ class LoginForm(AuthenticationForm):
 
 
 class CleanPasswordChangeForm(PasswordChangeForm):
-    """修改密码表单：仅移除“为了校验，请输入与上面相同的密码。”帮助文案，不改校验逻辑。"""
+    """修改密码表单：统一展示复杂度规则，并移除确认框的冗余帮助文案。"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # 校验失败时保留刚输入的内容（含旧密码），用户只需改不符合规则的新密码
+        self.fields['old_password'].widget = TogglePasswordInput(
+            attrs={'autocomplete': 'current-password'}
+        )
+        for name in ('new_password1', 'new_password2'):
+            self.fields[name].widget = TogglePasswordInput(
+                attrs={'autocomplete': 'new-password'}
+            )
+        self.fields['new_password1'].help_text = PASSWORD_HELP_TEXT
         self.fields['new_password2'].help_text = ''
 
 
@@ -35,7 +46,11 @@ class AccountForm(forms.Form):
     roles = forms.MultipleChoiceField(
         label='系统身份', choices=UserRole.ROLE_CHOICES, widget=forms.CheckboxSelectMultiple
     )
-    password = forms.CharField(label='初始密码（首次登录必须修改）', widget=forms.PasswordInput)
+    password = forms.CharField(
+        label='初始密码（首次登录必须修改）',
+        widget=TogglePasswordInput,
+        help_text=PASSWORD_HELP_TEXT,
+    )
 
     def clean(self):
         data = super().clean()
@@ -44,10 +59,14 @@ class AccountForm(forms.Form):
         if data.get('student_no') and User.objects.filter(student_no=data['student_no']).exists():
             self.add_error('student_no', '学工号已存在。')
         if data.get('password'):
-            validate_password(
-                data['password'],
-                User(username=data.get('username', ''), full_name=data.get('full_name', '')),
-            )
+            try:
+                validate_password(
+                    data['password'],
+                    User(username=data.get('username', ''), full_name=data.get('full_name', '')),
+                )
+            except ValidationError as exc:
+                # 把口令强度问题挂到密码字段，页面提示才会出现在输入框下方
+                self.add_error('password', exc)
         return data
 
 

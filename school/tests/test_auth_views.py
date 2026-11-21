@@ -81,14 +81,40 @@ class AuthViewTests(TestCase):
             reverse('password'),
             {
                 'old_password': 'SafePassword_2026',
-                'new_password1': 'AnotherSafe_2027',
-                'new_password2': 'AnotherSafe_2027',
+                'new_password1': 'AnotherSafe_2027!',
+                'new_password2': 'AnotherSafe_2027!',
             },
         )
         self.assertRedirects(response, reverse('dashboard'))
         self.student.refresh_from_db()
         self.assertFalse(self.student.must_change_password)
-        self.assertTrue(self.student.check_password('AnotherSafe_2027'))
+        self.assertTrue(self.student.check_password('AnotherSafe_2027!'))
+
+    def test_weak_existing_password_warns_after_login(self):
+        weak = User.objects.create_user(
+            username='weakuser', password='123456', must_change_password=False
+        )
+        UserRole.objects.create(user=weak, role='student')
+        response = self.client.post(
+            reverse('login'),
+            {'username': 'weakuser', 'password': '123456'},
+            follow=True,
+        )
+        # 工作台弹出可关闭的提醒，带确认按钮
+        self.assertContains(response, 'id="weak-password-dialog"')
+        self.assertContains(response, '密码安全提醒')
+        self.assertContains(response, 'data-weak-password-close')
+        # 提醒只出现一次：会话标记在渲染时已消费，刷新不再弹出
+        again = self.client.get(reverse('dashboard'))
+        self.assertNotContains(again, 'id="weak-password-dialog"')
+
+    def test_strong_password_does_not_warn_after_login(self):
+        response = self.client.post(
+            reverse('login'),
+            {'username': 'stu', 'password': 'SafePassword_2026'},
+            follow=True,
+        )
+        self.assertNotContains(response, 'id="weak-password-dialog"')
 
     def test_password_page_renders(self):
         self.client.force_login(self.student)

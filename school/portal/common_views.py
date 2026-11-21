@@ -22,6 +22,10 @@ def page(request, template, title, **context):
     # 没显式给上一级的页面（各模块的列表页）统一退回工作台
     navigation.track(request)
     context.setdefault('back_url', navigation.back_target(request, reverse('dashboard')))
+    # 登录时发现的弱口令只提示一次：这里取出后即从会话移除，刷新不再弹窗
+    context.setdefault(
+        'weak_password_warning', request.session.pop('weak_password_warning', False)
+    )
     return render(request, 'portal/' + template + '.html', {'title': title, **context})
 
 

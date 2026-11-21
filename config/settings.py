@@ -70,8 +70,16 @@ if DATABASES['default']['ENGINE'].endswith('mysql'):
 else:
     DATABASES['default']['OPTIONS'] = {'timeout': 30}
 AUTH_USER_MODEL = 'school.User'
-# 暂按试用要求取消密码复杂度校验，首次登录改密与确认密码检查仍保留。
-AUTH_PASSWORD_VALIDATORS = []
+# 三级等保：口令至少 8 位，且包含大写字母、小写字母、数字、特殊字符中的至少三类。
+# 修改密码、管理员重置、批量导入和命令行建号共用这一套校验器。
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {
+        'NAME': 'school.password_policy.PasswordComplexityValidator',
+        'OPTIONS': {'min_length': 8, 'min_character_classes': 3},
+    },
+]
 LANGUAGE_CODE = 'zh-hans'
 TIME_ZONE = 'Asia/Shanghai'
 USE_I18N = True

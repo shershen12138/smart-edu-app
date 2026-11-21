@@ -2,16 +2,22 @@
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.core.exceptions import ValidationError
 
 from school.models import Classroom, ClassStaff, DataDictionary, DictionaryItem, User
+from school.password_policy import HELP_TEXT as PASSWORD_HELP_TEXT
+from school.widgets import TogglePasswordInput
 
 
 class PersonForm(forms.ModelForm):
     password = forms.CharField(
         label='初始 / 重置密码',
         required=False,
-        widget=forms.PasswordInput,
-        help_text='新建时留空使用默认密码 123456；修改时留空保留原密码。设置后首次登录必须修改。',
+        widget=TogglePasswordInput,
+        help_text=(
+            '新建时留空使用默认密码 123456；修改时留空保留原密码。设置后首次登录必须修改。'
+            + PASSWORD_HELP_TEXT
+        ),
     )
     classrooms = forms.ModelMultipleChoiceField(
         label='所属教学班',
@@ -44,7 +50,11 @@ class PersonForm(forms.ModelForm):
     def clean(self):
         data = super().clean()
         if data.get('password') and data['password'] != '123456':
-            validate_password(data['password'], self.instance)
+            try:
+                validate_password(data['password'], self.instance)
+            except ValidationError as exc:
+                # 挂到密码字段，管理员能在输入框下直接看到不符合哪一条规则
+                self.add_error('password', exc)
         return data
 
 

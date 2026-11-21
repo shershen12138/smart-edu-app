@@ -64,3 +64,16 @@ if (polling) {
     } catch {}
   }, 2500)
 }
+// 密码框右侧“显示 / 隐藏”：只切换 input 类型，不改表单值
+document.addEventListener('click', (event) => {
+  const toggle = event.target.closest?.('[data-password-toggle]');
+  if (!toggle) return;
+  const input = toggle.closest('.password-field')?.querySelector('input');
+  if (!input) return;
+  const reveal = input.type === 'password';
+  input.type = reveal ? 'text' : 'password';
+  toggle.classList.toggle('is-revealed', reveal);
+  toggle.setAttribute('aria-pressed', String(reveal));
+  toggle.setAttribute('aria-label', reveal ? '隐藏密码' : '显示密码');
+  toggle.setAttribute('title', reveal ? '隐藏密码' : '显示密码');
+});
