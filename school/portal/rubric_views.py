@@ -91,7 +91,7 @@ def work_rubric_regenerate(request, pk):
     except rubric_agent.LLMNotConfigured:
         messages.error(
             request,
-            '当前账号还没有配置大模型：请先点击侧边栏“大模型配置”填写自己的 API Key，再重新生成。',
+            '算法端尚未配置可用的大模型端点，请联系管理员补充后再重新生成。',
         )
     except (rubric_agent.LLMError, rubric_agent.RubricParseError) as exc:
         messages.error(request, f'重新生成评分标准失败，已保留原有内容：{exc}')

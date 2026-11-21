@@ -298,7 +298,11 @@ def collect_evidence(student) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         rubric_labels = _rubric_labels(work)
         rubric = getattr(work, 'rubric', None)
         bloom_map = dict(getattr(rubric, 'bloom_map', None) or {})
-        if rubric is not None and rubric_agent.needs_bloom(work) and llm_client.configured(student):
+        if (
+            rubric is not None
+            and rubric_agent.needs_bloom(work)
+            and llm_client.configured(student)
+        ):
             # 老评分标准缺少每题认知层次：后台补标，本次先用规则兜底
             rubric_agent.schedule_bloom_fill(work.pk, student.pk)
         code = _read_code(entry.source_path)
@@ -1050,15 +1054,15 @@ def _refresh(student) -> StudentCapabilityProfile | None:
     facts = code_facts(tasks)
     payload = build_payload(student, tasks, facts, stats=stats)
     source, model = 'rule', ''
-    config = llm_client.get_config(student)
-    if llm_client.configured(student):
+    config = llm_client.resolve_config(student)
+    if config is not None:
         try:
             diagnosis = diagnose(student, tasks, payload, facts)
         except (LLMError, LLMNotConfigured, DiagnosisError) as exc:
             logger.info('综合能力大模型诊断失败，保留规则诊断 student=%s：%s', student.pk, exc)
         else:
             payload = build_payload(student, tasks, facts, diagnosis=diagnosis, stats=stats)
-            source, model = 'llm', config.model if config else ''
+            source, model = 'llm', config.model
     return _save_profile(
         student, payload, source, model, _signature(tasks, _model_stamp(config))
     )
@@ -1101,7 +1105,7 @@ def ensure_profile(student) -> tuple[StudentCapabilityProfile | None, bool]:
     tasks, stats = collect_evidence(student)
     if not tasks:
         return None, False
-    config = llm_client.get_config(student)
+    config = llm_client.resolve_config(student)
     signature = _signature(tasks, _model_stamp(config))
     profile = StudentCapabilityProfile.objects.filter(student=student).first()
     if profile is not None and profile.signature == signature:

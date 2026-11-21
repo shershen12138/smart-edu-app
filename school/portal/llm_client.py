@@ -1,11 +1,13 @@
-"""用户自备大模型客户端：评分标准智能体与训练题智能体共用。
+"""大模型客户端：算法端统一配置优先，个人配置只在显式允许时覆盖。
 
 设计边界：
-- 只使用**当前操作用户**在“大模型配置”弹窗里填写的服务商 / 接口地址 /
-  模型名 / API Key（存放在 ``UserLLMConfig``），不读取任何项目级全局 Key；
+- 默认使用部署环境里的 ``LLM_BASE_URL`` / ``LLM_MODEL`` / ``LLM_API_KEY``
+  （算法端配置），Key 不落库、不进页面、不写日志；
+- 页面不提供个人模型配置入口；``UserLLMConfig`` 仅作为旧环境或本地开发的
+  后端兜底，不再向学生、教师或管理员展示表单；
+- 算法端未配置时（本地开发、离线演示）回退到 ``UserLLMConfig``，旧环境照常可用；
 - 端点必须是 OpenAI 兼容的 ``/chat/completions`` 接口；
-- 未配置时抛 ``LLMNotConfigured``，调用方必须显式走规则兜底并标注来源，
-  不能把兜底结果当成模型结论。
+- 无可用配置时抛 ``LLMNotConfigured``，调用方必须显式走规则兜底并标注来源。
 """
 
 from __future__ import annotations
@@ -13,12 +15,12 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
-from typing import Any
+from typing import Any, NamedTuple
 from urllib.parse import urlparse
 
 from django.conf import settings
 
-from school.models import User, UserLLMConfig
+from school.models import UserLLMConfig
 
 # 常用 OpenAI 兼容服务商预设，选择后自动带出接口地址与默认模型
 PROVIDERS: dict[str, dict[str, str]] = {
@@ -48,6 +50,15 @@ PROVIDERS: dict[str, dict[str, str]] = {
 DEFAULT_TIMEOUT = 60.0
 
 
+class ServerConfig(NamedTuple):
+    """算法端（部署环境）提供的大模型配置，字段与 UserLLMConfig 对齐，便于统一取用。"""
+
+    provider: str
+    base_url: str
+    model: str
+    api_key: str
+
+
 class LLMConfigError(ValueError):
     """用户提交的大模型配置不合法。"""
 
@@ -73,9 +84,71 @@ def get_config(user) -> UserLLMConfig | None:
     return UserLLMConfig.objects.filter(user=user).first()
 
 
-def configured(user) -> bool:
-    config = get_config(user)
+def server_config() -> ServerConfig | None:
+    """读取部署环境里的算法端配置；三项缺一即视为未配置，避免半套配置被误用。"""
+    base_url = str(getattr(settings, 'LLM_BASE_URL', '') or '').strip().rstrip('/')
+    model = str(getattr(settings, 'LLM_MODEL', '') or '').strip()
+    api_key = str(getattr(settings, 'LLM_API_KEY', '') or '').strip()
+    if not (base_url and model and api_key):
+        return None
+    provider = str(getattr(settings, 'LLM_PROVIDER', '') or '').strip() or 'custom'
+    if provider not in PROVIDERS:
+        provider = 'custom'
+    return ServerConfig(provider=provider, base_url=base_url, model=model, api_key=api_key)
+
+
+def user_override_allowed() -> bool:
+    """是否允许个人 Key 覆盖算法端配置；默认关闭。"""
+    return bool(getattr(settings, 'LLM_ALLOW_USER_OVERRIDE', False))
+
+
+def personal_config_enabled() -> bool:
+    """个人配置在后端是否可用：算法端未配置，或显式允许覆盖。
+
+    页面已不再提供个人配置入口，此函数仅用于保留旧数据的读取与写入校验。
+    """
+    return server_config() is None or user_override_allowed()
+
+
+def _usable(config) -> bool:
     return bool(config and config.base_url and config.api_key and config.model)
+
+
+def resolve_config(user=None):
+    """按「算法端优先」取一份可用配置。
+
+    - 算法端已配置且未允许覆盖 → 算法端配置（不查库，生产默认路径）；
+    - 允许覆盖且个人配置完整 → 个人配置；
+    - 算法端未配置 → 回退个人配置（本地开发、离线演示）。
+    """
+    server = server_config()
+    if server is not None and not user_override_allowed():
+        return server
+    personal = get_config(user)
+    if server is not None and not _usable(personal):
+        return server
+    if _usable(personal):
+        return personal
+    return server
+
+
+def active_model(user=None) -> str:
+    """当前生效的模型名，用于结果来源标注与画像签名。"""
+    config = resolve_config(user)
+    return config.model if config is not None else ''
+
+
+def configured(user=None) -> bool:
+    """是否存在可用配置（算法端或允许的个人配置）。"""
+    return resolve_config(user) is not None
+
+
+def unconfigured_message() -> str:
+    """未配置时的统一提示：由算法端统一补充，不引导用户填写个人 Key。"""
+    return (
+        '大模型尚未配置：算法端未提供 LLM_BASE_URL / LLM_MODEL / LLM_API_KEY，当前只能走规则兜底。'
+        '请联系管理员在服务器环境补充。'
+    )
 
 
 def mask_key(key: str) -> str:
@@ -91,19 +164,26 @@ def host_of(base_url: str) -> str:
     return parsed.netloc or (base_url or '')
 
 
-def status_text(user) -> str:
-    config = get_config(user)
-    if not config:
+def status_text(user=None) -> str:
+    """页面展示用的配置来源说明：算法端统一配置或允许的个人覆盖。"""
+    server = server_config()
+    if server is not None and not user_override_allowed():
         return (
-            '当前账号尚未配置大模型：点击“模型配置”选择服务商并填写你自己的 API Key，'
-            '之后评分标准智能体与训练题智能体都会使用这份个人配置。'
+            f'由算法端统一配置：{server.model} @ {host_of(server.base_url)}'
+            '（全班共用，页面不显示 Key）'
         )
-    if not configured(user):
-        return '大模型配置不完整（缺少接口地址、模型名或 API Key），请重新填写。'
-    return (
-        f'当前使用你的个人配置：{config.model} @ {host_of(config.base_url)}'
-        f'（Key {mask_key(config.api_key)}）'
-    )
+    personal = get_config(user)
+    if _usable(personal):
+        return (
+            f'当前使用你的个人配置：{personal.model} @ {host_of(personal.base_url)}'
+            f'（Key {mask_key(personal.api_key)}）'
+        )
+    if server is not None:
+        return (
+            f'由算法端统一配置：{server.model} @ {host_of(server.base_url)}'
+            '（全班共用，页面不显示 Key）'
+        )
+    return unconfigured_message()
 
 
 def normalize_config(
@@ -136,7 +216,12 @@ def normalize_config(
 
 
 def save_values(user, values: dict[str, str]) -> UserLLMConfig:
-    """把 normalize_config 的结果写入当前用户的配置行。"""
+    """把 normalize_config 的结果写入当前用户的配置行。
+
+    算法端已配置且未允许覆盖时拒绝写入，避免页面上出现“保存成功但不生效”。
+    """
+    if not personal_config_enabled():
+        raise LLMConfigError('大模型由算法端统一配置，当前不允许修改个人配置。')
     config, _ = UserLLMConfig.objects.update_or_create(user=user, defaults=values)
     return config
 
@@ -211,13 +296,11 @@ def probe_config(values: dict[str, str], timeout_seconds: float | None = None) -
         )
 
 
-def chat(messages: list[dict[str, str]], user, temperature: float = 0.2) -> str:
-    """调用当前用户配置的 OpenAI 兼容对话补全端点。"""
-    config = get_config(user)
-    if not configured(user):
-        raise LLMNotConfigured(
-            '当前账号还没有配置大模型。请点击“模型配置”，选择服务商并填写你自己的 API Key。'
-        )
+def chat(messages: list[dict[str, str]], user=None, temperature: float = 0.2) -> str:
+    """调用当前生效配置（算法端优先，其次允许的个人配置）的对话补全端点。"""
+    config = resolve_config(user)
+    if config is None:
+        raise LLMNotConfigured(unconfigured_message())
     payload = _request_json(
         config.base_url,
         config.api_key,

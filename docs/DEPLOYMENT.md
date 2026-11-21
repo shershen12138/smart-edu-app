@@ -80,6 +80,32 @@ docker compose start web worker beat
 恢复必须在隔离验收环境执行：先停止写入，将备份导入空数据库，解压存储目录并恢复 UID 10001 的访问权，运行 `manage.py check`，登录核对一份历史提交、正式成绩和隐藏用例，再开放服务。
 实际恢复演练、磁盘容量报警和备份调度需要在目标服务器部署时配置，首版代码不会声称已完成这些运维验证。
 
+## 算法端大模型配置
+
+评分标准智能体、训练题智能体与综合能力归因统一使用部署环境里的模型配置。学生端、教师端和管理员端均不提供模型配置入口，用户无需自备 Key：
+
+| 变量 | 说明 |
+| --- | --- |
+| `LLM_BASE_URL` | OpenAI 兼容端点，如 `https://api.deepseek.com` |
+| `LLM_MODEL` | 模型名，如 `deepseek-chat` |
+| `LLM_API_KEY` | 服务端 Key，只写现场 `.env`（权限 600），不进仓库、不进数据库、不显示在页面 |
+| `LLM_PROVIDER` | 可选，仅用于页面展示来源，默认 `custom` |
+| `LLM_ALLOW_USER_OVERRIDE` | 默认 `false`；只影响后端是否采用数据库中已有的历史个人配置，页面已无入口 |
+
+三项（地址、模型、Key）缺一即视为未配置：所有智能体自动走规则兜底，并在结果里标注“规则诊断（未使用大模型）”。修改后重建 `web`、`worker`、`beat` 三个容器生效：
+
+```bash
+docker compose up -d --force-recreate web worker beat
+```
+
+在容器内核对当前来源（不会打印 Key）：
+
+```bash
+docker compose exec -T web python manage.py shell -c "from school.portal import llm_client; print(llm_client.status_text())"
+```
+
+历史个人配置（`user_llm_configs` 表）只在 `LLM_ALLOW_USER_OVERRIDE=true` 时参与后端解析；页面不再提供“模型配置”入口，相关写入接口也已移除。切换模型后能力画像签名变化，学生下次打开页面会重新生成。
+
 ## 数据库审计与注入巡检
 
 `compose.yaml` 为 MySQL 打开慢查询日志（超过 2 秒写入 `mysql.slow_log`，`general_log` 保持关闭，避免全量语句和个人信息落盘）。应用账号只有业务库权限，读不到 `mysql` 库，日志由维护人员取出后交给巡检命令：

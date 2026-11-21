@@ -277,7 +277,11 @@ class PracticeAgentCoverageTests(TestCase):
         with mock.patch.object(practice_agent, 'llm_configured', return_value=True), \
                 mock.patch.object(practice_agent, 'chat', return_value=json.dumps(payload, ensure_ascii=False)) as chat_mock, \
                 mock.patch.object(practice_agent.llm_client, 'get_config',
-                                  return_value=SimpleNamespace(model='mock-model')):
+                                  return_value=SimpleNamespace(
+                                      model='mock-model',
+                                      base_url='https://mock.example.com/v1',
+                                      api_key='sk-mock',
+                                  )):
             plan = practice_agent.generate_practice_plan(self.student)
         self.assertIsNotNone(plan)
         self.assertEqual(plan.source, 'llm')

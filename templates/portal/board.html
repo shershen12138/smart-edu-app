@@ -9,9 +9,48 @@
     <div class="welcome-symbol">.py</div>
   </section>
   {% include "portal/stats.html" %}
-  <div class="section-heading" id="assignments">
+  {% if urgent_cards and selected_filter == 'all' and selected_view == 'uncompleted' %}
+    <section class="deadline-alert" aria-labelledby="deadline-alert-title">
+      <div class="deadline-alert-head">
+        <span class="deadline-alert-mark" aria-hidden="true">!</span>
+        <div>
+          <h2 id="deadline-alert-title">即将截止</h2>
+          <p>以下作业将在 24 小时内截止，请优先完成。</p>
+        </div>
+        <span class="deadline-alert-count">{{ urgent_cards|length }} 项</span>
+      </div>
+      <div class="deadline-alert-list">
+        {% for c in urgent_cards %}
+          <a class="deadline-alert-item" href="{% url 'work' c.work.pk %}">
+            <span class="deadline-alert-item-title">{{ c.work.title }}</span>
+            <span class="deadline-alert-item-meta">{{ c.work.classroom.name }} · 剩 {{ c.remaining_label }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+  <div class="section-heading board-heading" id="assignments">
     <h2>{{ card_filter_label }}</h2>
-    {% if selected_filter != 'all' %}<a href="{% url 'dashboard' %}?filter=all#assignments">显示全部</a>{% endif %}
+    {% if selected_filter == 'all' %}
+      <div class="view-switch{% if selected_view == 'completed' %} is-completed{% endif %}"
+           role="tablist" aria-label="作业完成状态">
+        <span class="view-switch-thumb" aria-hidden="true"></span>
+        <a class="view-switch-option{% if selected_view != 'completed' %} active{% endif %}"
+           href="?filter=all&amp;view=uncompleted#assignments"
+           role="tab"
+           aria-selected="{% if selected_view != 'completed' %}true{% else %}false{% endif %}">
+          未完成 <b>{{ view_counts.uncompleted }}</b>
+        </a>
+        <a class="view-switch-option{% if selected_view == 'completed' %} active{% endif %}"
+           href="?filter=all&amp;view=completed#assignments"
+           role="tab"
+           aria-selected="{% if selected_view == 'completed' %}true{% else %}false{% endif %}">
+          已完成 <b>{{ view_counts.completed }}</b>
+        </a>
+      </div>
+    {% else %}
+      <a href="{% url 'dashboard' %}?filter=all#assignments">显示全部</a>
+    {% endif %}
   </div>
   {% if selected_filter == 'classrooms' %}
     <div class="assignment-grid board-grid">
@@ -32,15 +71,16 @@
   {% else %}
     <div class="assignment-grid board-grid">
       {% for c in card_page %}
-        <article class="card assignment-card">
+        <article class="card assignment-card{% if c.urgent %} is-urgent{% endif %}">
           <div class="tag-row">
             <span class="tag">{{ c.work.classroom.name }}</span>
             <span class="tag{% if c.work.grading_mode == 'manual' %} amber{% endif %}">{{ c.work.get_grading_mode_display }}</span>
+            {% if c.urgent %}<span class="tag danger">剩 {{ c.remaining_label }}</span>{% endif %}
           </div>
           <h2>
             <a href="{% url 'work' c.work.pk %}">{{ c.work.title }}</a>
           </h2>
-          <p>截止 {{ c.work.deadline|date:'Y-m-d H:i' }} · {% if c.expired %}已截止{% else %}可提交{% endif %}</p>
+          <p>截止 {{ c.work.deadline|date:'Y-m-d H:i' }} · {% if c.expired %}已截止{% elif c.urgent %}即将截止{% else %}可提交{% endif %}</p>
           <div class="card-meta">
             <span>{% if c.entry %}{{ c.entry.get_status_display }}{% else %}尚未提交{% endif %}</span>
             <span>
@@ -55,18 +95,26 @@
           </div>
         </article>
       {% empty %}
-        <div class="card empty">当前筛选条件下没有作业。</div>
+        <div class="card empty">
+          {% if selected_filter == 'all' and selected_view == 'completed' %}
+            还没有已完成的作业。
+          {% elif selected_filter == 'all' %}
+            没有未完成的作业，继续保持。
+          {% else %}
+            当前筛选条件下没有作业。
+          {% endif %}
+        </div>
       {% endfor %}
     </div>
   {% endif %}
   {% if card_page.has_other_pages %}
     <nav class="pagination" aria-label="作业分页">
       {% if card_page.has_previous %}
-        <a href="?filter={{ selected_filter|urlencode }}&page={{ card_page.previous_page_number }}#assignments">上一页</a>
+        <a href="?filter={{ selected_filter|urlencode }}&amp;view={{ selected_view|urlencode }}&amp;page={{ card_page.previous_page_number }}#assignments">上一页</a>
       {% endif %}
       <span>第 {{ card_page.number }} / {{ card_page.paginator.num_pages }} 页</span>
       {% if card_page.has_next %}
-        <a href="?filter={{ selected_filter|urlencode }}&page={{ card_page.next_page_number }}#assignments">下一页</a>
+        <a href="?filter={{ selected_filter|urlencode }}&amp;view={{ selected_view|urlencode }}&amp;page={{ card_page.next_page_number }}#assignments">下一页</a>
       {% endif %}
     </nav>
   {% endif %}

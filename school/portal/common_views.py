@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -102,6 +104,17 @@ def profile(request):
     )
 
 
+def _remaining_label(delta):
+    """把剩余时间压缩成看板可读的短文案。"""
+    minutes = max(1, int(delta.total_seconds() // 60))
+    hours, minutes = divmod(minutes, 60)
+    if hours and minutes:
+        return f'{hours} 小时 {minutes} 分'
+    if hours:
+        return f'{hours} 小时'
+    return f'{minutes} 分钟'
+
+
 @login_required
 def dashboard(request):
     current = role(request.user)
@@ -160,25 +173,53 @@ def dashboard(request):
     if current == 'student':
         works = works.filter(status='open')
         student_classrooms = list(classes_for(request.user))
+        now = timezone.now()
+        urgent_window = timedelta(hours=24)
         all_cards = []
         for work in works:
             entry = work.entries.filter(student=request.user).first()
+            remaining = work.deadline - now
+            expired = remaining <= timedelta(0)
+            urgent = not entry and not expired and remaining <= urgent_window
             all_cards.append(
-                {'work': work, 'entry': entry, 'expired': work.deadline < timezone.now()}
+                {
+                    'work': work,
+                    'entry': entry,
+                    'expired': expired,
+                    'urgent': urgent,
+                    'remaining_label': _remaining_label(remaining) if urgent else '',
+                }
             )
         selected_filter = request.GET.get('filter', 'all')
+        selected_view = request.GET.get('view', 'uncompleted')
+        completed_count = sum(bool(card['entry']) for card in all_cards)
+        view_counts = {
+            'completed': completed_count,
+            'uncompleted': len(all_cards) - completed_count,
+        }
+        urgent_cards = sorted(
+            (card for card in all_cards if card['urgent']),
+            key=lambda card: card['work'].deadline,
+        )
         if selected_filter == 'submitted':
             cards = [card for card in all_cards if card['entry']]
             card_filter_label = '已提交作业'
+            selected_view = ''
         elif selected_filter == 'pending':
             cards = [card for card in all_cards if not card['entry'] and not card['expired']]
             card_filter_label = '未截止且未提交的作业'
+            selected_view = ''
         elif selected_filter == 'classrooms':
             cards = all_cards
             card_filter_label = '我的教学班'
+            selected_view = ''
         else:
             selected_filter = 'all'
-            cards = all_cards
+            if selected_view == 'completed':
+                cards = [card for card in all_cards if card['entry']]
+            else:
+                selected_view = 'uncompleted'
+                cards = [card for card in all_cards if not card['entry']]
             card_filter_label = '全部作业'
         classroom_cards = [
             {
@@ -196,6 +237,9 @@ def dashboard(request):
             cards=cards,
             card_page=Paginator(displayed_cards, 6).get_page(request.GET.get('page')),
             selected_filter=selected_filter,
+            selected_view=selected_view,
+            view_counts=view_counts,
+            urgent_cards=urgent_cards,
             card_filter_label=card_filter_label,
             stats=[
                 {

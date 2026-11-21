@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -6,6 +7,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
+# 测试必须与现场 .env 隔离，避免真实模型配置让用例发起外部请求或改变兜底分支。
+TESTING = 'test' in sys.argv
 RUNTIME = BASE_DIR / '.runtime'
 RUNTIME.mkdir(exist_ok=True)
 DEBUG = os.getenv('DEBUG', 'true').lower() == 'true'
@@ -132,14 +135,24 @@ JUDGE_CONTAINER_START_GRACE_SECONDS = float(
 COURSEWORK_CASE_TIME_MS = int(os.getenv('COURSEWORK_CASE_TIME_MS', '2000'))
 COURSEWORK_SUBMISSION_TIME_MS = int(os.getenv('COURSEWORK_SUBMISSION_TIME_MS', '30000'))
 
-# 大模型：不再保存项目级端点与密钥。每位用户在“大模型配置”弹窗里
-# 填写自己的服务商、接口地址、模型与 API Key（存 UserLLMConfig），
-# 未配置时只能走规则兜底并在结果中标明来源。
-LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', '60'))
-# 保存大模型配置前先发一次最小请求，确认接口地址与 API Key 可用；
-# 失败时不落库，教师端弹出错误弹窗。离线/自动化测试可用环境变量关闭。
-LLM_VERIFY_ON_SAVE = os.getenv('LLM_VERIFY_ON_SAVE', 'true').lower() == 'true'
-LLM_VERIFY_TIMEOUT = float(os.getenv('LLM_VERIFY_TIMEOUT', '20'))
+# 大模型：默认由算法端（服务端环境）统一提供端点、模型与 Key，密钥只在部署
+# 环境里，不落库、不进页面。三项缺一即视为未配置，所有智能体走规则兜底并在
+# 结果中标明来源；本地开发可用个人配置兜底，生产应配置下面三项。
+LLM_PROVIDER = 'custom' if TESTING else os.getenv('LLM_PROVIDER', 'custom')
+LLM_BASE_URL = '' if TESTING else os.getenv('LLM_BASE_URL', '')
+LLM_MODEL = '' if TESTING else os.getenv('LLM_MODEL', '')
+LLM_API_KEY = '' if TESTING else os.getenv('LLM_API_KEY', '')
+# 是否允许历史个人配置覆盖算法端配置；默认关闭。页面不提供个人配置入口，
+# 该开关只影响后端是否采用数据库中已有的个人配置。
+LLM_ALLOW_USER_OVERRIDE = (
+    False if TESTING else os.getenv('LLM_ALLOW_USER_OVERRIDE', 'false').lower() == 'true'
+)
+LLM_TIMEOUT = float('60' if TESTING else os.getenv('LLM_TIMEOUT', '60'))
+# 保留给历史个人配置写入逻辑的校验开关；页面入口已下线，正常部署无需修改。
+LLM_VERIFY_ON_SAVE = (
+    False if TESTING else os.getenv('LLM_VERIFY_ON_SAVE', 'true').lower() == 'true'
+)
+LLM_VERIFY_TIMEOUT = float('20' if TESTING else os.getenv('LLM_VERIFY_TIMEOUT', '20'))
 # 个性化训练：知识点得分率低于该阈值视为弱项，触发训练题智能体出题。
 PRACTICE_WEAK_THRESHOLD = float(os.getenv('PRACTICE_WEAK_THRESHOLD', '0.6'))
 # 口令恢复副本默认不保存（8.1.4.7 鉴别数据保密性）；确需开启时按字段加密落库。

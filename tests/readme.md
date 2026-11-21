@@ -29,7 +29,7 @@
 
 | 分组 | 模块 | 覆盖内容 |
 | --- | --- | --- |
-| 现行三端回归 | `test_portal`、`test_roster_scope`、`test_review_changes`、`test_package_regressions`、`test_auth_views`、`test_llm_config`、`test_rubric_views`、`test_rubric_agent`、`test_quality_report`、`test_practice_agent` | 页面、权限、上传提交、批阅包更新、名册口径、认证、大模型配置、评分标准、质量报告、弱项练习 |
+| 现行三端回归 | `test_portal`、`test_roster_scope`、`test_review_changes`、`test_package_regressions`、`test_auth_views`、`test_llm_config`、`test_rubric_views`、`test_rubric_agent`、`test_quality_report`、`test_practice_agent` | 页面、权限、上传提交、批阅包更新、名册口径、认证、大模型客户端与入口下线、评分标准、质量报告、弱项练习 |
 | 旧路由回归 | `test_legacy_views`、`test_teaching`、`test_workflows` | 用 `@override_settings(ROOT_URLCONF='config.legacy_urls')` 跑旧门户全流程 |
 | 批阅与沙箱 | `test_judge_unit`、`test_judge_sandbox`、`test_grading_unit`、`test_docker` | 执行器状态机、Docker 命令（mock）；`test_docker` 是唯一需要真实容器的模块 |
 | 解析与命令 | `test_parsers`、`test_imports_and_commands` | 上传材料解析与校验、名单导入、管理命令 |

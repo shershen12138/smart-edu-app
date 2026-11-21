@@ -32,6 +32,10 @@
 
 更新前可在该终端执行 `sudo test -f /opt/coursejudge/.env && echo 原配置存在` 以及 `sudo docker version --format '{{.Server.Os}}'`，应看到配置存在和 `linux`。若缺少原目录或镜像，先核对是不是操作错电脑；不要用账号初始化或空数据库替代原环境。确认 `/opt/coursejudge` 所在磁盘有空间保存本次数据库和全部上传文件的备份。
 
+## 算法端大模型（可选）
+
+大模型默认由算法端统一提供。需要启用时，在 `/opt/coursejudge/.env` 追加 `LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY`（可选 `LLM_PROVIDER`），不要写进仓库或 `compose.yaml`；更新脚本会保留现场 `.env`，改完执行 `sudo docker compose --env-file .env -f compose.yaml up -d --force-recreate web worker beat` 生效。三项缺一时所有智能体走规则兜底，页面会标注来源。页面不提供个人 Key 入口，`LLM_ALLOW_USER_OVERRIDE` 仅影响后端是否采用历史个人配置，默认关闭。
+
 ## 本目录每个文件做什么
 
 | 文件 | 功能 | 实现方式 |

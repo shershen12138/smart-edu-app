@@ -14,6 +14,12 @@ x-app: &app
   STORE_RECOVERY_PASSWORDS: "0"
   FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:-}
   TRUST_PROXY: "false"
+  # 算法端大模型：Key 只写现场 .env，不写进仓库与镜像；三项齐全才启用。
+  LLM_PROVIDER: ${LLM_PROVIDER:-custom}
+  LLM_BASE_URL: ${LLM_BASE_URL:-}
+  LLM_MODEL: ${LLM_MODEL:-}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_ALLOW_USER_OVERRIDE: ${LLM_ALLOW_USER_OVERRIDE:-false}
 x-logging: &logging
   driver: json-file
   options:

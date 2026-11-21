@@ -771,8 +771,8 @@ class CapabilityProfileTests(TestCase):
         # 来源做成标题旁的状态徽标，任务数/更新时间放在底部信息条
         self.assertIn('capability-source', body)
         self.assertIn('capability-foot-stats', body)
-        # 四个账号入口使用同一套样式（个人中心/修改密码/大模型配置/退出登录）
-        self.assertEqual(body.count('class="sidebar-action"'), 4)
+        # 三个账号入口使用同一套样式（个人中心/修改密码/退出登录）
+        self.assertEqual(body.count('class="sidebar-action"'), 3)
         self.assertTrue(StudentCapabilityProfile.objects.filter(student=self.student).exists())
 
     def test_capability_is_its_own_sidebar_module(self):

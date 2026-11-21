@@ -6,7 +6,9 @@
   --line: #e1e7e2;
   --canvas: #f5f7f3;
   --white: #fff;
-  --amber: #a36e12
+  --amber: #a36e12;
+  --danger: #b42318;
+  --danger-light: #fdecea
 }
 
 * {
@@ -432,6 +434,172 @@ button:disabled {
 
 .board-grid .space-top {
   margin-top: 14px
+}
+
+/* 学生看板：24 小时内截止提醒与完成状态滑块 */
+.deadline-alert {
+  margin: 18px 0 24px;
+  padding: 18px 20px;
+  border: 1px solid #f2b8b5;
+  border-left: 5px solid var(--danger);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff7f6 0%, #fff 100%)
+}
+
+.deadline-alert-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px
+}
+
+.deadline-alert-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  font-weight: 700;
+  line-height: 1
+}
+
+.deadline-alert-head h2 {
+  margin: 0;
+  color: var(--danger);
+  font-size: 17px
+}
+
+.deadline-alert-head p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px
+}
+
+.deadline-alert-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--danger-light);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600
+}
+
+.deadline-alert-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px
+}
+
+.deadline-alert-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #f6d3d0;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink)
+}
+
+.deadline-alert-item:hover {
+  border-color: var(--danger);
+  text-decoration: none
+}
+
+.deadline-alert-item-title {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.deadline-alert-item-meta {
+  flex: 0 0 auto;
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 600
+}
+
+.assignment-card.is-urgent {
+  border-color: #e9a29d;
+  background: linear-gradient(180deg, #fff8f7 0%, #fff 70%);
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, .06)
+}
+
+.assignment-card.is-urgent:hover {
+  border-color: var(--danger)
+}
+
+.tag.danger {
+  background: var(--danger-light);
+  color: var(--danger)
+}
+
+.board-heading {
+  align-items: flex-end;
+  flex-wrap: wrap
+}
+
+.view-switch {
+  position: relative;
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #eef2ee;
+  isolation: isolate
+}
+
+.view-switch-thumb {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(23, 46, 43, .12);
+  transition: transform .2s ease
+}
+
+.view-switch.is-completed .view-switch-thumb {
+  transform: translateX(100%)
+}
+
+.view-switch-option {
+  position: relative;
+  z-index: 1;
+  min-width: 96px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  transition: color .2s ease
+}
+
+.view-switch-option:hover {
+  color: var(--ink);
+  text-decoration: none
+}
+
+.view-switch-option.active {
+  color: var(--ink);
+  font-weight: 600
+}
+
+.view-switch-option b {
+  margin-left: 2px;
+  font-size: 11px
 }
 
 .teacher-card-stats {
@@ -3044,5 +3212,32 @@ button[aria-busy="true"] {
 @media (max-width: 720px) {
   .plan-grid {
     grid-template-columns: minmax(0, 1fr)
+  }
+
+  .deadline-alert-list {
+    grid-template-columns: minmax(0, 1fr)
+  }
+
+  .deadline-alert-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px
+  }
+
+  .deadline-alert-head {
+    flex-wrap: wrap
+  }
+
+  .deadline-alert-count {
+    margin-left: 40px
+  }
+
+  .view-switch {
+    width: 100%
+  }
+
+  .view-switch-option {
+    flex: 1;
+    min-width: 0
   }
 }

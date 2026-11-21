@@ -203,6 +203,51 @@ class PortalTests(TestCase):
         self.assertEqual(len(response.context['card_page']), 2)
         self.assertContains(response, '上一页')
 
+    def test_student_dashboard_highlights_deadline_within_one_day(self):
+        self.work.deadline = timezone.now() + timezone.timedelta(days=3)
+        self.work.save(update_fields=['deadline'])
+        urgent = self.create_work(text=b'Urgent exercise')
+        urgent.title = '紧急作业'
+        urgent.deadline = timezone.now() + timezone.timedelta(hours=2)
+        urgent.save(update_fields=['title', 'deadline'])
+        normal = self.create_work(text=b'Normal exercise')
+        normal.title = '普通作业'
+        normal.deadline = timezone.now() + timezone.timedelta(days=3)
+        normal.save(update_fields=['title', 'deadline'])
+
+        response = self.get_as(self.student, f"{reverse('dashboard')}?filter=all")
+        self.assertContains(response, '即将截止')
+        self.assertContains(response, 'class="deadline-alert"', html=False)
+        self.assertContains(response, 'class="card assignment-card is-urgent"', html=False)
+        self.assertContains(response, '紧急作业')
+        self.assertEqual(
+            [card['work'].title for card in response.context['urgent_cards']], ['紧急作业']
+        )
+        self.assertEqual(response.context['urgent_cards'][0]['remaining_label'], '1 小时 59 分')
+
+    def test_student_dashboard_switches_completed_and_uncompleted(self):
+        self.work.title = '未完成作业'
+        self.work.save(update_fields=['title'])
+        done = self.create_work(text=b'Done exercise')
+        done.title = '已完成作业'
+        done.save(update_fields=['title'])
+        self.entry(work=done)
+
+        response = self.get_as(self.student, f"{reverse('dashboard')}?filter=all")
+        self.assertEqual(response.context['selected_view'], 'uncompleted')
+        self.assertEqual(response.context['view_counts'], {'completed': 1, 'uncompleted': 1})
+        self.assertContains(response, '未完成作业')
+        self.assertNotContains(response, '已完成作业')
+        self.assertContains(response, 'view=completed')
+
+        response = self.get_as(
+            self.student, f"{reverse('dashboard')}?filter=all&view=completed"
+        )
+        self.assertEqual(response.context['selected_view'], 'completed')
+        self.assertContains(response, '已完成作业')
+        self.assertNotContains(response, '未完成作业')
+        self.assertNotContains(response, 'class="deadline-alert"', html=False)
+
     def test_teacher_dashboard_filters_cards_and_paginates(self):
         self.work.title = '待批阅作业'
         self.work.save(update_fields=['title'])

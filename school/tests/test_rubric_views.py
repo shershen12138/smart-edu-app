@@ -152,7 +152,7 @@ class RubricViewTests(TestCase):
         response = self.client.post(reverse('work_rubric_regenerate', args=[self.work.pk]))
         self.assertEqual(response.status_code, 302)
         follow = self.client.get(response['Location'])
-        self.assertContains(follow, '大模型配置')
+        self.assertContains(follow, '请联系管理员')
         rubric.refresh_from_db()
         self.assertEqual(rubric.source, 'rule')
 

@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{{ title|default:'工作台' }} · 课码</title>
-    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261121-18">
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261121-19">
     <script src="{% static 'portal.js' %}?v=20261121-3" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
@@ -56,9 +56,6 @@
           <div class="sidebar-actions" role="navigation" aria-label="账号操作">
             <a class="sidebar-action" href="{% url 'profile' %}">个人中心</a>
             <a class="sidebar-action" href="{% url 'password' %}">修改密码</a>
-            <button class="sidebar-action" type="button" data-llm-config-open>
-              模型配置{% if llm_current %}<span class="sidebar-action-tag">已配置</span>{% endif %}
-            </button>
             <form method="post" action="{% url 'logout' %}">
               {% csrf_token %}
               <button class="sidebar-action" type="submit">退出登录</button>
@@ -97,63 +94,6 @@
       </div>
     </div>
     {% if user.is_authenticated %}
-      <dialog class="modal" id="llm-config-dialog" aria-labelledby="llm-config-title"
-              data-reveal-url="{% url 'llm_config_reveal' %}">
-        <form method="post" action="{% url 'llm_config' %}" data-llm-config-form>
-          {% csrf_token %}
-          <input type="hidden" name="next" value="{{ request.get_full_path }}">
-          <h2 id="llm-config-title">模型配置</h2>
-          <p class="subtle">
-            评分标准智能体与训练题智能体使用<strong>你自己的</strong>模型配置，
-            不会调用他人的 Key；这些信息仅保存在你的账号下。
-          </p>
-          <label>服务商
-            <select name="provider" data-llm-provider>
-              {% for key, item in llm_providers.items %}
-                <option value="{{ key }}"{% if llm_current and llm_current.provider == key %} selected{% endif %}>{{ item.label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label>接口地址（OpenAI 兼容）
-            <input name="base_url" data-llm-base value="{{ llm_current.base_url|default:'' }}"
-                   placeholder="https://api.deepseek.com" required>
-          </label>
-          <label>模型名
-            <input name="model" data-llm-model value="{{ llm_current.model|default:'' }}"
-                   placeholder="deepseek-chat" required>
-          </label>
-          <label>API Key
-            <div class="api-key-row">
-              <input type="password" name="api_key" data-llm-key autocomplete="off"
-                     placeholder="{% if llm_current %}已保存 {{ llm_current_masked }}，留空表示不修改{% else %}sk-...{% endif %}">
-              {% if llm_current %}
-                <button class="button secondary small" type="button" data-llm-key-reveal aria-label="显示已保存的 API Key">显示</button>
-                <button class="button secondary small" type="button" data-llm-key-copy aria-label="复制已保存的 API Key">复制</button>
-              {% endif %}
-            </div>
-          </label>
-          <p class="tip">点击输入框、选中或复制 Key 都不会关闭弹窗；按 Enter 也不会误提交，保存请点击“保存配置”按钮。</p>
-          <p class="tip">当前用哪家的模型由你决定：支持任何 OpenAI 兼容端点。Key 只用于你自己的调用，页面只回显打码后的值。</p>
-          <div class="actions space-top">
-            <button class="button" data-llm-submit>保存配置</button>
-            <button class="button secondary" type="button" data-llm-config-close>取消</button>
-          </div>
-        </form>
-        {% if llm_current %}
-          <form method="post" action="{% url 'llm_config_clear' %}" class="space-top">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <button class="text-button" type="submit">删除我的配置</button>
-          </form>
-        {% endif %}
-      </dialog>
-      <dialog class="modal" id="llm-config-error" aria-labelledby="llm-config-error-title">
-        <h2 id="llm-config-error-title">大模型配置未生效</h2>
-        <p class="subtle" data-llm-error-text>接口地址或 API Key 校验未通过。</p>
-        <div class="actions space-top">
-          <button class="button" type="button" data-llm-error-close>返回修改</button>
-        </div>
-      </dialog>
       {% if weak_password_warning %}
         <dialog class="modal" id="weak-password-dialog" aria-labelledby="weak-password-title">
           <div class="weak-password-mark" aria-hidden="true">
@@ -188,170 +128,6 @@
           })();
         </script>
       {% endif %}
-      <script>
-        // 模型配置弹窗逻辑内联在页面里（不依赖静态 JS 的浏览器缓存，避免旧缓存导致点击无反应）
-        (function () {
-          const dialog = document.getElementById('llm-config-dialog');
-          if (!dialog) return;
-          const presets = {
-            deepseek: ['https://api.deepseek.com', 'deepseek-chat'],
-            qwen: ['https://dashscope.aliyuncs.com/compatible-mode/v1', 'qwen-plus'],
-            moonshot: ['https://api.moonshot.cn/v1', 'moonshot-v1-8k'],
-            openai: ['https://api.openai.com/v1', 'gpt-4o-mini'],
-            custom: ['', ''],
-          };
-          const provider = dialog.querySelector('[data-llm-provider]');
-          const baseInput = dialog.querySelector('[data-llm-base]');
-          const modelInput = dialog.querySelector('[data-llm-model]');
-          const keyInput = dialog.querySelector('input[name="api_key"]');
-
-          const openDialog = () => {
-            if (typeof dialog.showModal !== 'function') {
-              // 极旧浏览器不支持 <dialog>：退回为普通设置块显示
-              dialog.setAttribute('open', 'open');
-            } else if (!dialog.open) {
-              dialog.showModal();
-            }
-            keyInput?.focus();
-          };
-
-          provider?.addEventListener('change', () => {
-            const preset = presets[provider.value];
-            if (!preset) return;
-            if (baseInput && preset[0]) baseInput.value = preset[0];
-            if (modelInput && preset[1]) modelInput.value = preset[1];
-          });
-
-          // 关闭只来自三个明确入口：取消按钮、点击遮罩空白、Esc。
-          // 点击输入框等内部控件时 event.target 一定是弹窗内元素，
-          // 不会命中下面的 target === dialog 判断，因此不会误关闭。
-          dialog.querySelector('[data-llm-config-close]')?.addEventListener('click', () => dialog.close());
-          dialog.addEventListener('click', (event) => {
-            if (event.target === dialog) dialog.close();
-          });
-
-          // 输入框内按 Enter 会触发浏览器隐式提交 → 整页 POST 跳转，
-          // 弹窗随之消失。这里统一拦截：保存只通过“保存配置”按钮触发。
-          dialog.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' && event.target.tagName === 'INPUT') event.preventDefault();
-          });
-
-          // 查看 / 复制已保存的 Key：点击、选中、复制都不引起关闭或跳转。
-          // keyInput 复用上方已声明的 api_key 输入框引用。
-          const revealButton = dialog.querySelector('[data-llm-key-reveal]');
-          const copyButton = dialog.querySelector('[data-llm-key-copy]');
-          const csrfToken = dialog.querySelector('[name="csrfmiddlewaretoken"]')?.value || '';
-          const revealUrl = dialog.dataset.revealUrl;
-
-          const fetchSavedKey = async () => {
-            const response = await fetch(revealUrl, {
-              method: 'POST',
-              headers: { 'X-CSRFToken': csrfToken },
-              credentials: 'same-origin',
-            });
-            if (!response.ok) throw new Error('reveal failed');
-            const payload = await response.json();
-            return payload.api_key || '';
-          };
-
-          revealButton?.addEventListener('click', async () => {
-            try {
-              const key = await fetchSavedKey();
-              if (!key) return;
-              if (keyInput.type === 'password') {
-                keyInput.value = key;
-                keyInput.type = 'text';
-                revealButton.textContent = '隐藏';
-                keyInput.select();
-              } else {
-                keyInput.type = 'password';
-                keyInput.value = '';
-                revealButton.textContent = '显示';
-              }
-            } catch { /* 静默失败，不打断操作 */ }
-          });
-
-          copyButton?.addEventListener('click', async () => {
-            const original = copyButton.textContent;
-            try {
-              const key = await fetchSavedKey();
-              if (!key) return;
-              if (navigator.clipboard?.writeText) {
-                await navigator.clipboard.writeText(key);
-              } else {
-                keyInput.value = key;
-                keyInput.type = 'text';
-                keyInput.select();
-                document.execCommand('copy');
-              }
-              copyButton.textContent = '已复制';
-            } catch { /* 剪贴板不可用时静默失败 */ }
-            window.setTimeout(() => { copyButton.textContent = original; }, 1500);
-          });
-
-          document.querySelectorAll('[data-llm-config-open], [data-llm-required]').forEach((button) => {
-            button.addEventListener('click', (event) => {
-              event.preventDefault();
-              openDialog();
-            });
-          });
-
-          // 保存前由服务端发一次最小请求验证接口地址与 Key：失败时弹窗说明原因，配置不落库
-          const form = dialog.querySelector('[data-llm-config-form]');
-          const errorDialog = document.getElementById('llm-config-error');
-          const errorText = errorDialog?.querySelector('[data-llm-error-text]');
-          const submitButton = form?.querySelector('[data-llm-submit]');
-
-          const showError = (message) => {
-            if (!errorDialog) {
-              window.alert(message);
-              return;
-            }
-            if (errorText) errorText.textContent = message;
-            if (typeof errorDialog.showModal === 'function') {
-              if (!errorDialog.open) errorDialog.showModal();
-            } else {
-              errorDialog.setAttribute('open', 'open');
-            }
-          };
-
-          errorDialog
-            ?.querySelector('[data-llm-error-close]')
-            ?.addEventListener('click', () => errorDialog.close());
-
-          form?.addEventListener('submit', async (event) => {
-            // 极旧浏览器没有 fetch/FormData 时交回原生提交（服务端仍会校验）
-            if (!window.fetch || !window.FormData) return;
-            event.preventDefault();
-            const original = submitButton ? submitButton.textContent : '';
-            if (submitButton) {
-              submitButton.disabled = true;
-              submitButton.textContent = '正在校验接口…';
-            }
-            try {
-              const response = await fetch(form.action, {
-                method: 'POST',
-                body: new FormData(form),
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                credentials: 'same-origin',
-              });
-              const data = await response.json().catch(() => ({}));
-              if (response.ok && data.ok) {
-                window.location.assign(data.next || window.location.href);
-                return;
-              }
-              showError(data.error || '保存失败，请稍后重试。');
-            } catch (error) {
-              showError('无法提交大模型配置，请检查网络连接后重试。');
-            } finally {
-              if (submitButton) {
-                submitButton.disabled = false;
-                submitButton.textContent = original;
-              }
-            }
-          });
-        })();
-      </script>
     {% endif %}
   </body>
 </html>

@@ -14,17 +14,11 @@
           <h2>训练题智能体</h2>
           <p class="subtle">{{ llm_status }}</p>
         </div>
-        {% if any_weak and not llm_ready %}
-          <button class="button secondary" type="button" data-llm-config-open>配置我的大模型</button>
-        {% endif %}
       </div>
       {% if any_weak and not llm_ready %}
         <p class="tip">
-          <strong>如何用自己的大模型出题：</strong>点击右侧按钮或左侧“模型配置”，
-          选择服务商（DeepSeek、通义千问、Kimi、OpenAI 或任何 OpenAI 兼容端点）并填写
-          <strong>你自己的 API Key</strong>；保存后回到本页再点一次即可生成。
-          配置只对当前账号生效。不配置也可以直接用各任务下的
-          “根据现有题库为该任务生成训练题”按钮挑选现成题目。
+          <strong>大模型暂不可用：</strong>算法端尚未配置可用的模型端点，当前只能使用题库中的现成题目；
+          如需生成新题，请联系管理员在服务器环境补充 LLM_BASE_URL / LLM_MODEL / LLM_API_KEY。
         </p>
       {% endif %}
       {% if any_weak and not bank_ready %}
@@ -97,8 +91,8 @@
             {% csrf_token %}
             <input type="hidden" name="work" value="{{ section.work.pk }}">
             {% if not llm_ready %}
-              <button class="button" type="button" data-llm-required
-                      title="先配置你自己的大模型：选择服务商并填写 API Key">配置我的大模型后出题</button>
+              <button class="button" type="button" disabled
+                      title="算法端尚未配置可用的大模型端点，请联系管理员">大模型未配置</button>
             {% else %}
               <button class="button"
                       {% if not section.weak %}

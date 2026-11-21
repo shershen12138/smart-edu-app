@@ -1,8 +1,7 @@
-"""用户级大模型配置：保存/清除/隔离，以及调用时只使用本人 Key。"""
+"""大模型客户端：算法端统一配置优先；页面不提供个人配置入口。"""
 
 import io
 import json
-import urllib.error
 from unittest import mock
 
 from django.test import TestCase, override_settings
@@ -21,6 +20,8 @@ from school.portal import llm_client
     CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
 )
 class LLMConfigTests(TestCase):
+    """客户端层：个人配置仍可作为本地开发兜底，但不再通过页面录入。"""
+
     def setUp(self):
         self.teacher = self._user('teacher', 'teacher')
         self.student = self._user('student', 'student')
@@ -35,15 +36,6 @@ class LLMConfigTests(TestCase):
         )
         UserRole.objects.create(user=user, role=role)
         return user
-
-    def _payload(self, api_key='sk-abcdef0123456789'):
-        return {
-            'provider': 'deepseek',
-            'base_url': 'https://api.deepseek.com',
-            'model': 'deepseek-chat',
-            'api_key': api_key,
-            'next': reverse('practice'),
-        }
 
     # ---- 客户端层 ----
 
@@ -98,70 +90,25 @@ class LLMConfigTests(TestCase):
         with self.assertRaises(llm_client.LLMNotConfigured):
             llm_client.chat([{'role': 'user', 'content': 'x'}], self.student)
 
-    # ---- 视图层 ----
+    # ---- 页面入口已删除 ----
 
-    def test_post_saves_and_redirects_back(self):
+    def test_config_urls_are_removed(self):
         self.client.force_login(self.student)
-        response = self.client.post(reverse('llm_config'), self._payload())
-        self.assertRedirects(response, reverse('practice'))
-        config = UserLLMConfig.objects.get(user=self.student)
-        self.assertEqual(config.model, 'deepseek-chat')
-        self.assertEqual(config.api_key, 'sk-abcdef0123456789')
+        for path in ('/llm-config/', '/llm-config/reveal/', '/llm-config/clear/'):
+            self.assertEqual(self.client.get(path).status_code, 404)
 
-    def test_invalid_post_shows_error_and_saves_nothing(self):
+    def test_pages_do_not_render_config_entry(self):
         self.client.force_login(self.student)
-        payload = self._payload()
-        payload['api_key'] = ''
-        response = self.client.post(reverse('llm_config'), payload)
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(UserLLMConfig.objects.filter(user=self.student).exists())
-        follow = self.client.get(reverse('practice'))
-        self.assertContains(follow, 'API Key')
+        for name in ('dashboard', 'practice'):
+            body = self.client.get(reverse(name)).content.decode('utf-8')
+            self.assertNotIn('data-llm-config-open', body)
+            self.assertNotIn('llm-config-dialog', body)
+            self.assertNotIn('模型配置', body)
 
-    def test_page_never_echoes_full_key(self):
-        llm_client.save_config(
-            self.student, 'deepseek', 'https://api.deepseek.com', 'deepseek-chat', 'sk-abcdef0123456789'
-        )
-        self.client.force_login(self.student)
-        response = self.client.get(reverse('practice'))
-        body = response.content.decode('utf-8')
-        self.assertIn('sk-a***6789', body)
-        self.assertNotIn('sk-abcdef0123456789', body)
-
-    def test_clear_removes_config(self):
-        llm_client.save_config(
-            self.student, 'deepseek', 'https://api.deepseek.com', 'deepseek-chat', 'sk-123'
-        )
-        self.client.force_login(self.student)
-        response = self.client.post(
-            reverse('llm_config_clear'), {'next': reverse('practice')}
-        )
-        self.assertRedirects(response, reverse('practice'))
-        self.assertFalse(UserLLMConfig.objects.filter(user=self.student).exists())
-
-    def test_post_rejects_external_next(self):
-        self.client.force_login(self.student)
-        payload = self._payload()
-        payload['next'] = 'https://evil.example.com/phish'
-        response = self.client.post(reverse('llm_config'), payload)
-        self.assertRedirects(response, reverse('dashboard'))
-
-    def test_requires_login(self):
-        response = self.client.post(reverse('llm_config'), self._payload())
-        self.assertEqual(response.status_code, 302)
-        self.assertIn(reverse('login'), response['Location'])
-
-    # ---- 页面结构：弹窗与入口必须内联在 HTML 里（不依赖静态 JS 缓存） ----
-
-    def test_sidebar_entry_and_inline_dialog(self):
-        self.client.force_login(self.student)
-        body = self.client.get(reverse('dashboard')).content.decode('utf-8')
-        self.assertIn('data-llm-config-open', body)
-        self.assertIn('id="llm-config-dialog"', body)
-        self.assertIn('showModal', body)
-        self.assertIn(reverse('llm_config'), body)
-        self.assertIn('id="llm-config-error"', body)
-        self.assertIn('data-llm-error-text', body)
+    def test_status_message_points_to_admin(self):
+        status = llm_client.status_text(self.student)
+        self.assertIn('请联系管理员', status)
+        self.assertNotIn('模型配置', status)
 
 
 @override_settings(
@@ -169,93 +116,77 @@ class LLMConfigTests(TestCase):
     ROOT_URLCONF='config.urls',
     REDIS_URL='',
     LLM_TIMEOUT=5,
-    LLM_VERIFY_ON_SAVE=True,
-    LLM_VERIFY_TIMEOUT=5,
+    LLM_VERIFY_ON_SAVE=False,
+    LLM_ALLOW_USER_OVERRIDE=False,
+    LLM_BASE_URL='https://server.example.com/v1',
+    LLM_MODEL='server-model',
+    LLM_API_KEY='sk-server-key',
     CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
 )
-class LLMConfigVerificationTests(TestCase):
-    """保存前先用一次最小请求确认真实可用；失败不落库并回传弹窗文案。"""
+class ServerConfigTests(TestCase):
+    """算法端统一配置：优先级高于个人配置。"""
 
     def setUp(self):
-        self.teacher = User.objects.create_user(
-            username='teacher',
-            full_name='teacher',
-            student_no='T-001',
+        self.student = User.objects.create_user(
+            username='student',
+            full_name='student',
+            student_no='S-001',
             password='Password-2026!',
             must_change_password=False,
         )
-        UserRole.objects.create(user=self.teacher, role='teacher')
-        self.client.force_login(self.teacher)
-
-    def _payload(self, **overrides):
-        payload = {
-            'provider': 'deepseek',
-            'base_url': 'https://api.deepseek.com',
-            'model': 'deepseek-chat',
-            'api_key': 'sk-abcdef0123456789',
-            'next': reverse('works'),
-        }
-        payload.update(overrides)
-        return payload
+        UserRole.objects.create(user=self.student, role='student')
 
     def _ok_response(self):
-        return io.BytesIO(json.dumps({'choices': [{'message': {'content': 'p'}}]}).encode())
+        return io.BytesIO(json.dumps({'choices': [{'message': {'content': 'hi'}}]}).encode())
 
-    def test_verified_config_is_saved(self):
+    def _personal_config(self):
+        return UserLLMConfig.objects.create(
+            user=self.student,
+            provider='custom',
+            base_url='https://personal.example.com/v1',
+            model='personal-model',
+            api_key='sk-personal',
+        )
+
+    def test_server_config_wins_over_personal(self):
+        self._personal_config()
         with mock.patch('urllib.request.urlopen', return_value=self._ok_response()) as urlopen:
-            response = self.client.post(reverse('llm_config'), self._payload())
-        self.assertRedirects(response, reverse('works'))
-        self.assertEqual(UserLLMConfig.objects.get(user=self.teacher).model, 'deepseek-chat')
+            self.assertEqual(
+                llm_client.chat([{'role': 'user', 'content': 'x'}], self.student), 'hi'
+            )
         request = urlopen.call_args.args[0]
-        self.assertTrue(request.full_url.endswith('/chat/completions'))
+        self.assertEqual(request.full_url, 'https://server.example.com/v1/chat/completions')
+        self.assertIn('sk-server-key', request.headers['Authorization'])
+        self.assertIn(b'server-model', request.data)
 
-    def test_invalid_key_returns_popup_error_and_saves_nothing(self):
-        error = urllib.error.HTTPError(
-            'https://api.deepseek.com/chat/completions',
-            401,
-            'Unauthorized',
-            {},
-            io.BytesIO(b'{"error":"invalid api key"}'),
-        )
-        with mock.patch('urllib.request.urlopen', side_effect=error):
-            response = self.client.post(
-                reverse('llm_config'),
-                self._payload(),
-                HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+    def test_configured_without_personal_config(self):
+        self.assertFalse(UserLLMConfig.objects.exists())
+        self.assertTrue(llm_client.configured(self.student))
+
+    def test_personal_config_cannot_be_saved(self):
+        with self.assertRaisesMessage(llm_client.LLMConfigError, '算法端'):
+            llm_client.save_config(
+                self.student, 'deepseek', 'https://api.deepseek.com', 'deepseek-chat', 'sk-x'
             )
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertFalse(payload['ok'])
-        self.assertIn('API Key', payload['error'])
-        self.assertFalse(UserLLMConfig.objects.filter(user=self.teacher).exists())
+        self.assertFalse(UserLLMConfig.objects.exists())
 
-    def test_wrong_endpoint_points_at_address(self):
-        error = urllib.error.HTTPError(
-            'https://api.deepseek.com/chat/completions',
-            404,
-            'Not Found',
-            {},
-            io.BytesIO(b'not found'),
-        )
-        with mock.patch('urllib.request.urlopen', side_effect=error):
-            response = self.client.post(
-                reverse('llm_config'),
-                self._payload(),
-                HTTP_X_REQUESTED_WITH='XMLHttpRequest',
-            )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('接口地址', response.json()['error'])
-        self.assertFalse(UserLLMConfig.objects.filter(user=self.teacher).exists())
+    def test_status_reports_algorithm_side_without_key(self):
+        status = llm_client.status_text(self.student)
+        self.assertIn('算法端统一配置', status)
+        self.assertIn('server-model', status)
+        self.assertNotIn('sk-server-key', status)
 
-    def test_non_ajax_failure_redirects_without_saving(self):
-        error = urllib.error.HTTPError(
-            'https://api.deepseek.com/chat/completions',
-            401,
-            'Unauthorized',
-            {},
-            io.BytesIO(b'{}'),
+    @override_settings(LLM_ALLOW_USER_OVERRIDE=True)
+    def test_override_switch_uses_personal_config(self):
+        llm_client.save_config(
+            self.student,
+            'custom',
+            'https://personal.example.com/v1',
+            'personal-model',
+            'sk-personal',
         )
-        with mock.patch('urllib.request.urlopen', side_effect=error):
-            response = self.client.post(reverse('llm_config'), self._payload())
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(UserLLMConfig.objects.filter(user=self.teacher).exists())
+        with mock.patch('urllib.request.urlopen', return_value=self._ok_response()) as urlopen:
+            llm_client.chat([{'role': 'user', 'content': 'x'}], self.student)
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, 'https://personal.example.com/v1/chat/completions')
+        self.assertIn('sk-personal', request.headers['Authorization'])

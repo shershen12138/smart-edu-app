@@ -787,10 +787,11 @@ class PracticeViewTests(TestCase):
         response = self.client.get(reverse('practice'))
         self.assertEqual(response.status_code, 200)
         body = response.content.decode('utf-8')
-        # 未配置个人大模型：页面提示填写自己的 Key，并给出配置入口
-        self.assertIn('你自己的 API Key', body)
-        self.assertIn('配置我的大模型', body)
-        self.assertIn(reverse('llm_config'), body)
+        # 未配置大模型：页面只提示联系管理员，不再提供个人配置入口
+        self.assertIn('请联系管理员', body)
+        self.assertNotIn('你自己的 API Key', body)
+        self.assertNotIn('配置我的大模型', body)
+        self.assertNotIn('/llm-config/', body)
         # 分层题库文档已覆盖该弱项，题库提示不应出现
         self.assertNotIn('“根据现有题库生成训练题”为什么会失败', body)
 

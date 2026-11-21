@@ -14,7 +14,7 @@
 ## 2. 结论摘要
 
 - 系统是 **Python 3.12 + Django 5.2 单体 Web 应用 + Celery 异步判题 + Docker 沙箱** 的组合，前端为服务端渲染，**不是 SPA，也没有独立 REST API 层**。
-- AI 能力已在 Web 链路内，分两类：**生成类**（评分标准、弱项训练题，`school/portal/rubric_agent.py`、`practice_agent.py`，教师操作时触发，失败降级为规则）与**评测类**（代码质量报告，`tools/code_quality_agent/`，提交后由后台线程生成）。模型走 OpenAI 兼容协议、**按用户配置**（`school/portal/llm_client.py` + `UserLLMConfig`），不绑定单一供应商；两类链路都**不做工具调用与自主规划**。
+- AI 能力已在 Web 链路内，分两类：**生成类**（评分标准、弱项训练题，`school/portal/rubric_agent.py`、`practice_agent.py`，教师操作时触发，失败降级为规则）与**评测类**（代码质量报告，`tools/code_quality_agent/`，提交后由后台线程生成）。模型走 OpenAI 兼容协议、**由算法端统一配置**（`LLM_*` 环境变量，`school/portal/llm_client.py` 解析），学生、教师和管理员页面均不提供模型配置入口；两类链路都**不做工具调用与自主规划**。
 - 这套选型是**交付约束驱动**的结果：学校目标是 Ubuntu 校园服务器离线部署、前端零 Node 构建、任教教师直接使用。因此"简单、可离线、可排障"优先级高于"技术先进"。
 - 主要技术债集中在：明文密码副本、缺失限流与可观测性、`docker.sock` 挂载到 worker。这些是下周自学计划的重点输入。
 
@@ -29,7 +29,7 @@
 | 异步任务层 | 判题排队、结果回写、定时派发 | Celery 5.6 + Redis Broker，`beat` 每 15s 执行 `dispatch_pending`；`acks_late` + `prefetch=1` 保证不丢任务 | `config/settings.py:111-119`、`school/tasks.py` |
 | 判题沙箱层 | 隔离执行不可信学生代码 | 每份提交启动一次性 `python:3.12-slim` 容器，只读挂载、`--network none`、降权 `--user 65534`、多层资源 ulimit | `school/judge.py:59-101` |
 | 数据层 | 业务持久化、缓存、私有文件 | MySQL 8.4（PyMySQL，环境未配置时回退 SQLite）、Redis 7（缓存 + Broker）、本地 `PRIVATE_STORAGE` | `config/settings.py:60-71,120-123`、`compose.yaml` |
-| AI/模型层 | 生成评分标准/训练题、生成代码质量报告 | 生成类：OpenAI 兼容端点（用户自填 base URL/模型/Key）+ 标准库 `urllib` 单次调用 + 解析失败降级规则；评测类：LangGraph 状态图 + pylint + AST，**不调用大模型** | `school/portal/llm_client.py`、`rubric_agent.py`、`practice_agent.py`、`tools/code_quality_agent/agent_graph.py` |
+| AI/模型层 | 生成评分标准/训练题、生成代码质量报告 | 生成类：OpenAI 兼容端点（算法端 `LLM_*` 环境变量，个人覆盖可选）+ 标准库 `urllib` 单次调用 + 解析失败降级规则；评测类：LangGraph 状态图 + pylint + AST，**不调用大模型** | `school/portal/llm_client.py`、`rubric_agent.py`、`practice_agent.py`、`tools/code_quality_agent/agent_graph.py` |
 | 基础设施层 | 容器化与校园离线部署 | Docker / docker-compose（db/redis/web/worker/beat 五服务）、`deploy/linux/` 更新与备份脚本、ruff + Django 测试 | `compose.yaml`、`deploy/linux/README.md` |
 
 ---
@@ -112,21 +112,21 @@
 
 ### 4.6 OpenAI 兼容 HTTP 客户端 + Schema 校验自修复（AI 层）
 
-> **现状标注（2026-11）**：本节写于 2026-09，其中"写死 DeepSeek""只在 `.env` 配 Key"已被后续实现取代——现在由每位用户在网页「大模型配置」里填自己的服务商/模型/Key，存 `UserLLMConfig` 表；智能体代码也从 `tools/rubric_agent/` 迁到 `school/portal/rubric_agent.py`、`school/portal/practice_agent.py`，HTTP 通道统一为 `school/portal/llm_client.py`。下面保留原始选型理由，涉及路径与供应商的描述以下面更正后的为准。
+> **现状标注（2026-11）**：本节写于 2026-09，其中"写死 DeepSeek"已被后续实现取代。当前口径是**算法端统一配置**：端点/模型/Key 走部署环境的 `LLM_*` 变量，学生、教师和管理员页面均无个人配置入口；`LLM_ALLOW_USER_OVERRIDE=true` 仅影响后端是否采用数据库中已有的个人配置（`UserLLMConfig`）。智能体代码从 `tools/rubric_agent/` 迁到 `school/portal/rubric_agent.py`、`school/portal/practice_agent.py`，HTTP 通道统一为 `school/portal/llm_client.py`。下面保留原始选型理由，涉及路径与供应商的描述以下面更正后的为准。
 
 **选择理由**
 
 - **评分标准与训练题生成不用 LangChain / LangGraph / LlamaIndex**：这两条链路是**固定四步**（加载素材 → 构造提示词 → 调用模型 → 校验落盘，现实现见 `school/portal/rubric_agent.py` 的 `generate_for` 与 `school/portal/practice_agent.py` 的 `generate_practice_plan`），没有动态路由、没有多轮工具调用、没有检索需求。给一条串行链路套编排框架只会增加抽象层与依赖体积，收益为负。
-- **不用 OpenAI SDK**：仅一个 POST 调用，标准库 `urllib` 足够，离线安装更简单；对 API Key 的处理也可以完全自控（Key 存 `UserLLMConfig`，页面只回显打码值，见 `school/portal/llm_client.py` 的 `mask_key`）。
+- **不用 OpenAI SDK**：仅一个 POST 调用，标准库 `urllib` 足够，离线安装更简单；对 API Key 的处理也可以完全自控（默认只存在于部署环境的 `LLM_API_KEY`，不进数据库、不进页面；页面已无个人配置入口，历史个人 Key 也不会回显）。
 - **核心设计是"标签闭环"**：模型输出的知识点统一经 `tools/taglib/loader.py` 的 `normalize_tag()` 归一（先精确后包含匹配），与下游静态评测的 `curriculum.POINT_LABELS` 用同一套词表；**归不到叶子 tag 时保留原始名称并记一条 warning**，不伪造、不丢弃。解析失败时不写半成品：自动生成失败保留旧评分标准（`rubric_agent._regenerate_coursework_job` 捕获异常并记录），由教师手动重试。
 - **隐私边界**：生成评分标准只上传题目材料与参考答案，不上传学生源码全文；未配置大模型或调用失败时全部降级为规则兜底，并在结果里标注来源。
 
 **代价**
 
-- ~~模型层无抽象接口（写死 DeepSeek），切换供应商需改 `deepseek.py`~~ **已解决**：改为 OpenAI 兼容协议 + 用户级配置（`school/portal/llm_client.py`），换供应商只需改用户填写的 base URL 与模型名。
+- ~~模型层无抽象接口（写死 DeepSeek），切换供应商需改 `deepseek.py`~~ **已解决**：改为 OpenAI 兼容协议 + 算法端统一配置（`school/portal/llm_client.py`），换供应商只需改部署环境的 `LLM_BASE_URL` 与 `LLM_MODEL`。
 - 无 token 预算与成本观测，批量生成长章节时费用不可预估。
 - 无评测集，Prompt 改动后缺乏回归依据。
-- 密钥从"一个 `.env`"变成"每人一份"，带来新的风险面：用户填错/泄露 Key 无法集中回收，只能逐个清除；`UserLLMConfig` 也成了需要一起备份的敏感数据。
+- ~~密钥从"一个 `.env`"变成"每人一份"，带来新的风险面~~ **已收敛**：只保留部署环境里的一份 Key，可集中轮换与回收；个人配置入口已下线，历史 `UserLLMConfig` 数据仍需按敏感数据备份。
 
 ### 4.6.1 评测编排引入 LangGraph（与上节不矛盾）
 
@@ -166,7 +166,7 @@ START → resolve_specs → prepare ─┬─(整文件可解析)→ lint ─┐
 | LangChain（Chain / Agent / Retriever / Memory） | 不引入 | 需要工具调用与多轮推理；本项目不执行学生代码、不给模型工具，引入只会多一层抽象 |
 | **LangGraph** | **已引入（仅评测编排）** | `tools/code_quality_agent/agent_graph.py`：6 节点 + 1 条件边，用于"整文件不可解析时跳过 pylint"的分支与节点级单测；图内不调用大模型。详见 4.6.1 |
 | 向量库（pgvector / Milvus / Chroma） | 暂不引入 | 无检索语义需求；评分标准的"知识约束"已由标签白名单 + Schema 校验解决 |
-| LiteLLM / one-api 多模型代理 | 暂不引入 | 已支持用户自填任意 OpenAI 兼容端点（`UserLLMConfig`），代理层仍属过早抽象 |
+| LiteLLM / one-api 多模型代理 | 暂不引入 | 已支持任意 OpenAI 兼容端点（算法端 `LLM_*` 配置），代理层仍属过早抽象 |
 | Kubernetes / Prometheus / Vault | 暂不引入 | 单机交付场景下运维成本 > 收益；但**日志/指标缺失已被记为技术债** |
 
 **总原则**：本系统主体是 Web 应用，AI 能力分两类——**生成类**（评分标准、训练题）走"单次调用 + 规则兜底"，**评测类**走"LangGraph 编排 + AST/pylint"。两类都**不做工具调用、不做自主规划**，因此不引入 Agent 执行器、记忆与 RAG。当且仅当出现以下信号时才继续演进——多模型/多供应商、实时判题反馈需要长连接、AI 能力进入在线请求链路、worker 需横向扩展。

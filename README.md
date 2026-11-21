@@ -27,9 +27,9 @@
 - 删除账号、班级、作业时实际清理相应数据库关系与专用文件；教学班归档保留数据，所有角色的日常页面与旧链接隐藏该班内容，管理员在归档页取消勾选后恢复。
 - 名单导入后显示处理结果；同一班级的名单、人数和报表统一统计口径，支持页码跳转与每页条数。管理员总名单统计全部日常可见学生账号（含未分班），并显示所属教学班；选定具体班级后才是该班人数。管理员名单页不显示“本班作业”。
 - 教师可查看机器批阅的期望结果及实际返回值；学生端仍不显示答案。两种批阅方式都支持按班打包下载每名学生最后一次提交；人工答案 ZIP 会直接展开到“学号_姓名_提交次数”目录。保留教师均分、最高/最低分及分布图。
-- 评分标准由题目分析智能体生成，知识点统一为《Python教学Tag库》标准名（`tools/taglib/`，词表见 `data/Python教学Tag库_v1.0.md`）；学生每次提交生成代码质量评测报告：六轴“考察重点”雷达图 + 逐题明细（机器可判定的知识点 ✓/✗、缺陷所在行与修改建议）。用户未配置个人大模型时只用规则兜底，结果标注来源。
+- 评分标准由题目分析智能体生成，知识点统一为《Python教学Tag库》标准名（`tools/taglib/`，词表见 `data/Python教学Tag库_v1.0.md`）；学生每次提交生成代码质量评测报告：六轴“考察重点”雷达图 + 逐题明细（机器可判定的知识点 ✓/✗、缺陷所在行与修改建议）。算法端未配置大模型时只用规则兜底，结果标注来源。
 - 学生端“弱项练习”按任务区分：取每个任务**第一次提交**评测报告逐题明细里的缺陷，归到 Tag 库对应知识点作为该任务弱项，再据此从题库或大模型生成该任务的训练题；训练题不计入正式成绩。
-- 大模型为**用户自备**：只有“教师生成评分标准”和“学生生成弱项训练题”两处调用大模型；两者都在点击按钮时弹出配置窗口，可自选服务商（DeepSeek、通义千问、Kimi、OpenAI 或任意 OpenAI 兼容端点）并填写自己的 API Key，配置只对本人生效，页面只回显打码 Key。
+- 大模型**由算法端统一配置**：端点、模型名与 Key 写在服务器环境的 `LLM_*` 变量里。学生端、教师端和管理员端都不再提供“模型配置”入口，用户不需要也不应该自己填 Key。
 
 ## 本地运行
 
@@ -44,9 +44,9 @@ py -3.12 -m venv .venv                       # 或 python -m venv .venv
 Copy-Item .env.example .env
 ```
 
-依赖全部收在 `requirements/` 目录：`base.in` 是宽松版本区间，`base.txt` 是精确锁定（含传递依赖，Docker 镜像与部署用它），`dev.txt` 在 `base.txt` 之上追加开发工具（含 pylint 与 matplotlib，缺失时缺陷检测与雷达图会降级）。日常安装用 `dev.txt` 即可，它已包含 `base.txt`。`.env` 中按需填写 `REDIS_URL`（留空则用本地文件缓存）、`PRIVATE_STORAGE`（留空默认 `.runtime/private`）、`LLM_TIMEOUT`。`.env` 不进 Git。
+依赖全部收在 `requirements/` 目录：`base.in` 是宽松版本区间，`base.txt` 是精确锁定（含传递依赖，Docker 镜像与部署用它），`dev.txt` 在 `base.txt` 之上追加开发工具（含 pylint 与 matplotlib，缺失时缺陷检测与雷达图会降级）。日常安装用 `dev.txt` 即可，它已包含 `base.txt`。`.env` 中按需填写 `REDIS_URL`（留空则用本地文件缓存）、`PRIVATE_STORAGE`（留空默认 `.runtime/private`），以及算法端模型 `LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY`（可选 `LLM_PROVIDER`、`LLM_TIMEOUT`）。`.env` 不进 Git。
 
-**大模型不再写在 `.env` 里**：每位用户登录后点击侧边栏“配置大模型”，选择服务商（DeepSeek、通义千问、Kimi、OpenAI 或任何 OpenAI 兼容端点）并填写自己的 API Key。配置保存在数据库中（`UserLLMConfig`），只对本人生效；评分标准智能体使用教师自己的配置，训练题智能体使用学生自己的配置，未配置时只能走规则兜底。页面只回显打码后的 Key。
+**大模型配置在算法端**：在 `.env` 填 `LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY`（可选 `LLM_PROVIDER`），重启后评分标准智能体、训练题智能体与能力归因统一使用这份配置；Key 不进数据库、不进页面，缺失时全部走规则兜底并在结果里标注来源。页面已移除个人模型配置入口；旧的 `UserLLMConfig` 表仅在算法端未配置时作为本地开发兜底。
 
 ### 2. 初始化数据库
 
@@ -174,7 +174,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 | 位置 | 功能 | 实现方式 |
 | --- | --- | --- |
 | `config/urls.py` | 全站唯一对外入口 | 先挂 `login/`、`logout/`、`password/`、`health/` 四个认证视图，再 `include` 四个 portal 路由模块 |
-| `school/portal/urls_common.py` | 仪表盘、个人设置、大模型配置 | 四个路由模块都用 `path('', include(...))` 平铺到根路径，**没有 namespace**，URL name 全局唯一 |
+| `school/portal/urls_common.py` | 仪表盘、个人设置 | 四个路由模块都用 `path('', include(...))` 平铺到根路径，**没有 namespace**，URL name 全局唯一 |
 | `school/portal/urls_administration.py` | 管理员页面 | `teachers/` 与 `students/` 复用同一个 `people` 视图，靠传 `{'kind': ...}` 区分；`work_export` 是 `work_results` 带 `{'export': True}` 的别名路由 |
 | `school/portal/urls_teaching.py` | 教师端作业、结果、导出 | 作业 CRUD、`work/<pk>/package-file/`、`submissions.zip`、`results/` |
 | `school/portal/urls_learning.py` | 学生端提交、结果与知识图谱 | `knowledge/`（知识图谱）、`practice/`（弱项练习）、`work/<pk>/`、`entries/<pk>/`、质量报告与雷达图 |
@@ -197,7 +197,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 | `school/portal/access.py` | 当前权限判定 | `role()` 按 `admin > teacher > student` 取首个命中；`require_role()` 不符即抛 `PermissionDenied`；`classes_for(user, action)` 按 `ClassStaff` 授权位与 `expires_at` 过滤，学生传 `action` 时返回空 |
 | `school/portal/common_views.py` | `work_for(user, pk, action)` 作业级鉴权单点 | 统一过滤软删与归档；学生要求作业 `status == 'open'` 且在班；教师只看 `can_<action>` 授权位 |
 | `school/middleware.py` | `AccountMiddleware` | 从 session 恢复 `active_role` 并确认仍在 `UserRole` 中；停用账号强制登出；`must_change_password` 时除改密、登出、静态文件外一律重定向 |
-| `school/context.py` | 模板上下文处理器 `common` | 注入角色、打码后的大模型配置、未读通知数；按 `request.urlconf` 在 `school/base.html` 与 `portal/base.html` 之间切换 |
+| `school/context.py` | 模板上下文处理器 `common` | 注入角色与未读通知数；按 `request.urlconf` 在 `school/base.html` 与 `portal/base.html` 之间切换 |
 | `school/permissions.py` | 旧门户的权限函数 | 纯函数 + ORM `Q` 查询，供 `school/views.py` 使用；新代码改用 `portal/access.py` |
 
 ### 批阅执行
@@ -222,7 +222,6 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 | `school/portal/rubric_views.py` | 评分标准页 | 只读展示与 `.md` 下载；历史作业用规则兜底补一份，不调用大模型 |
 | `school/portal/practice_views.py` | 弱项练习 | 首页、答题、提交、结果；提交后**同步**调用 `practice_agent.grade_attempt()` 走 Docker 判题 |
 | `school/portal/knowledge_views.py` | Python 知识图谱（仅学生） | `require_role(user, 'student')`；`knowledge_graph.build_graph()` 读 `data/python_graph.json` 并计算放射布局坐标，模板用 ECharts 渲染，支持放射/力导向双布局 |
-| `school/portal/llm_views.py` | 个人大模型配置 | 保存/清除只作用于当前用户；跳转用 `url_has_allowed_host_and_scheme` 防开放重定向 |
 
 ### 业务服务层
 
@@ -244,7 +243,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 
 | 模块 | 功能 | 实现方式 |
 | --- | --- | --- |
-| `school/portal/llm_client.py` | 用户自备大模型 | 读取当前用户的 `UserLLMConfig`，按 OpenAI 兼容协议 `chat()`；`mask_key()` 只回显打码 Key；未配置抛 `LLMNotConfigured` |
+| `school/portal/llm_client.py` | 大模型客户端（算法端优先） | `resolve_config()` 先取环境变量里的 `LLM_*`，允许覆盖时再用个人配置，算法端未配置则回退 `UserLLMConfig`；按 OpenAI 兼容协议 `chat()`；未配置抛 `LLMNotConfigured` |
 | `school/portal/rubric_agent.py` | 题目分析智能体（评分标准） | `build_messages → chat → parse/normalize → render_markdown`；无 Key 时 `rule_based()` 用 `ast` 解析参考代码兜底；`prepare_for_upload` / `schedule_regeneration` 在后台线程重建 |
 | `school/portal/quality_service.py` | 代码质量报告与缓存 | `supported(entry)` 只认机器批阅单文件；`generate()` 用“源码 sha256 + 量表/知识点/能力签名”判断能否复用旧报告；`schedule_generate` 在 `on_commit` 后起守护线程 |
 | `school/portal/knowledge_profile.py` | 知识点画像 | 按任务聚合逐题缺陷 → 弱项 / 已掌握 |
@@ -283,7 +282,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 
 | 分组 | 模块 | 覆盖内容 |
 | --- | --- | --- |
-| 现行三端回归 | `test_portal`、`test_roster_scope`、`test_review_changes`、`test_package_regressions`、`test_auth_views`、`test_llm_config`、`test_rubric_views`、`test_rubric_agent`、`test_quality_report`、`test_practice_agent` | 页面、权限、上传提交、包更新、名册口径、认证、大模型配置、评分标准、质量报告、弱项练习 |
+| 现行三端回归 | `test_portal`、`test_roster_scope`、`test_review_changes`、`test_package_regressions`、`test_auth_views`、`test_llm_config`、`test_rubric_views`、`test_rubric_agent`、`test_quality_report`、`test_practice_agent` | 页面、权限、上传提交、包更新、名册口径、认证、大模型客户端与入口下线、评分标准、质量报告、弱项练习 |
 | 旧路由回归 | `test_legacy_views`、`test_teaching`、`test_workflows` | 用 `override_settings(ROOT_URLCONF='config.legacy_urls')` 跑旧门户全流程 |
 | 批阅与沙箱 | `test_judge_unit`、`test_judge_sandbox`、`test_grading_unit`、`test_docker` | 执行器状态机与 Docker 命令（mock）；`test_docker` 是唯一需要 `RUN_DOCKER_TESTS=1` 的真实容器验收 |
 | 解析与命令 | `test_parsers`、`test_imports_and_commands` | 上传材料解析/校验、名单导入、管理命令 |

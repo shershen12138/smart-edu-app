@@ -395,10 +395,7 @@ def generate_practice_plan(
 
     if offline or not llm_configured(student):
         if not offline:
-            raise LLMNotConfigured(
-                '当前账号还没有配置大模型。请点击“模型配置”，选择服务商并填写你自己的 API Key，'
-                '或改用现有题库生成。'
-            )
+            raise LLMNotConfigured(llm_client.unconfigured_message())
         questions = rule_based(weak)
         source, model = 'rule', ''
     else:
@@ -408,7 +405,7 @@ def generate_practice_plan(
             temperature=0.3,
         )
         questions = parse_practice(text, [item['name'] for item in weak])
-        source, model = 'llm', llm_client.get_config(student).model
+        source, model = 'llm', llm_client.active_model(student)
 
     if not questions:
         if source == 'rule':
@@ -535,7 +532,7 @@ def latest_plan(student: User, work=None) -> PracticePlan | None:
 
 
 def llm_configured(student) -> bool:
-    """该学生是否已配置自己的大模型端点。"""
+    """当前是否可用大模型：算法端已配置，或部署允许覆盖且本人已填写。"""
     return llm_client.configured(student)
 
 

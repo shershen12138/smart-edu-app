@@ -1,7 +1,7 @@
 """题目分析智能体：把教师上传的题目交给大模型，产出可执行的评分标准。
 
 设计边界：
-- 只使用**当前教师自己配置**的 OpenAI 兼容端点（见 llm_client / 大模型配置弹窗）；
+- 只使用算法端统一配置的 OpenAI 兼容端点（见 llm_client）；
   未配置时抛 LLMNotConfigured，需要演示或离线运行时必须显式 `offline=True`，
   结果标记为“规则兜底”；
 - 模型输出必须落到固定维度池，避免每次生成不同维度导致雷达图无法比较；
@@ -197,12 +197,12 @@ def default_dimensions() -> list[agent_models.Dimension]:
 
 
 def llm_configured(user=None) -> bool:
-    """当前操作用户是否已配置自己的大模型端点。"""
+    """当前是否可用大模型：算法端已配置，或部署允许个人覆盖且本人已填写。"""
     return llm_client.configured(user)
 
 
 def llm_status(user=None) -> str:
-    """页面展示用的个人配置状态说明（Key 打码）。"""
+    """页面展示用的配置来源说明（算法端统一配置或个人覆盖，Key 打码）。"""
     return llm_client.status_text(user)
 
 
@@ -956,7 +956,7 @@ def generate_abilities(coursework, offline: bool = False, user=None) -> list[dic
 
 
 def generate_for(coursework, offline: bool = False, force: bool = True, user=None):
-    """生成/重建评分标准；user 为空时使用作业创建者的个人大模型配置。"""
+    """生成/重建评分标准；默认使用算法端统一配置，允许覆盖时优先个人配置。"""
     existing = CourseworkRubric.objects.filter(coursework=coursework).first()
     if existing and not force:
         return existing
@@ -966,13 +966,10 @@ def generate_for(coursework, offline: bool = False, force: bool = True, user=Non
         raise RubricParseError('该作业还没有题目清单，无法分析知识点。')
 
     actor = user or coursework.owner
-    config = llm_client.get_config(actor)
-    if offline or not llm_configured(actor):
+    config = llm_client.resolve_config(actor)
+    if offline or config is None:
         if not offline:
-            raise LLMNotConfigured(
-                '当前账号还没有配置大模型。请点击“模型配置”，选择服务商并填写你自己的 API Key，'
-                '或改用规则兜底生成。'
-            )
+            raise LLMNotConfigured(llm_client.unconfigured_message())
         result = rule_based(context, reference_code=_reference_code(coursework))
         source, model = 'rule', ''
     else:
