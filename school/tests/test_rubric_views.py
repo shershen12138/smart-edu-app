@@ -105,20 +105,81 @@ class RubricViewTests(TestCase):
         self.assertContains(response, '大模型生成')
         self.assertEqual(CourseworkRubric.objects.count(), 1)
 
-    def test_page_has_no_generate_buttons(self):
-        """生成方式由上传时的勾选决定，页面不再提供生成按钮。"""
+    def test_page_has_no_mode_selection_buttons(self):
+        """生成方式由上传时的勾选决定，页面上没有“选规则/选大模型”的按钮。"""
         CourseworkRubric.objects.create(coursework=self.work, markdown='# 标准')
         self.client.force_login(self.teacher)
         body = self.client.get(reverse('work_rubric', args=[self.work.pk])).content.decode('utf-8')
-        # 没有提交生成方式的表单，也没有生成按钮
         self.assertNotIn('name="mode"', body)
         self.assertNotIn('规则兜底生成（离线演示）</button>', body)
         self.assertNotIn('调用大模型生成</button>', body)
+        # 已有大模型版本时不需要“重新生成”
+        self.assertNotIn(reverse('work_rubric_regenerate', args=[self.work.pk]), body)
 
     def test_post_not_allowed(self):
         self.client.force_login(self.teacher)
         response = self.client.post(reverse('work_rubric', args=[self.work.pk]), {})
         self.assertEqual(response.status_code, 405)
+
+    # ---- 规则兜底后的“重新生成” ----
+
+    def _rule_rubric(self):
+        return CourseworkRubric.objects.create(
+            coursework=self.work, markdown='# 规则兜底标准', source='rule'
+        )
+
+    def test_rule_rubric_offers_regenerate_button(self):
+        self._rule_rubric()
+        self.client.force_login(self.teacher)
+        body = self.client.get(reverse('work_rubric', args=[self.work.pk])).content.decode('utf-8')
+        self.assertIn('重新生成', body)
+        self.assertIn(reverse('work_rubric_regenerate', args=[self.work.pk]), body)
+
+    def test_regenerate_requires_post(self):
+        self._rule_rubric()
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse('work_rubric_regenerate', args=[self.work.pk]))
+        self.assertEqual(response.status_code, 405)
+
+    def test_regenerate_without_llm_config_keeps_rule_rubric(self):
+        from school.course_models import CourseworkItem
+
+        CourseworkItem.objects.create(
+            coursework=self.work, function_name='func301', title='合并两个列表', points=100
+        )
+        rubric = self._rule_rubric()
+        self.client.force_login(self.teacher)
+        response = self.client.post(reverse('work_rubric_regenerate', args=[self.work.pk]))
+        self.assertEqual(response.status_code, 302)
+        follow = self.client.get(response['Location'])
+        self.assertContains(follow, '大模型配置')
+        rubric.refresh_from_db()
+        self.assertEqual(rubric.source, 'rule')
+
+    def test_regenerate_uses_current_teacher_config(self):
+        self._rule_rubric()
+        self.client.force_login(self.teacher)
+        with mock.patch.object(
+            rubric_agent_module, 'generate_for', return_value=None
+        ) as generate:
+            response = self.client.post(reverse('work_rubric_regenerate', args=[self.work.pk]))
+        self.assertEqual(response.status_code, 302)
+        generate.assert_called_once()
+        self.assertTrue(generate.call_args.kwargs['force'])
+        self.assertEqual(generate.call_args.kwargs['user'], self.teacher)
+
+    def test_regenerate_requires_edit_permission(self):
+        self._rule_rubric()
+        ClassStaff.objects.create(
+            classroom=self.classroom,
+            user=self.other,
+            role='teacher',
+            can_edit=False,
+            can_view_grades=True,
+        )
+        self.client.force_login(self.other)
+        response = self.client.post(reverse('work_rubric_regenerate', args=[self.work.pk]))
+        self.assertEqual(response.status_code, 403)
 
     # ---- 上传题目文件时的勾选 ----
 

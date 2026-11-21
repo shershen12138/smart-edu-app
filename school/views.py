@@ -26,6 +26,7 @@ from .services import *
 from .storage import read_private, save_private
 from .imports import preview_import, commit_import, HEADERS
 from .teaching import latest_drafts
+from .portal import navigation
 
 
 def form_page(request, title, form, **context):
@@ -77,6 +78,9 @@ def password_view(request):
         audit(user, 'auth.password_change', 'self')
         messages.success(request, '密码已更新。')
         return redirect('dashboard')
+    # 改密页可以从任何页面进入，“取消并返回”回到进入前的那一页
+    navigation.track(request)
+    back_url = navigation.back_target(request, reverse('dashboard'))
     # 与“个人中心”统一版式（大标题 + 白色圆角卡片 + 卡片底部弱提示）。
     # 该版式的侧边栏依赖现行 URL 结构的路由；旧版 URL 结构（legacy_urls，
     # 供回归测试）沿用原版式，避免路由名缺失报错。
@@ -87,12 +91,13 @@ def password_view(request):
             request,
             '修改密码',
             form,
+            back_url,
             description='首次使用需要设置新密码。忘记密码时请联系管理员核验身份后重置。',
         )
     return render(
         request,
         'portal/password.html',
-        {'title': '修改密码', 'form': form, 'back_url': reverse('dashboard')},
+        {'title': '修改密码', 'form': form, 'back_url': back_url},
     )
 
 

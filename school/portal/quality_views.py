@@ -17,6 +17,7 @@ from school.course_models import CourseworkSubmission, QualityReport
 from . import quality_service
 from .access import allowed, role
 from .common_views import page, private_download
+from .navigation import back_target
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +63,9 @@ def quality_report(request, pk):
         report=report,
         detail=report.payload,
         radar_url=reverse('quality_radar', args=[entry.pk]) if report.radar_key else '',
-        back_url=reverse('work', args=[work.pk]),
-        back_label='返回作业',
+        # 报告属于某一次提交，上一级是那份提交的结果页（从作业页进来时会回到作业页）
+        back_url=back_target(request, reverse('entry', args=[entry.pk])),
+        back_label='返回本题结果',
     )
 
 

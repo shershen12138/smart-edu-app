@@ -2,6 +2,7 @@
 
 import io
 import json
+import urllib.error
 from unittest import mock
 
 from django.test import TestCase, override_settings
@@ -16,6 +17,7 @@ from school.portal import llm_client
     ROOT_URLCONF='config.urls',
     REDIS_URL='',
     LLM_TIMEOUT=5,
+    LLM_VERIFY_ON_SAVE=False,
     CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
 )
 class LLMConfigTests(TestCase):
@@ -158,3 +160,102 @@ class LLMConfigTests(TestCase):
         self.assertIn('id="llm-config-dialog"', body)
         self.assertIn('showModal', body)
         self.assertIn(reverse('llm_config'), body)
+        self.assertIn('id="llm-config-error"', body)
+        self.assertIn('data-llm-error-text', body)
+
+
+@override_settings(
+    PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'],
+    ROOT_URLCONF='config.urls',
+    REDIS_URL='',
+    LLM_TIMEOUT=5,
+    LLM_VERIFY_ON_SAVE=True,
+    LLM_VERIFY_TIMEOUT=5,
+    CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}},
+)
+class LLMConfigVerificationTests(TestCase):
+    """保存前先用一次最小请求确认真实可用；失败不落库并回传弹窗文案。"""
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username='teacher',
+            full_name='teacher',
+            student_no='T-001',
+            password='Password-2026!',
+            must_change_password=False,
+        )
+        UserRole.objects.create(user=self.teacher, role='teacher')
+        self.client.force_login(self.teacher)
+
+    def _payload(self, **overrides):
+        payload = {
+            'provider': 'deepseek',
+            'base_url': 'https://api.deepseek.com',
+            'model': 'deepseek-chat',
+            'api_key': 'sk-abcdef0123456789',
+            'next': reverse('works'),
+        }
+        payload.update(overrides)
+        return payload
+
+    def _ok_response(self):
+        return io.BytesIO(json.dumps({'choices': [{'message': {'content': 'p'}}]}).encode())
+
+    def test_verified_config_is_saved(self):
+        with mock.patch('urllib.request.urlopen', return_value=self._ok_response()) as urlopen:
+            response = self.client.post(reverse('llm_config'), self._payload())
+        self.assertRedirects(response, reverse('works'))
+        self.assertEqual(UserLLMConfig.objects.get(user=self.teacher).model, 'deepseek-chat')
+        request = urlopen.call_args.args[0]
+        self.assertTrue(request.full_url.endswith('/chat/completions'))
+
+    def test_invalid_key_returns_popup_error_and_saves_nothing(self):
+        error = urllib.error.HTTPError(
+            'https://api.deepseek.com/chat/completions',
+            401,
+            'Unauthorized',
+            {},
+            io.BytesIO(b'{"error":"invalid api key"}'),
+        )
+        with mock.patch('urllib.request.urlopen', side_effect=error):
+            response = self.client.post(
+                reverse('llm_config'),
+                self._payload(),
+                HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+            )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertFalse(payload['ok'])
+        self.assertIn('API Key', payload['error'])
+        self.assertFalse(UserLLMConfig.objects.filter(user=self.teacher).exists())
+
+    def test_wrong_endpoint_points_at_address(self):
+        error = urllib.error.HTTPError(
+            'https://api.deepseek.com/chat/completions',
+            404,
+            'Not Found',
+            {},
+            io.BytesIO(b'not found'),
+        )
+        with mock.patch('urllib.request.urlopen', side_effect=error):
+            response = self.client.post(
+                reverse('llm_config'),
+                self._payload(),
+                HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('接口地址', response.json()['error'])
+        self.assertFalse(UserLLMConfig.objects.filter(user=self.teacher).exists())
+
+    def test_non_ajax_failure_redirects_without_saving(self):
+        error = urllib.error.HTTPError(
+            'https://api.deepseek.com/chat/completions',
+            401,
+            'Unauthorized',
+            {},
+            io.BytesIO(b'{}'),
+        )
+        with mock.patch('urllib.request.urlopen', side_effect=error):
+            response = self.client.post(reverse('llm_config'), self._payload())
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(UserLLMConfig.objects.filter(user=self.teacher).exists())

@@ -18,7 +18,7 @@
     <div>
       <h2>{{ entry.get_status_display }}</h2>
       <p>
-        {% if entry.status == "done" and entry.coursework.grading_mode == "manual" %}教师已经完成本次人工批阅。{% elif entry.status == "done" %}每题按通过用例数占该题全部用例的比例计分。{% elif entry.status == "review" %}答案ZIP已保存，等待教师人工批阅。{% elif entry.status == "waiting" %}文件已保存，批阅包正在验证或等待关联。{% elif entry.status == "error" %}本次没有生成成绩。批阅服务恢复后可以重试。{% else %}文件已保存，结果会自动更新。{% endif %}
+        {% if entry.status == "done" and entry.coursework.grading_mode == "manual" %}教师已完成本次批阅。{% elif entry.status == "done" %}按通过用例比例计分。{% elif entry.status == "review" %}已保存，等待教师批阅。{% elif entry.status == "waiting" %}已保存，等待批阅。{% elif entry.status == "error" %}本次未生成成绩，可稍后重试。{% else %}已保存，结果会自动更新。{% endif %}
       </p>
     </div>
     <div class="score">
@@ -66,7 +66,7 @@
     <h2 class="space-top">逐题批阅结果</h2>
   {% else %}
     <h2 class="space-top">题目与用例结果</h2>
-    <p class="subtle">点击题目展开用例。{% if show_answers %}教师可查看期望结果和学生实际返回结果；升级前的提交可能没有记录实际结果。{% else %}页面显示测试输入，参考答案不对学生公开。{% endif %}</p>
+    <p class="subtle">{% if show_answers %}可查看期望结果与实际结果。{% else %}只显示测试输入。{% endif %}</p>
   {% endif %}
   {% for q in questions %}
     <details class="card space-bottom"
@@ -86,7 +86,7 @@
             <th>测试输入</th>
             {% if show_answers %}<th>期望结果</th><th>实际结果</th>{% endif %}
             <th>批阅结果</th>
-            <th>耗时（含容器启动）</th>
+            <th>耗时</th>
           </tr>
         </thead>
         <tbody>

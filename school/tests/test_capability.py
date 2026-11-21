@@ -406,16 +406,16 @@ class CapabilityProfileTests(TestCase):
         self.assertEqual(profile.model, '')
         self.assertTrue(profile.payload['summary'])
 
-    def test_no_report_returns_empty_state(self):
+    def test_capability_page_shows_empty_state_without_reports(self):
         self.client.force_login(self.other)
-        response = self.client.get(reverse('practice'))
+        response = self.client.get(reverse('capability'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '综合能力分析')
         self.assertContains(response, '完成一次机器批阅作业后')
 
-    def test_practice_page_renders_capability_module(self):
+    def test_capability_page_renders_module(self):
         self.client.force_login(self.student)
-        response = self.client.get(reverse('practice'))
+        response = self.client.get(reverse('capability'))
         self.assertEqual(response.status_code, 200)
         body = response.content.decode('utf-8')
         self.assertIn('综合能力分析', body)
@@ -427,11 +427,36 @@ class CapabilityProfileTests(TestCase):
         # 来源做成标题旁的状态徽标，任务数/更新时间放在底部信息条
         self.assertIn('capability-source', body)
         self.assertIn('capability-foot-stats', body)
-        # 训练题智能体改为区块标题，弱项达成率带进度条
-        self.assertIn('agent-intro', body)
-        self.assertIn('rate-cell', body)
-        # 侧边栏四个账号入口使用同一套样式（个人中心/修改密码/大模型配置/退出登录）
+        # 四个账号入口使用同一套样式（个人中心/修改密码/大模型配置/退出登录）
         self.assertEqual(body.count('class="sidebar-action"'), 4)
         self.assertTrue(StudentCapabilityProfile.objects.filter(student=self.student).exists())
-        # 综合能力卡片位于知识点画像之前
-        self.assertLess(body.index('综合能力分析'), body.index('知识点画像'))
+
+    def test_capability_is_its_own_sidebar_module(self):
+        """综合能力分析是独立的一级模块，并出现在学生端左侧导航。"""
+        self.client.force_login(self.student)
+        body = self.client.get(reverse('capability')).content.decode('utf-8')
+        self.assertIn(f'href="{reverse("capability")}"', body)
+        self.assertIn(f'href="{reverse("practice")}"', body)
+        self.assertIn(f'href="{reverse("knowledge_map")}"', body)
+
+    def test_practice_page_no_longer_shows_capability_module(self):
+        """综合能力分析已迁移出去，弱项练习只保留训练题。"""
+        self.client.force_login(self.student)
+        response = self.client.get(reverse('practice'))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode('utf-8')
+        # 侧边栏仍有入口文案，但页面内不再有综合能力分析的卡片
+        self.assertNotIn('capability-panel', body)
+        self.assertNotIn('布鲁姆认知水平', body)
+        self.assertNotIn('计算思维水平', body)
+        self.assertIn('个性化训练', body)
+        # 训练题相关区块仍在
+        self.assertIn('agent-intro', body)
+        self.assertIn('rate-cell', body)
+        # 弱项知识点表格限高滚动
+        self.assertIn('weak-scroll', body)
+
+    def test_capability_page_rejects_non_students(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse('capability'))
+        self.assertEqual(response.status_code, 403)

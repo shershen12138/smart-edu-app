@@ -112,6 +112,10 @@ COURSEWORK_SUBMISSION_TIME_MS = int(os.getenv('COURSEWORK_SUBMISSION_TIME_MS', '
 # 填写自己的服务商、接口地址、模型与 API Key（存 UserLLMConfig），
 # 未配置时只能走规则兜底并在结果中标明来源。
 LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', '60'))
+# 保存大模型配置前先发一次最小请求，确认接口地址与 API Key 可用；
+# 失败时不落库，教师端弹出错误弹窗。离线/自动化测试可用环境变量关闭。
+LLM_VERIFY_ON_SAVE = os.getenv('LLM_VERIFY_ON_SAVE', 'true').lower() == 'true'
+LLM_VERIFY_TIMEOUT = float(os.getenv('LLM_VERIFY_TIMEOUT', '20'))
 # 个性化训练：知识点得分率低于该阈值视为弱项，触发训练题智能体出题。
 PRACTICE_WEAK_THRESHOLD = float(os.getenv('PRACTICE_WEAK_THRESHOLD', '0.6'))
 STORE_RECOVERY_PASSWORDS = os.getenv('STORE_RECOVERY_PASSWORDS', '1' if DEBUG else '0') == '1'

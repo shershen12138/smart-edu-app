@@ -2628,3 +2628,132 @@ button[aria-busy="true"] {
     width: 250px;
   }
 }
+
+/* 弱项练习：弱项知识点表最多显示三行，超出上下滚动；表头吸顶 */
+.weak-scroll {
+  max-height: 206px;
+  overflow-y: auto;
+  overflow-x: auto
+}
+
+.weak-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f3f7f3
+}
+
+/* 弱项练习：已掌握知识点收起时只占一行，点三角展开全部 */
+.mastered-details {
+  margin-top: 14px
+}
+
+.mastered-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  min-height: 30px
+}
+
+.mastered-summary::-webkit-details-marker {
+  display: none
+}
+
+.mastered-caret {
+  display: inline-block;
+  flex: none;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--muted);
+  transition: transform .15s ease
+}
+
+.mastered-details[open] .mastered-caret {
+  transform: rotate(90deg)
+}
+
+.mastered-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-width: 0
+}
+
+.mastered-details[open] .mastered-preview {
+  display: none
+}
+
+.mastered-details[open] .mastered-row {
+  margin-top: 10px
+}
+
+.mastered-more {
+  color: var(--muted);
+  background: #f7faf8
+}
+
+/* 训练计划：每个知识点一组，题目卡片两列铺满，宽屏下不再留大片空白 */
+.plan-group {
+  margin-top: 14px
+}
+
+.plan-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none
+}
+
+.plan-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfdfb
+}
+
+.plan-card-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0
+}
+
+.plan-card-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.plan-card .tag,
+.plan-card-action {
+  flex: none
+}
+
+@media (max-width: 720px) {
+  .plan-grid {
+    grid-template-columns: minmax(0, 1fr)
+  }
+}

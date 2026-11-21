@@ -106,8 +106,13 @@ def status_text(user) -> str:
     )
 
 
-def save_config(user, provider: str, base_url: str, model: str, api_key: str) -> UserLLMConfig:
-    """保存/更新当前用户的大模型配置，字段做基本校验。"""
+def normalize_config(
+    user, provider: str, base_url: str, model: str, api_key: str
+) -> dict[str, str]:
+    """校验并归一化一份待保存的配置，返回可直接落库的字段字典。
+
+    只做字段级校验，不写库、不联网，方便调用方先验证再保存。
+    """
     provider = (provider or '').strip() or 'custom'
     if provider not in PROVIDERS:
         provider = 'custom'
@@ -127,20 +132,83 @@ def save_config(user, provider: str, base_url: str, model: str, api_key: str) ->
             raise LLMConfigError('请填写你自己的 API Key。')
         api_key = existing.api_key
 
-    config, _ = UserLLMConfig.objects.update_or_create(
-        user=user,
-        defaults={
-            'provider': provider,
-            'base_url': base_url,
-            'model': model,
-            'api_key': api_key,
-        },
-    )
+    return {'provider': provider, 'base_url': base_url, 'model': model, 'api_key': api_key}
+
+
+def save_values(user, values: dict[str, str]) -> UserLLMConfig:
+    """把 normalize_config 的结果写入当前用户的配置行。"""
+    config, _ = UserLLMConfig.objects.update_or_create(user=user, defaults=values)
     return config
+
+
+def save_config(user, provider: str, base_url: str, model: str, api_key: str) -> UserLLMConfig:
+    """保存/更新当前用户的大模型配置，字段做基本校验。"""
+    return save_values(user, normalize_config(user, provider, base_url, model, api_key))
 
 
 def clear_config(user) -> None:
     UserLLMConfig.objects.filter(user=user).delete()
+
+
+def endpoint_of(base_url: str) -> str:
+    """把用户填写的接口地址补全成对话补全端点。"""
+    base = (base_url or '').rstrip('/')
+    return base if base.endswith('/chat/completions') else base + '/chat/completions'
+
+
+def _request_json(
+    base_url: str, api_key: str, body: dict[str, Any], timeout_seconds: float | None = None
+) -> Any:
+    """向 OpenAI 兼容端点发一次 POST，把网络/HTTP 故障统一转成 LLMError。"""
+    request = urllib.request.Request(
+        endpoint_of(base_url),
+        data=json.dumps(body).encode('utf-8'),
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}',
+        },
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds or timeout()) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode('utf-8', 'replace')[:200]
+        if exc.code in (401, 403):
+            raise LLMError(
+                f'API Key 无效或没有该模型的调用权限（HTTP {exc.code}），请核对后重新填写。{detail}'
+            ) from exc
+        if exc.code == 404:
+            raise LLMError(
+                '接口地址不正确（HTTP 404）：请填写 OpenAI 兼容端点，'
+                f'例如 https://api.deepseek.com 或 https://api.openai.com/v1。{detail}'
+            ) from exc
+        raise LLMError(f'大模型返回 HTTP {exc.code}：{detail}') from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise LLMError(f'无法连接大模型端点：{exc}') from exc
+
+
+def probe_config(values: dict[str, str], timeout_seconds: float | None = None) -> None:
+    """保存前用一次最小请求确认接口地址与 API Key 真的可用。
+
+    只发一个 ``max_tokens=1`` 的问候语，成本可忽略；失败抛 ``LLMError``，
+    调用方据此拒绝保存并提示具体原因。
+    """
+    payload = _request_json(
+        values['base_url'],
+        values['api_key'],
+        {
+            'model': values['model'],
+            'messages': [{'role': 'user', 'content': 'ping'}],
+            'temperature': 0,
+            'max_tokens': 1,
+        },
+        timeout_seconds,
+    )
+    if not isinstance(payload, dict) or 'choices' not in payload:
+        raise LLMError(
+            '端点返回内容不是对话补全格式，请确认接口地址是 OpenAI 兼容端点（通常以 /v1 结尾）。'
+        )
 
 
 def chat(messages: list[dict[str, str]], user, temperature: float = 0.2) -> str:
@@ -150,36 +218,11 @@ def chat(messages: list[dict[str, str]], user, temperature: float = 0.2) -> str:
         raise LLMNotConfigured(
             '当前账号还没有配置大模型。请点击“模型配置”，选择服务商并填写你自己的 API Key。'
         )
-    base = config.base_url
-    url = base if base.endswith('/chat/completions') else base + '/chat/completions'
-    body = json.dumps(
-        {
-            'model': config.model,
-            'messages': messages,
-            'temperature': temperature,
-        }
-    ).encode('utf-8')
-    request = urllib.request.Request(
-        url,
-        data=body,
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {config.api_key}',
-        },
-        method='POST',
+    payload = _request_json(
+        config.base_url,
+        config.api_key,
+        {'model': config.model, 'messages': messages, 'temperature': temperature},
     )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout()) as response:
-            payload: Any = json.loads(response.read().decode('utf-8'))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode('utf-8', 'replace')[:200]
-        if exc.code in (401, 403):
-            raise LLMError(
-                f'大模型返回 HTTP {exc.code}：API Key 无效或无权限，请重新配置。{detail}'
-            ) from exc
-        raise LLMError(f'大模型返回 HTTP {exc.code}：{detail}') from exc
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise LLMError(f'无法连接大模型端点：{exc}') from exc
     try:
         return payload['choices'][0]['message']['content']
     except (KeyError, IndexError, TypeError) as exc:

@@ -665,6 +665,15 @@ class PortalTests(TestCase):
         self.assertContains(dashboard, '最高分')
         self.assertContains(dashboard, '最低分')
 
+    def test_results_page_offers_work_detail_link_before_export(self):
+        response = self.get_as(self.teacher, reverse('work_results', args=[self.work.pk]))
+        body = response.content.decode('utf-8')
+        detail_link = f'href="{reverse("work", args=[self.work.pk])}"'
+        export_link = f'href="{reverse("work_export", args=[self.work.pk])}"'
+        self.assertIn('查看作业', body)
+        self.assertIn(detail_link, body)
+        self.assertLess(body.index(detail_link), body.index(export_link))
+
     def test_grader_failure_is_ungraded_not_zero_and_retry_possible(self):
         entry = self.entry()
         with patch(

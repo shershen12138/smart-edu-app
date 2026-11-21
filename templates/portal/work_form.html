@@ -100,8 +100,7 @@
           {% if work %}
             {% if work.package.archive_path or work.materials_path %}
               <p class="tip space-top">
-                当前作业已有题目文件；不重新上传将保留原文件，切换批阅方式时必须重新上传。
-                只改单个文件可使用右上角“更新单个文件”。
+                不重新上传将保留原文件；只改单个文件可用右上角“更新单个文件”。
               </p>
             {% endif %}
           {% endif %}
@@ -121,11 +120,11 @@
         <section class="card aside-card">
           <h2>上传前检查</h2>
           <ul class="check-list">
-            <li>机器批阅包必须包含题目 DOCX、sample*.py、gold.py、func_info_list.txt 与 data 目录。</li>
-            <li>非机器批阅包包含一份题目 DOCX 和学生所需的数据文件。</li>
-            <li>单个 ZIP 不超过 10 MB，包内路径与文件名不要使用中文以外的特殊字符。</li>
-            <li>已有学生提交后，批阅方式不能再切换。</li>
-            <li>勾选“自动调用大模型生成评分标准”会使用你个人的模型配置，未配置时自动退回规则生成。</li>
+            <li>机器批阅包需含 DOCX、sample*.py、gold.py、func_info_list.txt 与 data/。</li>
+            <li>非机器批阅包需含题目 DOCX 与数据文件。</li>
+            <li>ZIP 不超过 10 MB，文件名避免特殊字符。</li>
+            <li>已有学生提交后不能切换批阅方式。</li>
+            <li>勾选自动生成评分标准会使用你个人的大模型配置。</li>
           </ul>
         </section>
         <section class="card aside-card">
@@ -137,7 +136,7 @@
 ├─ func_info_list.txt
 └─ data/
    └─ func301.txt</pre>
-          <p class="subtle aside-note">gold.py 只用于服务端评测，不会发给学生。</p>
+          <p class="subtle aside-note">gold.py 不会发给学生。</p>
         </section>
       </aside>
     </div>
@@ -145,7 +144,7 @@
     <div class="form-actions">
       <button class="button" type="submit">保存并发布</button>
       <a class="button secondary" href="{{ back_url }}">取消并返回</a>
-      <span class="subtle form-actions-note">保存后学生即可在截止时间前查看与提交。</span>
+      <span class="subtle form-actions-note">保存后学生即可查看与提交。</span>
     </div>
   </form>
 

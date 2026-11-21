@@ -4,9 +4,15 @@
     <div>
       <span class="tag">{{ work.classroom.name }}</span>
       <h1 class="space-top">{{ work.title }} · 评分标准</h1>
-      <p class="subtle">由题目分析智能体生成“考察知识点 + 考察重点（雷达图维度，含五分制量表）”，供后续代码质量评测与雷达图使用。</p>
+      <p class="subtle">由题目分析智能体生成，供代码质量评测与能力雷达图使用。</p>
     </div>
     <div class="actions">
+      {% if can_regenerate %}
+        <form method="post" action="{% url 'work_rubric_regenerate' work.pk %}">
+          {% csrf_token %}
+          <button class="button secondary small" type="submit">重新生成</button>
+        </form>
+      {% endif %}
       {% if rubric %}
         <a class="button secondary small"
            data-no-loading href="{% url 'work_rubric_download' work.pk %}">下载 Markdown</a>
@@ -22,18 +28,19 @@
         <span class="subtle">更新时间：{{ rubric.updated_at|date:'Y-m-d H:i' }}</span>
       </p>
       {% if rubric.source == "llm" %}
-        <p class="subtle">本页内容来自上传题目文件时勾选的“自动调用大模型生成评分标准”（使用你自己的大模型配置）。</p>
+        <p class="subtle">由大模型生成。</p>
       {% else %}
         <p class="tip">
-          本页内容为<strong>规则兜底生成（离线演示）</strong>：上传题目文件时未勾选“自动调用大模型生成评分标准”。
-          规则兜底只依据题库函数名与知识点模板生成，不能当作大模型结论。
+          由规则生成，未调用大模型。
           {% if not llm_configured %}
-            <br>另外你的账号还没有配置大模型，可先点击侧边栏“模型配置”填写自己的 API Key，再重新上传题目文件并勾选该选项。
+            <br>先在侧边栏“模型配置”填写 API Key，再点右上角“重新生成”。
+          {% else %}
+            <br>点右上角“重新生成”可换成大模型版本。
           {% endif %}
         </p>
       {% endif %}
     {% else %}
-      <p class="tip">该作业尚未生成评分标准：若是非机器批阅作业，评分标准不参与批阅；若是机器批阅作业，请重新上传题目文件。</p>
+      <p class="tip">尚未生成评分标准。</p>
     {% endif %}
   </section>
   {% if rubric %}

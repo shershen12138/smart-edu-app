@@ -27,6 +27,7 @@ from . import admin_forms as forms
 from .access import classes_for, require_role, role
 from .account_services import save_person
 from .common_views import csv_response, form_page, link, page, table
+from .navigation import back_target
 from .rosters import students_in, visible_students, with_student_counts
 
 
@@ -85,14 +86,14 @@ def people(request, kind):
         if kind == 'student'
         else []
     )
-    description = '按当前筛选条件统计人数。'
+    description = ''
     if kind == 'student':
         description = (
             f'当前范围：{classroom}，与该班教师名单使用相同人数口径。'
             if classroom
-            else '当前范围：全平台学生账号（含未分班），不等于某一个班级的在班人数。请选择具体教学班核对人数。'
+            else '当前范围：全部学生账号（含未分班）。'
         )
-        description += '停用账号仍保留在班关系，移出班级后才不计入在班人数。'
+        description += '停用账号仍计入在班人数。'
     return table(
         request,
         '教师用户管理' if kind == 'teacher' else '教学班名单管理',
@@ -148,7 +149,7 @@ def person_edit(request, kind, pk=None):
         request,
         ('编辑' if pk else '新建') + ('教师账号' if kind == 'teacher' else '学生账号'),
         form,
-        back,
+        back_target(request, back),
         recovery_password=user.recovery_password
         if user and settings.STORE_RECOVERY_PASSWORDS
         else '',
@@ -176,8 +177,8 @@ def person_delete(request, kind, pk):
         'confirm',
         '删除账号',
         object=user,
-        back_url=back,
-        description='永久删除账号及其学生提交、成绩、文件和班级关系，无法恢复；教师已布置的作业仍归教学班所有。',
+        back_url=back_target(request, back),
+        description='永久删除账号及其提交、成绩和文件，无法恢复。',
     )
 
 
@@ -210,11 +211,11 @@ def teacher_grants(request, pk):
         request,
         f'{user.full_name} · 用户授权',
         form,
-        reverse('teachers'),
+        back_target(request, reverse('teachers')),
         grants=user.teaching.filter(
             classroom__deleted_at__isnull=True, classroom__archived=False
         ).select_related('classroom'),
-        description='选择教学班并勾选权限；再次选择同一班级将覆盖原授权。取消启用即可撤销本班访问。',
+        description='选择教学班并勾选权限，同一班级再次保存会覆盖原授权。',
     )
 
 
@@ -306,7 +307,7 @@ def students_import(request):
         rows=rows,
         ready=bool(rows) and not any(r['error'] for r in rows),
         error=error,
-        back_url=reverse('students'),
+        back_url=back_target(request, reverse('students')),
     )
 
 
@@ -352,7 +353,12 @@ def class_edit(request, pk=None):
         saved = form.save()
         audit(request.user, 'portal.class.save', str(saved.pk))
         return redirect('classes')
-    return form_page(request, '编辑教学班' if pk else '新建教学班', form, reverse('classes'))
+    return form_page(
+        request,
+        '编辑教学班' if pk else '新建教学班',
+        form,
+        back_target(request, reverse('classes')),
+    )
 
 
 @login_required
@@ -372,8 +378,8 @@ def class_delete(request, pk):
         'confirm',
         '删除教学班',
         object=classroom,
-        back_url=reverse('classes'),
-        description='永久删除该班、班级关系、全部作业、提交、成绩及相关文件，无法恢复。学生和教师账号及其他班级数据保留；仅想隐藏请使用归档管理。',
+        back_url=back_target(request, reverse('classes')),
+        description='永久删除该班及其作业、提交、成绩和文件，无法恢复；仅想隐藏请用归档管理。',
     )
 
 
@@ -393,7 +399,7 @@ def class_detail(request, pk):
             if admin
             else [link('查看学生结果', 'student_results', pk, user.pk)],
         },
-        back_url=reverse('classes'),
+        back_url=back_target(request, reverse('classes')),
         extras=[{'label': '维护本班名单', 'url': reverse('students') + f'?classroom={pk}'}]
         if admin
         else [{'label': '本班作业', 'url': reverse('works') + f'?classroom={pk}'}],
@@ -472,8 +478,8 @@ def dictionary_edit(request, pk=None):
         request,
         '编辑字典' if pk else '新建字典',
         form,
-        reverse('dictionaries'),
-        description='course、term 分别用于教学班的课程与学期选项；可以添加其他基础字典备用。',
+        back_target(request, reverse('dictionaries')),
+        description='course、term 用于教学班的课程与学期选项。',
     )
 
 
@@ -509,7 +515,7 @@ def dictionary_delete(request, pk, item_id=None):
         '删除字典项' if item_id else '删除字典',
         object=target.label if item_id else dictionary.name,
         description='删除字典时会同时删除其全部字典项；使用中的数据不能删除。',
-        back_url=back,
+        back_url=back_target(request, back),
     )
 
 
@@ -532,7 +538,7 @@ def dictionary_items(request, pk):
             for i in dictionary.items.all()
         ],
         create=link('新建字典项', 'dictionary_item_new', pk),
-        back_url=reverse('dictionaries'),
+        back_url=back_target(request, reverse('dictionaries')),
     )
 
 
@@ -560,5 +566,5 @@ def dictionary_item_edit(request, pk, item_id=None):
         request,
         '编辑字典项' if item_id else '新建字典项',
         form,
-        reverse('dictionary_items', args=[pk]),
+        back_target(request, reverse('dictionary_items', args=[pk])),
     )

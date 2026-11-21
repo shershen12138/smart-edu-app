@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{{ title|default:'工作台' }} · 课码</title>
-    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261121-2">
+    <link rel="stylesheet" href="{% static 'app.css' %}?v=20261121-14">
     <script src="{% static 'portal.js' %}?v=20261121-1" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
@@ -26,6 +26,7 @@
           </a>
           {% if portal_role == "student" %}
             <a href="{% url 'knowledge_map' %}">知识图谱</a>
+            <a href="{% url 'capability' %}">综合能力分析</a>
           {% endif %}
           {% if portal_role == "admin" %}
             <a href="{% url 'teachers' %}">教师用户与授权</a>
@@ -93,7 +94,7 @@
     {% if user.is_authenticated %}
       <dialog class="modal" id="llm-config-dialog" aria-labelledby="llm-config-title"
               data-reveal-url="{% url 'llm_config_reveal' %}">
-        <form method="post" action="{% url 'llm_config' %}">
+        <form method="post" action="{% url 'llm_config' %}" data-llm-config-form>
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
           <h2 id="llm-config-title">模型配置</h2>
@@ -129,7 +130,7 @@
           <p class="tip">点击输入框、选中或复制 Key 都不会关闭弹窗；按 Enter 也不会误提交，保存请点击“保存配置”按钮。</p>
           <p class="tip">当前用哪家的模型由你决定：支持任何 OpenAI 兼容端点。Key 只用于你自己的调用，页面只回显打码后的值。</p>
           <div class="actions space-top">
-            <button class="button">保存配置</button>
+            <button class="button" data-llm-submit>保存配置</button>
             <button class="button secondary" type="button" data-llm-config-close>取消</button>
           </div>
         </form>
@@ -140,6 +141,13 @@
             <button class="text-button" type="submit">删除我的配置</button>
           </form>
         {% endif %}
+      </dialog>
+      <dialog class="modal" id="llm-config-error" aria-labelledby="llm-config-error-title">
+        <h2 id="llm-config-error-title">大模型配置未生效</h2>
+        <p class="subtle" data-llm-error-text>接口地址或 API Key 校验未通过。</p>
+        <div class="actions space-top">
+          <button class="button" type="button" data-llm-error-close>返回修改</button>
+        </div>
       </dialog>
       <script>
         // 模型配置弹窗逻辑内联在页面里（不依赖静态 JS 的浏览器缓存，避免旧缓存导致点击无反应）
@@ -247,6 +255,61 @@
               event.preventDefault();
               openDialog();
             });
+          });
+
+          // 保存前由服务端发一次最小请求验证接口地址与 Key：失败时弹窗说明原因，配置不落库
+          const form = dialog.querySelector('[data-llm-config-form]');
+          const errorDialog = document.getElementById('llm-config-error');
+          const errorText = errorDialog?.querySelector('[data-llm-error-text]');
+          const submitButton = form?.querySelector('[data-llm-submit]');
+
+          const showError = (message) => {
+            if (!errorDialog) {
+              window.alert(message);
+              return;
+            }
+            if (errorText) errorText.textContent = message;
+            if (typeof errorDialog.showModal === 'function') {
+              if (!errorDialog.open) errorDialog.showModal();
+            } else {
+              errorDialog.setAttribute('open', 'open');
+            }
+          };
+
+          errorDialog
+            ?.querySelector('[data-llm-error-close]')
+            ?.addEventListener('click', () => errorDialog.close());
+
+          form?.addEventListener('submit', async (event) => {
+            // 极旧浏览器没有 fetch/FormData 时交回原生提交（服务端仍会校验）
+            if (!window.fetch || !window.FormData) return;
+            event.preventDefault();
+            const original = submitButton ? submitButton.textContent : '';
+            if (submitButton) {
+              submitButton.disabled = true;
+              submitButton.textContent = '正在校验接口…';
+            }
+            try {
+              const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+              });
+              const data = await response.json().catch(() => ({}));
+              if (response.ok && data.ok) {
+                window.location.assign(data.next || window.location.href);
+                return;
+              }
+              showError(data.error || '保存失败，请稍后重试。');
+            } catch (error) {
+              showError('无法提交大模型配置，请检查网络连接后重试。');
+            } finally {
+              if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = original;
+              }
+            }
           });
         })();
       </script>

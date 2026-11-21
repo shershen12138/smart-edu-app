@@ -20,6 +20,7 @@ from . import rubric_agent
 from .access import allowed, classes_for, role
 from .common_views import csv_response, form_page, link, page, safe_csv, table, work_for
 from .coursework_services import save_work
+from .navigation import back_target
 from .package_update_services import (
     create_package_update,
     package_update_display,
@@ -142,10 +143,10 @@ def work_edit(request, pk=None):
         request,
         '修改作业' if pk else '上传题目文件',
         form,
-        reverse('works'),
+        back_target(request, reverse('works')),
         template='work_form',
         work=work,
-        description='先选择机器批阅或非机器批阅。机器批阅上传机器批阅包；非机器批阅上传包含题目DOCX和数据文件的ZIP。',
+        description='选择批阅方式并上传题目 ZIP。',
         secondary_action=(
             link('更新单个文件', 'work_package_file', work.pk)
             if work
@@ -170,7 +171,7 @@ class AutomaticPackageStrategy:
         return package_member_choices(archive)
 
     def description(self):
-        return '只有修改Word说明文档不重评；修改sample.py或其他批阅文件时，验证通过后重新批阅已有提交。'
+        return '改说明文档不重评；改批阅文件验证通过后重新批阅。'
 
     def success_message(self, update):
         if update.status == 'activated':
@@ -194,7 +195,7 @@ class ManualPackageStrategy:
         return manual_member_choices(archive)
 
     def description(self):
-        return '非机器批阅材料更新后直接生效，不调用Docker，也不改动已有人工成绩。'
+        return '更新后直接生效，不改动已有人工成绩。'
 
     def success_message(self, update):
         if update.status == 'activated' and not update.grading_changed:
@@ -248,8 +249,8 @@ def work_package_file(request, pk):
         request,
         '更新批阅包中的单个文件',
         form,
-        reverse('work', args=[pk]),
-        description='选择原ZIP中的文件并上传替代文件。系统会生成新版本，不会直接修改原ZIP。'
+        back_target(request, reverse('work', args=[pk])),
+        description='选择原 ZIP 中的文件并上传替代文件，系统会生成新版本。'
         + strategy.description(),
     )
 
@@ -288,8 +289,8 @@ def work_delete(request, pk):
         'confirm',
         '删除作业',
         object=work.title,
-        back_url=reverse('work', args=[pk]),
-        description='永久删除本作业、所有学生提交、批阅结果和相关文件，无法恢复。其他作业仍在使用的批阅包会保留。',
+        back_url=back_target(request, reverse('work', args=[pk])),
+        description='永久删除本作业及其提交、成绩和文件，无法恢复。',
     )
 
 
@@ -330,7 +331,7 @@ def results(request):
         classrooms=classes_for(request.user, 'view_grades'),
         filter_class=True,
         selected_class=selected,
-        description='统计当前在班学生的最后一次提交。未提交、等待批阅及服务异常不计入均分；成绩无需再次发布。',
+        description='统计在班学生最后一次提交，未出分的不计入均分。',
     )
 
 
@@ -384,7 +385,7 @@ def work_results(request, pk, export=False):
         distribution_graded_count=graded_count,
         package_update_alert=package_update_alert,
         export=allowed(request.user, work.classroom, 'export'),
-        back_url=reverse('results'),
+        back_url=back_target(request, reverse('results')),
     )
 
 
@@ -416,5 +417,5 @@ def student_results(request, class_id, student_id):
         f'{student.full_name} · {student.student_no}',
         ['作业', '状态', '得分'],
         rows,
-        back_url=reverse('class_detail', args=[class_id]),
+        back_url=back_target(request, reverse('class_detail', args=[class_id])),
     )

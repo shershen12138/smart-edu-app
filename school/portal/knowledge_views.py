@@ -9,6 +9,7 @@ from django.views.decorators.http import require_http_methods
 from . import knowledge_graph
 from .access import require_role
 from .common_views import page
+from .navigation import back_target
 
 
 @login_required
@@ -25,5 +26,5 @@ def knowledge_map(request):
         hub_total=sum(1 for node in graph['nodes'] if node['level'] == 2),
         point_total=sum(1 for node in graph['nodes'] if node['level'] >= 3),
         edge_total=len(graph['edges']),
-        back_url=reverse('dashboard'),
+        back_url=back_target(request, reverse('dashboard')),
     )

@@ -3,162 +3,9 @@
   <div class="page-heading split">
     <div>
       <h1>个性化训练</h1>
-      <p class="subtle">按任务分析你第一次提交的评测报告逐题缺陷，定位弱项知识点并生成对应训练题；训练题不计入正式成绩。</p>
+      <p class="subtle">按任务定位弱项知识点并生成训练题，不计入正式成绩。</p>
     </div>
   </div>
-
-  <section class="card capability-panel{% if capability.ready %} has-foot{% endif %} space-bottom" id="capability">
-    <div class="capability-head">
-      <div class="capability-heading">
-        <div class="capability-title">
-          <h2>综合能力分析</h2>
-          {% if capability.ready %}
-            <span class="capability-source{% if capability.source == 'llm' %} is-llm{% endif %}">
-              <span class="capability-source-dot" aria-hidden="true"></span>{{ capability.source_note }}
-            </span>
-          {% endif %}
-        </div>
-        <p class="subtle capability-lead">
-          汇总你所有机器批阅任务的评测报告错误点与提交代码：分数由逐题得分率按分值加权计算，
-          诊断说明由你自己配置的大模型生成；未被考察的维度只标注样本不足，不记 0 分。
-        </p>
-      </div>
-    </div>
-
-    {% if capability.ready %}
-      {% if capability.refreshing %}
-        <p class="tip space-top">检测到新的评测数据，正在后台重新分析；下面是上一次的结果，稍后刷新即可看到更新。</p>
-      {% endif %}
-      <div class="capability-grid space-top">
-        <div>
-          <h3>布鲁姆认知水平</h3>
-          {% if capability.radar.width %}
-            <div class="radar-figure" data-radar>
-              <svg viewBox="0 0 {{ capability.radar.width }} {{ capability.radar.height }}"
-                   role="img"
-                   aria-label="你的布鲁姆认知水平六维雷达图">
-                {% for ring in capability.radar.rings %}
-                  <polygon class="radar-ring" points="{{ ring }}" />
-                {% endfor %}
-                {% for axis in capability.radar.axes %}
-                  <line class="radar-spoke"
-                        x1="{{ capability.radar.center_x }}" y1="{{ capability.radar.center_y }}"
-                        x2="{{ axis.x }}" y2="{{ axis.y }}" />
-                {% endfor %}
-                <polygon class="radar-area" points="{{ capability.radar.polygon }}" />
-                {% for axis in capability.radar.axes %}
-                  <g class="radar-axis" tabindex="0" role="button"
-                     aria-label="{{ axis.label }} {% if axis.covered %}{{ axis.score }} 分{% else %}暂无数据{% endif %}"
-                     data-label="{{ axis.label }}"
-                     data-score="{{ axis.score }}"
-                     data-level="{{ axis.level }}"
-                     data-weight="{{ axis.weight }}"
-                     data-coverage="{{ axis.coverage_percent|floatformat:0 }}"
-                     data-covered="{% if axis.covered %}1{% else %}0{% endif %}">
-                    <circle class="radar-point" cx="{{ axis.x }}" cy="{{ axis.y }}" r="4.5" />
-                    <text class="radar-label" x="{{ axis.label_x }}" y="{{ axis.label_y }}"
-                          text-anchor="{{ axis.anchor }}">{{ axis.label }}</text>
-                    <text class="radar-value" x="{{ axis.label_x }}" y="{{ axis.value_y }}"
-                          text-anchor="{{ axis.anchor }}">
-                      {% if axis.covered %}{{ axis.score|floatformat:"-1" }} 分{% else %}暂无数据{% endif %}
-                    </text>
-                  </g>
-                {% endfor %}
-              </svg>
-              <div class="radar-tooltip" role="status" hidden></div>
-            </div>
-          {% else %}
-            <p class="tip">雷达图暂不可用，下面的维度分数与证据不受影响。</p>
-          {% endif %}
-          <ul class="capability-legend">
-            {% for row in capability.bloom %}
-              <li>
-                <span class="tag">{{ row.label }}</span>
-                {% if row.covered %}
-                  <strong>{{ row.score|floatformat:"-1" }}</strong> 分 · {{ row.level }} {{ row.level_label }}
-                {% else %}
-                  暂无数据
-                {% endif %}
-                <span class="subtle">{{ row.coverage_text }}</span>
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-
-        <div>
-          <h3>计算思维水平</h3>
-          <div class="capability-cards">
-            {% for card in capability.thinking %}
-              <article class="capability-card">
-                <header>
-                  <span>{{ card.label }}</span>
-                  <strong>{% if card.covered %}{{ card.score|floatformat:"-1" }}{% else %}—{% endif %}</strong>
-                </header>
-                <div class="capability-meter" role="img"
-                     aria-label="{{ card.label }}{% if card.covered %} {{ card.score|floatformat:'-1' }} 分{% else %} 暂无数据{% endif %}">
-                  <span style="width: {% if card.covered %}{{ card.percent|floatformat:0 }}{% else %}0{% endif %}%"></span>
-                </div>
-                <p class="subtle">
-                  {% if card.covered %}
-                    {{ card.level }} · {{ card.level_label }} · {{ card.coverage_text }}
-                  {% else %}
-                    暂无该维度的判题记录
-                  {% endif %}
-                </p>
-                {% if card.evidence %}
-                  <p class="capability-evidence">{{ card.evidence|join:"；" }}</p>
-                {% endif %}
-              </article>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-
-      {% if capability.summary %}
-        <div class="capability-diagnosis space-top">
-          <h3>诊断摘要</h3>
-          <ul>
-            {% for line in capability.summary %}<li>{{ line }}</li>{% endfor %}
-          </ul>
-          {% if capability.suggestion %}<p class="subtle">{{ capability.suggestion }}</p>{% endif %}
-        </div>
-      {% endif %}
-
-      {% if capability.observations %}
-        <details class="capability-observations space-top">
-          <summary>代码证据与改进建议（{{ capability.observations|length }} 条）</summary>
-          <ul>
-            {% for item in capability.observations %}
-              <li>
-                <span class="tag">{{ item.dimension_label }}</span>
-                <code>{{ item.task_id }}{% if item.line %} 第 {{ item.line }} 行{% endif %}</code>
-                {% if item.quote %}<p class="capability-quote">{{ item.quote }}</p>{% endif %}
-                <p>{{ item.comment }}{% if item.advice %} 建议：{{ item.advice }}{% endif %}</p>
-              </li>
-            {% endfor %}
-          </ul>
-        </details>
-      {% endif %}
-
-      <footer class="capability-foot">
-        <div class="capability-foot-stats">
-          <span><strong>{{ capability.works }}</strong> 个任务</span>
-          <span><strong>{{ capability.graded_tasks }}</strong> 题有判题记录</span>
-          {% if capability.updated_at %}<span>更新于 {{ capability.updated_at|date:"m-d H:i" }}</span>{% endif %}
-        </div>
-        {% if capability.code_facts.files %}
-          <p class="capability-foot-code">
-            代码结构：{{ capability.code_facts.files }} 份提交 · {{ capability.code_facts.lines }} 行 ·
-            自定义函数 {{ capability.code_facts.functions }} · 类 {{ capability.code_facts.classes }} ·
-            推导式 {{ capability.code_facts.comprehensions }} · 最大嵌套 {{ capability.code_facts.max_depth }} 层 ·
-            魔法数字 {{ capability.code_facts.magic_numbers }} 处
-          </p>
-        {% endif %}
-      </footer>
-    {% else %}
-      <p class="tip space-top">{{ capability.empty_reason }}</p>
-    {% endif %}
-  </section>
 
   {% if tasks %}
     <section class="agent-intro space-bottom">
@@ -181,11 +28,7 @@
         </p>
       {% endif %}
       {% if any_weak and not bank_ready %}
-        <p class="tip space-top">
-          <strong>“根据现有题库生成训练题”为什么会失败：</strong>该按钮只从题库挑选
-          带测试用例、且知识点标签或题名能对应你弱项关键词的现成题目，不会自己编题。
-          若某个任务的题库没有覆盖它的弱项知识点，点击后会提示“题库中没有匹配弱项知识点的现成题”。
-        </p>
+        <p class="tip space-top">题库中没有匹配该任务弱项知识点的现成题目。</p>
       {% endif %}
     </section>
 
@@ -200,7 +43,7 @@
           {% endif %}
         </div>
         {% if section.weak %}
-          <div class="table-card">
+          <div class="table-card weak-scroll">
             <table>
               <thead>
                 <tr><th>弱项知识点</th><th>达成率</th><th>达成 / 判定</th><th>出现题数</th></tr>
@@ -228,12 +71,25 @@
           <p class="tip space-top">该任务第一次提交的评测报告里没有得分率偏低的弱项知识点。</p>
         {% endif %}
         {% if section.mastered %}
-          <div class="mastered-row">
-            <span class="mastered-label">已掌握</span>
-            {% for item in section.mastered %}
-              <span class="chip">{{ item.name }} <b>{{ item.percent }}%</b></span>
-            {% endfor %}
-          </div>
+          <details class="mastered-details">
+            <summary class="mastered-summary">
+              <span class="mastered-caret" aria-hidden="true">▶</span>
+              <span class="mastered-label">已掌握 {{ section.mastered|length }} 个</span>
+              <span class="mastered-preview">
+                {% for item in section.mastered|slice:":5" %}
+                  <span class="chip">{{ item.name }} <b>{{ item.percent }}%</b></span>
+                {% endfor %}
+                {% if section.mastered|length > 5 %}
+                  <span class="chip mastered-more">+{{ section.mastered|length|add:"-5" }}</span>
+                {% endif %}
+              </span>
+            </summary>
+            <div class="mastered-row">
+              {% for item in section.mastered %}
+                <span class="chip">{{ item.name }} <b>{{ item.percent }}%</b></span>
+              {% endfor %}
+            </div>
+          </details>
         {% endif %}
 
         <div class="actions space-top">
@@ -249,7 +105,7 @@
                         disabled
                         title="不可用：该任务没有得分率偏低的弱项知识点"
                       {% endif %}
-              >为该任务调用大模型生成训练题</button>
+              >调用大模型生成训练题</button>
             {% endif %}
           </form>
           <form method="post" data-loading="正在从现有题库挑选训练题…">
@@ -262,7 +118,7 @@
                 disabled
                 title="不可用：该任务没有得分率偏低的弱项知识点"
               {% endif %}
-            >根据现有题库为该任务生成训练题</button>
+            >根据现有题库生成训练题</button>
           </form>
         </div>
 
@@ -273,20 +129,23 @@
             <span class="subtle">生成时间：{{ section.plan.created_at|date:'Y-m-d H:i' }}</span>
           </div>
           {% for point, problems in section.grouped.items %}
-            <table>
-              <thead>
-                <tr><th>{{ point }}</th><th>难度</th><th>操作</th></tr>
-              </thead>
-              <tbody>
+            <div class="plan-group">
+              <h4 class="plan-group-title">
+                {{ point }}
+                <span class="tag">{{ problems|length }} 题</span>
+              </h4>
+              <ul class="plan-grid">
                 {% for problem in problems %}
-                  <tr>
-                    <td>{{ problem.title }}</td>
-                    <td>{{ problem.difficulty }}</td>
-                    <td><a href="{% url 'practice_problem' problem.pk %}">开始练习</a></td>
-                  </tr>
+                  <li class="plan-card">
+                    <div class="plan-card-main">
+                      <p class="plan-card-title">{{ problem.title }}</p>
+                      <span class="tag {% if problem.difficulty == '进阶' %}amber{% endif %}">{{ problem.difficulty }}</span>
+                    </div>
+                    <a class="button secondary small plan-card-action" href="{% url 'practice_problem' problem.pk %}">开始练习</a>
+                  </li>
                 {% endfor %}
-              </tbody>
-            </table>
+              </ul>
+            </div>
           {% empty %}
             <p class="tip">该任务本次计划没有可用题目。</p>
           {% endfor %}
@@ -296,11 +155,7 @@
   {% else %}
     <section class="card space-bottom">
       <h2>知识点画像</h2>
-      <p class="tip space-top">
-        当前没有得分率偏低的弱项知识点。画像依据各任务<strong>第一次提交的评测报告逐题明细</strong>：
-        报告里机器判定的知识点缺陷会归到《Python教学Tag库》对应的知识点，每个任务的弱项各不一样。
-        完成作业并生成评测报告后，画像会自动更新。
-      </p>
+      <p class="tip space-top">当前没有得分率偏低的弱项知识点，完成作业后自动更新。</p>
     </section>
   {% endif %}
 {% endblock %}

@@ -30,6 +30,11 @@ urlpatterns = [
         rubric_views.work_rubric_download,
         name='work_rubric_download',
     ),
+    path(
+        'work/<int:pk>/rubric/regenerate/',
+        rubric_views.work_rubric_regenerate,
+        name='work_rubric_regenerate',
+    ),
     path('work/<int:pk>/package-file/', views.work_package_file, name='work_package_file'),
     path('work/<int:pk>/package-retry/', views.work_package_retry, name='work_package_retry'),
     path('work/<int:pk>/delete/', views.work_delete, name='work_delete'),

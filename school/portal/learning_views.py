@@ -16,6 +16,7 @@ from . import learning_forms as forms
 from . import quality_service
 from .access import allowed, role
 from .common_views import page, private_download, work_for
+from .navigation import back_target
 from .package_update_services import package_update_display
 from .parsers import parse_manual_submission_archive
 from .result_display import result_text
@@ -68,7 +69,7 @@ def work_detail(request, pk):
         package_update_history=package_update_history,
         can_results=allowed(request.user, work.classroom, 'view_grades'),
         open=work.opens_at <= timezone.now() <= work.deadline,
-        back_url=reverse('dashboard' if student else 'works'),
+        back_url=back_target(request, reverse('dashboard' if student else 'works')),
     )
 
 
@@ -157,9 +158,12 @@ def entry_detail(request, pk, download=False):
         grade_form=grade_form,
         can_grade=can_grade,
         can_report=quality_service.supported(entry),
-        back_url=reverse('work', args=[entry.coursework_id])
-        if role(request.user) == 'student'
-        else reverse('work_results', args=[entry.coursework_id]),
+        back_url=back_target(
+            request,
+            reverse('work', args=[entry.coursework_id])
+            if role(request.user) == 'student'
+            else reverse('work_results', args=[entry.coursework_id]),
+        ),
         can_retry=role(request.user) in ('teacher', 'admin')
         and entry.status == 'error'
         and allowed(request.user, entry.coursework.classroom, 'edit'),

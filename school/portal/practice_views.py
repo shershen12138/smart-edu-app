@@ -18,11 +18,14 @@ from school.judge import InfrastructureError
 from school.models import Classroom
 from school.storage import read_private, save_private
 
-from . import capability_service, knowledge_profile, practice_agent
+from . import knowledge_profile, practice_agent
 from .access import allowed, classes_for, require_role, role
 from .common_views import page
+from .navigation import back_target
 from .practice_agent import LLMNotConfigured, PracticeParseError
 from .rubric_agent import LLMError
+
+logger = logging.getLogger(__name__)
 
 
 class PracticeSubmitForm(forms.Form):
@@ -74,8 +77,8 @@ def _sample_cases(problem):
 def _case_text(key):
     try:
         return read_private(key)
-    except Exception:  # noqa: BLE001 -- 展示层兜底：读不到用例文件时留空
-        logging.getLogger(__name__).warning('读取训练题用例文件失败 key=%s', key, exc_info=True)
+    except Exception:
+        logger.warning('读取训练题用例文件失败 key=%s', key, exc_info=True)
         return ''
 
 
@@ -85,20 +88,6 @@ def _grouped_problems(plan):
     for problem in problems:
         grouped.setdefault(problem.knowledge_point, []).append(problem)
     return grouped
-
-
-def _capability_context(student):
-    """综合能力画像失败时降级为空态，不能让弱项分析页整体 500。"""
-    try:
-        return capability_service.view_model(student)
-    except Exception:
-        logger.warning('综合能力画像生成失败 student=%s', student.pk, exc_info=True)
-        return {
-            'ready': False,
-            'refreshing': False,
-            'llm_ready': False,
-            'empty_reason': '综合能力分析暂时不可用，请稍后刷新重试。',
-        }
 
 
 @login_required
@@ -165,8 +154,7 @@ def practice_home(request):
         llm_ready=practice_agent.llm_configured(request.user),
         llm_status=practice_agent.status_text(request.user),
         bank_ready=practice_agent.bank_matches_exist(merged_weak),
-        capability=_capability_context(request.user),
-        back_url=reverse('dashboard'),
+        back_url=back_target(request, reverse('dashboard')),
     )
 
 
@@ -184,7 +172,7 @@ def practice_problem(request, pk):
         samples=_sample_cases(problem),
         attempts=attempts,
         form=form,
-        back_url=reverse('practice'),
+        back_url=back_target(request, reverse('practice')),
         back_label='返回训练计划',
     )
 
@@ -272,7 +260,7 @@ def practice_result(request, pk):
         samples=_sample_cases(attempt.problem),
         cases=_result_cases(attempt),
         retry_url=reverse('practice_problem', args=[attempt.problem_id]),
-        back_url=reverse('practice_problem', args=[attempt.problem_id]),
+        back_url=back_target(request, reverse('practice_problem', args=[attempt.problem_id])),
         back_label='返回题目',
     )
 
@@ -296,5 +284,5 @@ def practice_overview(request, class_id):
         classroom=classroom,
         summary=summary,
         students=students,
-        back_url=reverse('results'),
+        back_url=back_target(request, reverse('class_detail', args=[classroom.pk])),
     )

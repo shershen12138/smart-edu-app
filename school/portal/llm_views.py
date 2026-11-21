@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -24,27 +25,54 @@ def _next_url(request) -> str:
     return reverse('dashboard')
 
 
+def _wants_json(request) -> bool:
+    """弹窗用 fetch 提交时返回 JSON，浏览器原生提交时保持重定向。"""
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
+def _failure(request, message: str, wants_json: bool):
+    messages.error(request, message)
+    if wants_json:
+        return JsonResponse({'ok': False, 'error': message}, status=400)
+    return redirect(_next_url(request))
+
+
 @login_required
 @require_http_methods(['POST'])
 def llm_config(request):
-    """保存当前用户的模型配置（个人 Key 只写入自己的账号）。"""
+    """保存当前用户的模型配置（个人 Key 只写入自己的账号）。
+
+    保存前先发一次最小请求：接口地址写错、Key 无效或端点不可达时不落库，
+    通过弹窗把具体原因告诉教师，避免"保存成功但用不了"。
+    """
+    wants_json = _wants_json(request)
     try:
-        config = llm_client.save_config(
+        values = llm_client.normalize_config(
             request.user,
             request.POST.get('provider', ''),
             request.POST.get('base_url', ''),
             request.POST.get('model', ''),
             request.POST.get('api_key', ''),
         )
+        if getattr(settings, 'LLM_VERIFY_ON_SAVE', True):
+            llm_client.probe_config(
+                values, getattr(settings, 'LLM_VERIFY_TIMEOUT', None)
+            )
+        config = llm_client.save_values(request.user, values)
     except llm_client.LLMConfigError as exc:
-        messages.error(request, f'模型配置未保存：{exc}')
-    else:
-        messages.success(
-            request,
-            f'已保存你的模型配置：{config.model} @ {llm_client.host_of(config.base_url)}'
-            f'（Key {llm_client.mask_key(config.api_key)}），仅对当前账号生效。',
-        )
-    return redirect(_next_url(request))
+        return _failure(request, f'模型配置未保存：{exc}', wants_json)
+    except llm_client.LLMError as exc:
+        return _failure(request, f'接口地址或 API Key 校验未通过：{exc}', wants_json)
+
+    message = (
+        f'已保存你的模型配置：{config.model} @ {llm_client.host_of(config.base_url)}'
+        f'（Key {llm_client.mask_key(config.api_key)}），仅对当前账号生效。'
+    )
+    messages.success(request, message)
+    target = _next_url(request)
+    if wants_json:
+        return JsonResponse({'ok': True, 'next': target, 'message': message})
+    return redirect(target)
 
 
 @login_required

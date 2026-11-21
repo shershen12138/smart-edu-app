@@ -5,11 +5,14 @@
       <h1>{{ title }}</h1>
       <p>{{ work.classroom.name }} · 以当前在班学生的最后一次提交统计，未批阅不计入均分。</p>
     </div>
-    {% if export %}
-      <div class="actions"><a class="button" href="{% url 'work_export' work.pk %}">导出 CSV 报表</a>
-      <a class="button secondary"
-   data-no-loading href="{% url 'work_submissions_download' work.pk %}">打包下载作业（每人最后一次）</a></div>
-    {% endif %}
+    <div class="actions">
+      <a class="button" href="{% url 'work' work.pk %}">查看作业</a>
+      {% if export %}
+        <a class="button" href="{% url 'work_export' work.pk %}">导出 CSV 报表</a>
+        <a class="button secondary"
+           data-no-loading href="{% url 'work_submissions_download' work.pk %}">打包下载作业（每人最后一次）</a>
+      {% endif %}
+    </div>
   </div>
   {% include "portal/package_update_status.html" %}
   {% include "portal/stats.html" %}

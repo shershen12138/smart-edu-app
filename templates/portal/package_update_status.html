@@ -1,10 +1,10 @@
 {% if package_update_alert %}
   {% with update=package_update_alert progress=package_update_alert.regrade_progress %}
     {% if update.status == 'pending' or update.status == 'validating' %}
-      <p class="tip" data-refresh="10000">单文件更新“{{ update.changed_path }}”正在等待 Docker 验证；旧版本和旧成绩仍在使用。</p>
+      <p class="tip" data-refresh="10000">“{{ update.changed_path }}”正在验证，旧版本和成绩暂不变。</p>
     {% elif update.status == 'error' %}
       <div class="tip">
-        <p>单文件更新“{{ update.changed_path }}”验证失败：{{ update.error }} 旧版本和旧成绩未改变。</p>
+        <p>“{{ update.changed_path }}”验证失败：{{ update.error }}</p>
         {% if can_retry_package %}
           <form method="post" action="{% url 'work_package_retry' work.pk %}"
                 data-loading="正在重新验证批阅包…">
@@ -13,9 +13,9 @@
         {% endif %}
       </div>
     {% elif progress.remaining %}
-      <p class="tip" data-refresh="10000">新版本“{{ update.changed_path }}”已生效，重评进度：成功 {{ progress.success }} / {{ progress.total }}，剩余 {{ progress.remaining }}，失败 {{ progress.failed }}。</p>
+      <p class="tip" data-refresh="10000">“{{ update.changed_path }}”已生效，重评进度：成功 {{ progress.success }} / {{ progress.total }}，剩余 {{ progress.remaining }}，失败 {{ progress.failed }}。</p>
     {% elif progress.failed %}
-      <p class="tip">本次重新批阅已经结束：成功 {{ progress.success }} / {{ progress.total }}，失败 {{ progress.failed }}。请在班级结果中查看并重试失败提交。</p>
+      <p class="tip">重评结束：成功 {{ progress.success }} / {{ progress.total }}，失败 {{ progress.failed }}。可在班级结果中重试失败提交。</p>
     {% endif %}
   {% endwith %}
 {% endif %}
@@ -36,7 +36,7 @@
                 <td>
                   {% if update.status == 'error' %}{{ update.error }}
                   {% elif update.status != 'activated' %}—
-                  {% elif work.grading_mode == 'manual' %}材料已更新，无需调用 Docker 或重新批阅
+                  {% elif work.grading_mode == 'manual' %}材料已更新，无需重评
                   {% elif not update.grading_changed %}仅说明文档变化，无需重评
                   {% elif not progress.total %}没有历史提交需要重评
                   {% elif progress.remaining %}成功 {{ progress.success }}/{{ progress.total }}，剩余 {{ progress.remaining }}，失败 {{ progress.failed }}

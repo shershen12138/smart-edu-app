@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from school.models import Coursework, DataDictionary, User
 
+from . import navigation
 from .access import allowed, classes_for, role
 from .pagination import pagination
 from .reporting_services import roster_rows
@@ -17,6 +18,10 @@ from .rosters import visible_students
 
 
 def page(request, template, title, **context):
+    # 记录访问链，“返回”按钮据此回到真正点进来的上一页；
+    # 没显式给上一级的页面（各模块的列表页）统一退回工作台
+    navigation.track(request)
+    context.setdefault('back_url', navigation.back_target(request, reverse('dashboard')))
     return render(request, 'portal/' + template + '.html', {'title': title, **context})
 
 
@@ -88,7 +93,9 @@ def csv_response(content, filename):
 
 @login_required
 def profile(request):
-    return page(request, 'profile', '个人中心', back_url=reverse('dashboard'))
+    return page(
+        request, 'profile', '个人中心', back_url=navigation.back_target(request, reverse('dashboard'))
+    )
 
 
 @login_required

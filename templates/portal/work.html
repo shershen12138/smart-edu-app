@@ -56,13 +56,13 @@
   </section>
   {% include "portal/package_update_status.html" with can_retry_package=True show_package_update_history=True %}
   {% if work.grading_mode == 'manual' %}
-    <p class="tip">本作业由教师人工批阅。学生提交后会显示“待教师批阅”。</p>
+    <p class="tip">教师人工批阅，提交后显示“待批阅”。</p>
   {% elif not work.package.reference_path %}
-    <p class="tip">本作业可收取 Python 文件，自动批阅程序尚待关联；提交后不会生成虚假分数。</p>
+    <p class="tip">自动批阅尚未配置，提交后暂不出分。</p>
   {% elif work.package.status == "pending" or work.package.status == "validating" %}
-    <p class="tip">完整批阅包已保存，正在 Docker 中验证标准答案；验证通过后等待中的提交会自动进入批阅。</p>
+    <p class="tip">正在验证批阅包，通过后自动开始批阅。</p>
   {% elif work.package.status == "error" %}
-    <p class="tip">批阅包验证失败：{{ work.package.validation_error }}。学生文件仍会保存，但暂不生成成绩。</p>
+    <p class="tip">批阅包验证失败：{{ work.package.validation_error }}</p>
   {% endif %}
   {% if work.items.all %}
     <details class="card space-bottom">
@@ -89,9 +89,9 @@
     <section class="card form-card">
       <h2>提交 Python 作业</h2>
       {% if work.grading_mode == 'manual' %}
-        <p class="subtle"><strong>请上传包含 `1001.py` 至 `1005.py` 的ZIP文件。教师提供的数据文件和程序生成的结果文件无需提交。</strong></p>
+        <p class="subtle"><strong>请上传包含 `1001.py` 至 `1005.py` 的ZIP文件。</strong></p>
       {% else %}
-        <p class="subtle">请上传一个 UTF-8 编码的 Python 文件。文件名不限，但不得修改题目规定的函数名和参数。重新提交会覆盖看板中的当前成绩，历史提交仍可查看。</p>
+        <p class="subtle">请上传 UTF-8 编码的 .py 文件，不要修改题目规定的函数名。以最后一次提交为准。</p>
       {% endif %}
       {% if open %}
         <form method="post" enctype="multipart/form-data" data-loading="正在上传并提交作业…">
